@@ -54,67 +54,7 @@ from components.dashboard_cards import (
     factory_status,
     notification
 )
-
-st.subheader(
-    "🏭 Factory Control Centre"
-)
-
-
-status1, status2 = st.columns(2)
-
-
-with status1:
-
-    factory_status(
-        "Milling Line 1",
-        "Running"
-    )
-
-    factory_status(
-        "Milling Line 2",
-        "Running"
-    )
-
-    factory_status(
-        "Packaging Line",
-        "Warning"
-    )
-
-
-with status2:
-
-    factory_status(
-        "Raw Material Warehouse",
-        "Running"
-    )
-
-    factory_status(
-        "Dispatch Yard",
-        "Running"
-    )
-
-    factory_status(
-        "Maintenance",
-        "Warning"
-    )
-
-st.subheader(
-    "🔔 Notifications"
-)
-
-
-alerts = [
-    "New maize delivery expected today",
-    "Packaging material below reorder level",
-    "Production batch MB-001 completed",
-    "Truck scheduled for Juba dispatch"
-]
-
-
-for alert in alerts:
-
-    notification(alert)
-
+     
 # =====================================
 # DATABASE INITIALIZATION
 # =====================================
@@ -130,52 +70,6 @@ except Exception as e:
     st.error("Database initialization failed")
     st.exception(e)
 
-st.subheader(
-    "📊 Business Overview"
-)
-
-
-col1, col2, col3, col4 = st.columns(4)
-
-
-with col1:
-
-    kpi_card(
-        "Production",
-        "128 Tonnes",
-        "+12%",
-        "🌾"
-    )
-
-
-with col2:
-
-    kpi_card(
-        "Sales Today",
-        "UGX 45.2M",
-        "+8%",
-        "💰"
-    )
-
-
-with col3:
-
-    kpi_card(
-        "Inventory",
-        "685 Tonnes",
-        "+5%",
-        "📦"
-    )
-
-
-with col4:
-
-    kpi_card(
-        "Orders",
-        "24",
-        "+3",
-        "🚚"
-    )
 
 # =====================================
 # PAGE CONFIGURATION
@@ -200,7 +94,6 @@ if "username" not in st.session_state:
 
 if "role" not in st.session_state:
     st.session_state.role = None
-
 
 # =====================================
 # LOGIN FUNCTION
@@ -390,6 +283,113 @@ else:
     st.info(
         f"{menu} module will be developed in the next phase."
     )
+
+st.subheader(
+    
+"📊 Business Overview"
+)
+
+
+col1, col2, col3, col4 = st.columns(4)
+
+
+with col1:
+
+    kpi_card(
+        "Production",
+        "128 Tonnes",
+        "+12%",
+        "🌾"
+    )
+
+
+with col2:
+
+    kpi_card(
+        "Sales Today",
+        "UGX 45.2M",
+        "+8%",
+        "💰"
+    )
+
+
+with col3:
+
+    kpi_card(
+        "Inventory",
+        "685 Tonnes",
+        "+5%",
+        "📦"
+    )
+
+
+with col4:
+
+    kpi_card(
+        "Orders",
+        "24",
+        "+3",
+        "🚚"
+    )st.subheader(
+    
+"🔔 Notifications"
+)
+
+
+alerts = [
+    "New maize delivery expected today",
+    "Packaging material below reorder level",
+    "Production batch MB-001 completed",
+    "Truck scheduled for Juba dispatch"
+]
+
+
+for alert in alerts:
+
+    notification(alert)st.subheader(
+    
+"🏭 Factory Control Centre"
+)
+
+
+status1, status2 = st.columns(2)
+
+
+with status1:
+
+    factory_status(
+        "Milling Line 1",
+        "Running"
+    )
+
+    factory_status(
+        "Milling Line 2",
+        "Running"
+    )
+
+    factory_status(
+        "Packaging Line",
+        "Warning"
+    )
+
+
+with status2:
+
+    factory_status(
+        "Raw Material Warehouse",
+        "Running"
+    )
+
+    factory_status(
+        "Dispatch Yard",
+        "Running"
+    )
+
+    factory_status(
+        "Maintenance",
+        "Warning"
+    )
+
 
 
 
