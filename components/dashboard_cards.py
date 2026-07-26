@@ -10,25 +10,29 @@ def kpi_card(title, value, change, icon):
     )
 
 
+
 def factory_status(name, status):
 
     if status == "Running":
 
         st.success(
-            f"🟢 {name}: {status}"
+            f"🟢 {name}: Running"
         )
+
 
     elif status == "Warning":
 
         st.warning(
-            f"🟡 {name}: {status}"
+            f"🟡 {name}: Warning"
         )
+
 
     else:
 
         st.error(
-            f"🔴 {name}: {status}"
+            f"🔴 {name}: Offline"
         )
+
 
 
 def notification(message):
