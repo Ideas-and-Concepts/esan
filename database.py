@@ -1,15 +1,15 @@
 """
-Esan ERP Database Connection
+Esan ERP Database Engine
 """
 
 import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 from config import DATABASE_URL
 
 
-# Create data folder automatically
 if DATABASE_URL.startswith("sqlite"):
     os.makedirs("data", exist_ok=True)
 
@@ -34,12 +34,6 @@ SessionLocal = sessionmaker(
 Base = declarative_base()
 
 
-def get_db():
+def get_session():
 
-    db = SessionLocal()
-
-    try:
-        return db
-
-    finally:
-        db.close()
+    return SessionLocal()
