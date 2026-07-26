@@ -232,3 +232,48 @@ class Inventory(Base):
         DateTime,
         default=datetime.utcnow
     )
+
+class StockMovement(Base):
+
+    __tablename__ = "stock_movements"
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+    transaction_number = Column(
+        String,
+        unique=True
+    )
+
+    product = Column(
+        String,
+        nullable=False
+    )
+
+    movement_type = Column(
+        String
+    )
+
+    quantity = Column(
+        Float
+    )
+
+    unit = Column(
+        String,
+        default="Tonnes"
+    )
+
+    from_location = Column(
+        String
+    )
+
+    to_location = Column(
+        String
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
