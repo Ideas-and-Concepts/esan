@@ -15,7 +15,7 @@ from config import (
     VERSION
 )
 
-from database import Base, engine
+from database import Base, engine, SessionLocal
 
 
 try:
