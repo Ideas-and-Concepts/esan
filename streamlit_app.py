@@ -43,11 +43,21 @@ from auth import verify_password
 
 from services.user_service import create_admin
 
-from components.dashboard_cards import (
-    kpi_card,
-    factory_status,
-    notification
-)
+try:
+
+    from components.dashboard_cards import (
+        kpi_card,
+        factory_status,
+        notification
+    )
+
+except Exception as e:
+
+    st.error(
+        "Dashboard components failed to load"
+    )
+
+    st.exception(e)
 
 
 # =====================================
