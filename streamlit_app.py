@@ -49,6 +49,12 @@ if css_file.exists():
             unsafe_allow_html=True
         )
 
+from components.dashboard_cards import (
+    kpi_card,
+    factory_status,
+    notification
+)
+
 # =====================================
 # DATABASE INITIALIZATION
 # =====================================
