@@ -1,5 +1,6 @@
 streamlit
-pandas
-plotly
 sqlalchemy
 python-dotenv
+pandas
+plotly
+openpyxl
