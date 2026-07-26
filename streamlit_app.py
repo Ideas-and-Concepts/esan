@@ -15,11 +15,22 @@ from config import (
     VERSION
 )
 
-from database import (
-    Base,
-    engine,
-    SessionLocal
-)
+from database import Base, engine
+
+
+try:
+
+    Base.metadata.create_all(
+        bind=engine
+    )
+
+except Exception as e:
+
+    st.error(
+        "Database startup error"
+    )
+
+    st.exception(e)
 
 from models import User
 
