@@ -35,5 +35,4 @@ Base = declarative_base()
 
 
 def get_session():
-
     return SessionLocal()
