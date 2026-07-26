@@ -1,5 +1,5 @@
 """
-Esan ERP Database Models
+Esan ERP Models
 Nile Harvest Foods Ltd.
 """
 
@@ -16,11 +16,6 @@ from sqlalchemy import (
 
 from database import Base
 
-
-
-# ==========================
-# USER MANAGEMENT
-# ==========================
 
 class User(Base):
 
@@ -62,11 +57,6 @@ class User(Base):
     )
 
 
-
-# ==========================
-# SUPPLIERS
-# ==========================
-
 class Supplier(Base):
 
     __tablename__ = "suppliers"
@@ -82,8 +72,7 @@ class Supplier(Base):
     )
 
     name = Column(
-        String,
-        nullable=False
+        String
     )
 
     phone = Column(
@@ -98,104 +87,6 @@ class Supplier(Base):
         String
     )
 
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow
-    )
-
-
-
-# ==========================
-# PURCHASE ORDERS
-# ==========================
-
-class PurchaseOrder(Base):
-
-    __tablename__ = "purchase_orders"
-
-    id = Column(
-        Integer,
-        primary_key=True
-    )
-
-    po_number = Column(
-        String,
-        unique=True
-    )
-
-    supplier = Column(
-        String
-    )
-
-    product = Column(
-        String
-    )
-
-    quantity = Column(
-        Float
-    )
-
-    unit_price = Column(
-        Float
-    )
-
-    status = Column(
-        String,
-        default="Pending"
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow
-    )
-
-
-
-# ==========================
-# DELIVERIES
-# ==========================
-
-class Delivery(Base):
-
-    __tablename__ = "deliveries"
-
-    id = Column(
-        Integer,
-        primary_key=True
-    )
-
-    delivery_number = Column(
-        String,
-        unique=True
-    )
-
-    supplier = Column(
-        String
-    )
-
-    product = Column(
-        String
-    )
-
-    quantity = Column(
-        Float
-    )
-
-    quality_status = Column(
-        String,
-        default="Pending"
-    )
-
-    received_date = Column(
-        DateTime,
-        default=datetime.utcnow
-    )
-
-
-
-# ==========================
-# INVENTORY
-# ==========================
 
 class Inventory(Base):
 
@@ -210,77 +101,19 @@ class Inventory(Base):
         String
     )
 
-    category = Column(
-        String
-    )
-
     quantity = Column(
         Float,
         default=0
     )
 
     unit = Column(
-        String,
-        default="Tonnes"
+        String
     )
 
     location = Column(
         String
     )
 
-    updated_at = Column(
-        DateTime,
-        default=datetime.utcnow
-    )
-
-class StockMovement(Base):
-
-    __tablename__ = "stock_movements"
-
-    id = Column(
-        Integer,
-        primary_key=True
-    )
-
-    transaction_number = Column(
-        String,
-        unique=True
-    )
-
-    product = Column(
-        String,
-        nullable=False
-    )
-
-    movement_type = Column(
-        String
-    )
-
-    quantity = Column(
-        Float
-    )
-
-    unit = Column(
-        String,
-        default="Tonnes"
-    )
-
-    from_location = Column(
-        String
-    )
-
-    to_location = Column(
-        String
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow
-    )
-
-# ==========================
-# PRODUCTION MANAGEMENT
-# ==========================
 
 class ProductionBatch(Base):
 
@@ -304,20 +137,8 @@ class ProductionBatch(Base):
         Float
     )
 
-    flour_output = Column(
+    output_quantity = Column(
         Float
-    )
-
-    by_product_output = Column(
-        Float
-    )
-
-    waste_quantity = Column(
-        Float
-    )
-
-    production_line = Column(
-        String
     )
 
     status = Column(
@@ -325,47 +146,6 @@ class ProductionBatch(Base):
         default="Planned"
     )
 
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow
-    )
-
-
-
-class Machine(Base):
-
-    __tablename__ = "machines"
-
-    id = Column(
-        Integer,
-        primary_key=True
-    )
-
-    machine_code = Column(
-        String,
-        unique=True
-    )
-
-    name = Column(
-        String
-    )
-
-    capacity = Column(
-        Float
-    )
-
-    status = Column(
-        String,
-        default="Available"
-    )
-
-    last_maintenance = Column(
-        String
-    )
-
-# ==========================
-# PACKAGING MANAGEMENT
-# ==========================
 
 class PackagingBatch(Base):
 
@@ -385,264 +165,15 @@ class PackagingBatch(Base):
         String
     )
 
-    input_quantity = Column(
+    quantity = Column(
         Float
     )
 
     package_size = Column(
-        Float
-    )
-
-    number_of_packages = Column(
-        Integer
-    )
-
-    packaging_line = Column(
         String
     )
 
     status = Column(
         String,
         default="Planned"
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow
-    )
-
-
-
-class PackagingMaterial(Base):
-
-    __tablename__ = "packaging_materials"
-
-    id = Column(
-        Integer,
-        primary_key=True
-    )
-
-    material_name = Column(
-        String
-    )
-
-    quantity = Column(
-        Float
-    )
-
-    unit = Column(
-        String
-    )
-
-    location = Column(
-        String
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow
-    )
-
-# ==========================
-# PACKAGING MANAGEMENT
-# ==========================
-
-class PackagingBatch(Base):
-
-    __tablename__ = "packaging_batches"
-
-    id = Column(
-        Integer,
-        primary_key=True
-    )
-
-    batch_number = Column(
-        String,
-        unique=True
-    )
-
-    product = Column(
-        String
-    )
-
-    input_quantity = Column(
-        Float
-    )
-
-    package_size = Column(
-        Float
-    )
-
-    number_of_packages = Column(
-        Integer
-    )
-
-    packaging_line = Column(
-        String
-    )
-
-    status = Column(
-        String,
-        default="Planned"
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow
-    )
-
-
-
-class PackagingMaterial(Base):
-
-    __tablename__ = "packaging_materials"
-
-    id = Column(
-        Integer,
-        primary_key=True
-    )
-
-    material_name = Column(
-        String
-    )
-
-    quantity = Column(
-        Float
-    )
-
-    unit = Column(
-        String
-    )
-
-    location = Column(
-        String
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow
-    )
-
-# ==========================
-# SALES MANAGEMENT
-# ==========================
-
-class Customer(Base):
-
-    __tablename__ = "customers"
-
-    id = Column(
-        Integer,
-        primary_key=True
-    )
-
-    customer_code = Column(
-        String,
-        unique=True
-    )
-
-    name = Column(
-        String,
-        nullable=False
-    )
-
-    country = Column(
-        String
-    )
-
-    phone = Column(
-        String
-    )
-
-    customer_type = Column(
-        String
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow
-    )
-
-
-
-class SalesOrder(Base):
-
-    __tablename__ = "sales_orders"
-
-    id = Column(
-        Integer,
-        primary_key=True
-    )
-
-    order_number = Column(
-        String,
-        unique=True
-    )
-
-    customer = Column(
-        String
-    )
-
-    product = Column(
-        String
-    )
-
-    quantity = Column(
-        Float
-    )
-
-    package_size = Column(
-        String
-    )
-
-    destination = Column(
-        String
-    )
-
-    status = Column(
-        String,
-        default="Pending"
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow
-    )
-
-
-
-class Shipment(Base):
-
-    __tablename__ = "shipments"
-
-    id = Column(
-        Integer,
-        primary_key=True
-    )
-
-    shipment_number = Column(
-        String,
-        unique=True
-    )
-
-    order_number = Column(
-        String
-    )
-
-    truck_number = Column(
-        String
-    )
-
-    route = Column(
-        String
-    )
-
-    status = Column(
-        String,
-        default="Preparing"
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow
     )
