@@ -277,3 +277,88 @@ class StockMovement(Base):
         DateTime,
         default=datetime.utcnow
     )
+
+# ==========================
+# PRODUCTION MANAGEMENT
+# ==========================
+
+class ProductionBatch(Base):
+
+    __tablename__ = "production_batches"
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+    batch_number = Column(
+        String,
+        unique=True
+    )
+
+    raw_material = Column(
+        String
+    )
+
+    input_quantity = Column(
+        Float
+    )
+
+    flour_output = Column(
+        Float
+    )
+
+    by_product_output = Column(
+        Float
+    )
+
+    waste_quantity = Column(
+        Float
+    )
+
+    production_line = Column(
+        String
+    )
+
+    status = Column(
+        String,
+        default="Planned"
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+
+
+class Machine(Base):
+
+    __tablename__ = "machines"
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+    machine_code = Column(
+        String,
+        unique=True
+    )
+
+    name = Column(
+        String
+    )
+
+    capacity = Column(
+        Float
+    )
+
+    status = Column(
+        String,
+        default="Available"
+    )
+
+    last_maintenance = Column(
+        String
+    )
