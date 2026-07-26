@@ -70,6 +70,52 @@ except Exception as e:
     st.error("Database initialization failed")
     st.exception(e)
 
+st.subheader(
+    "📊 Business Overview"
+)
+
+
+col1, col2, col3, col4 = st.columns(4)
+
+
+with col1:
+
+    kpi_card(
+        "Production",
+        "128 Tonnes",
+        "+12%",
+        "🌾"
+    )
+
+
+with col2:
+
+    kpi_card(
+        "Sales Today",
+        "UGX 45.2M",
+        "+8%",
+        "💰"
+    )
+
+
+with col3:
+
+    kpi_card(
+        "Inventory",
+        "685 Tonnes",
+        "+5%",
+        "📦"
+    )
+
+
+with col4:
+
+    kpi_card(
+        "Orders",
+        "24",
+        "+3",
+        "🚚"
+    )
 
 # =====================================
 # PAGE CONFIGURATION
