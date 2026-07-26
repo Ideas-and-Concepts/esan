@@ -4,71 +4,10 @@ Nile Harvest Foods Ltd.
 Version 1.0.0 Alpha
 """
 
-import os
 from datetime import datetime
-
-import streamlit as st
-
-from config import (
-    APP_NAME,
-    COMPANY_NAME,
-    VERSION
-)
-
-from database import Base, engine, SessionLocal
-
-
-try:
-
-    Base.metadata.create_all(
-        bind=engine
-    )
-
-except Exception as e:
-
-    st.error(
-        "Database startup error"
-    )
-
-    st.exception(e)
-
-from models import User
-
-from auth import verify_password
-
-from services.user_service import create_admin
-
 from pathlib import Path
 
-css_file = Path("assets/style.css")
-
-if css_file.exists():
-    with open(css_file) as f:
-        st.markdown(
-            f"<style>{f.read()}</style>",
-            unsafe_allow_html=True
-        )
-
-from components.dashboard_cards import (
-    kpi_card,
-    factory_status,
-    notification
-)
-     
-# =====================================
-# DATABASE INITIALIZATION
-# =====================================
-
-try:
-    Base.metadata.create_all(bind=engine)
-
-    db = SessionLocal()
-    create_admin(db)
-    db.close()
-
-except Exception as e:
-    st.error("Database initialization failed")
-    st.exception(e)
+import streamlit as st
 
 
 # =====================================
@@ -76,10 +15,82 @@ except Exception as e:
 # =====================================
 
 st.set_page_config(
-    page_title=APP_NAME,
+    page_title="Esan ERP",
     page_icon="🌾",
     layout="wide"
 )
+
+
+# =====================================
+# IMPORTS
+# =====================================
+
+from config import (
+    APP_NAME,
+    COMPANY_NAME,
+    VERSION
+)
+
+from database import (
+    Base,
+    engine,
+    SessionLocal
+)
+
+from models import User
+
+from auth import verify_password
+
+from services.user_service import create_admin
+
+from components.dashboard_cards import (
+    kpi_card,
+    factory_status,
+    notification
+)
+
+
+# =====================================
+# LOAD CSS THEME
+# =====================================
+
+css_file = Path("assets/style.css")
+
+if css_file.exists():
+
+    with open(css_file) as f:
+
+        st.markdown(
+            f"<style>{f.read()}</style>",
+            unsafe_allow_html=True
+        )
+
+
+# =====================================
+# DATABASE INITIALIZATION
+# =====================================
+
+try:
+
+    Base.metadata.create_all(
+        bind=engine
+    )
+
+    db = SessionLocal()
+
+    create_admin(db)
+
+    db.close()
+
+
+except Exception as e:
+
+    st.error(
+        "Database initialization failed"
+    )
+
+    st.exception(e)
+
 
 
 # =====================================
@@ -87,13 +98,20 @@ st.set_page_config(
 # =====================================
 
 if "logged_in" not in st.session_state:
+
     st.session_state.logged_in = False
 
+
 if "username" not in st.session_state:
+
     st.session_state.username = None
 
+
 if "role" not in st.session_state:
+
     st.session_state.role = None
+
+
 
 # =====================================
 # LOGIN FUNCTION
@@ -127,24 +145,30 @@ def login(username, password):
 
             return True
 
+
     return False
 
 
 
 # =====================================
-# LOGIN PAGE
+# LOGIN SCREEN
 # =====================================
 
 if not st.session_state.logged_in:
 
-    st.title("🌾 Esan ERP")
+
+    st.title(
+        "🌾 Esan ERP"
+    )
+
 
     st.subheader(
         COMPANY_NAME
     )
 
+
     st.write(
-        "Please login to access the management system."
+        "Enterprise Milling & Packaging Management System"
     )
 
 
@@ -159,7 +183,10 @@ if not st.session_state.logged_in:
     )
 
 
-    if st.button("Login"):
+    if st.button(
+        "Login"
+    ):
+
 
         if login(
             username,
@@ -171,6 +198,7 @@ if not st.session_state.logged_in:
             )
 
             st.rerun()
+
 
         else:
 
@@ -189,15 +217,22 @@ if not st.session_state.logged_in:
 
 
 # =====================================
-# MAIN APPLICATION
+# MAIN HEADER
 # =====================================
 
-st.title("🌾 Esan ERP")
+st.title(
+    "🌾 Esan ERP"
+)
+
 
 st.subheader(
     COMPANY_NAME
 )
 
+
+# =====================================
+# SIDEBAR
+# =====================================
 
 st.sidebar.success(
     f"User: {st.session_state.username}"
@@ -208,32 +243,44 @@ st.sidebar.info(
 )
 
 
-if st.sidebar.button("Logout"):
+if st.sidebar.button(
+    "Logout"
+):
 
     st.session_state.logged_in = False
+
     st.session_state.username = None
+
     st.session_state.role = None
 
     st.rerun()
 
 
 
-# =====================================
-# NAVIGATION
-# =====================================
-
 menu = st.sidebar.selectbox(
+
     "Navigate",
+
     [
+
         "Dashboard",
+
         "Procurement",
+
         "Warehouse",
+
         "Milling",
+
         "Packaging",
+
         "Sales",
+
         "Finance",
+
         "Reports",
+
         "Settings"
+
     ]
 )
 
@@ -245,155 +292,174 @@ menu = st.sidebar.selectbox(
 
 if menu == "Dashboard":
 
+
     st.header(
         "📊 Executive Dashboard"
     )
 
 
-    c1, c2, c3, c4 = st.columns(4)
+    # KPI CARDS
 
-
-    c1.metric(
-        "Production Today",
-        "0 Tonnes"
+    st.subheader(
+        "Business Overview"
     )
 
-    c2.metric(
-        "Raw Materials",
-        "0 Tonnes"
+
+    col1, col2, col3, col4 = st.columns(4)
+
+
+    with col1:
+
+        kpi_card(
+            "Production",
+            "128 Tonnes",
+            "+12%",
+            "🌾"
+        )
+
+
+    with col2:
+
+        kpi_card(
+            "Sales Today",
+            "UGX 45.2M",
+            "+8%",
+            "💰"
+        )
+
+
+    with col3:
+
+        kpi_card(
+            "Inventory",
+            "685 Tonnes",
+            "+5%",
+            "📦"
+        )
+
+
+    with col4:
+
+        kpi_card(
+            "Orders",
+            "24",
+            "+3",
+            "🚚"
+        )
+
+
+
+    st.divider()
+
+
+    # FACTORY STATUS
+
+    st.subheader(
+        "🏭 Factory Control Centre"
     )
 
-    c3.metric(
-        "Sales",
-        "UGX 0"
+
+    status1, status2 = st.columns(2)
+
+
+    with status1:
+
+        factory_status(
+            "Milling Line 1",
+            "Running"
+        )
+
+
+        factory_status(
+            "Milling Line 2",
+            "Running"
+        )
+
+
+        factory_status(
+            "Packaging Line",
+            "Warning"
+        )
+
+
+
+    with status2:
+
+        factory_status(
+            "Raw Material Warehouse",
+            "Running"
+        )
+
+
+        factory_status(
+            "Dispatch Yard",
+            "Running"
+        )
+
+
+        factory_status(
+            "Maintenance",
+            "Warning"
+        )
+
+
+
+    st.divider()
+
+
+    # NOTIFICATIONS
+
+    st.subheader(
+        "🔔 Notifications"
     )
 
-    c4.metric(
-        "Machine Status",
-        "Online"
-    )
 
+    alerts = [
+
+        "New maize delivery expected today",
+
+        "Packaging material below reorder level",
+
+        "Production batch MB-001 completed",
+
+        "Truck scheduled for Juba dispatch"
+
+    ]
+
+
+    for alert in alerts:
+
+        notification(
+            alert
+        )
+
+
+
+# =====================================
+# OTHER MODULES
+# =====================================
 
 else:
+
 
     st.header(
         f"📁 {menu}"
     )
 
+
     st.info(
         f"{menu} module will be developed in the next phase."
     )
 
-        st.subheader(  
-"📊 Business Overview"
-)
 
 
-col1, col2, col3, col4 = st.columns(4)
-
-
-with col1:
-
-    kpi_card(
-        "Production",
-        "128 Tonnes",
-        "+12%",
-        "🌾"
-    )
-
-
-with col2:
-
-    kpi_card(
-        "Sales Today",
-        "UGX 45.2M",
-        "+8%",
-        "💰"
-    )
-
-
-with col3:
-
-    kpi_card(
-        "Inventory",
-        "685 Tonnes",
-        "+5%",
-        "📦"
-    )
-
-
-with col4:
-
-    kpi_card(
-        "Orders",
-        "24",
-        "+3",
-        "🚚"
-    )st.subheader(
-    
-"🔔 Notifications"
-)
-
-
-alerts = [
-    "New maize delivery expected today",
-    "Packaging material below reorder level",
-    "Production batch MB-001 completed",
-    "Truck scheduled for Juba dispatch"
-]
-
-
-for alert in alerts:
-
-    notification(alert)st.subheader(
-    
-"🏭 Factory Control Centre"
-)
-
-
-status1, status2 = st.columns(2)
-
-
-with status1:
-
-    factory_status(
-        "Milling Line 1",
-        "Running"
-    )
-
-    factory_status(
-        "Milling Line 2",
-        "Running"
-    )
-
-    factory_status(
-        "Packaging Line",
-        "Warning"
-    )
-
-
-with status2:
-
-    factory_status(
-        "Raw Material Warehouse",
-        "Running"
-    )
-
-    factory_status(
-        "Dispatch Yard",
-        "Running"
-    )
-
-    factory_status(
-        "Maintenance",
-        "Warning"
-    )
-
-
-
+# =====================================
+# FOOTER
+# =====================================
 
 st.divider()
 
+
 st.caption(
-    f"© {datetime.now().year} Nile Harvest Foods Ltd. | Esan ERP"
+    f"© {datetime.now().year} Nile Harvest Foods Ltd. | Esan ERP | Version {VERSION}"
 )
