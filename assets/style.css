@@ -1,0 +1,36 @@
+/* ===========================
+   ESAN ERP THEME
+=========================== */
+
+.main {
+    background-color: #F5F7FA;
+}
+
+section[data-testid="stSidebar"] {
+    background: #1F6E43;
+}
+
+h1,h2,h3{
+    color:#1F6E43;
+    font-weight:700;
+}
+
+div[data-testid="stMetric"]{
+    background:white;
+    border-radius:12px;
+    padding:18px;
+    box-shadow:0 2px 8px rgba(0,0,0,.08);
+}
+
+.stButton>button{
+    background:#1F6E43;
+    color:white;
+    border-radius:10px;
+    border:none;
+    height:48px;
+    font-weight:bold;
+}
+
+.stButton>button:hover{
+    background:#2C8A54;
+}
