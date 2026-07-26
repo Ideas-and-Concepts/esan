@@ -1,11 +1,10 @@
 streamlit
-pandas
-numpy
-plotly
 sqlalchemy
 python-dotenv
-passlib
+pandas
+plotly
+openpyxl
 bcrypt
+passlib
 fastapi
 uvicorn
-openpyxl
