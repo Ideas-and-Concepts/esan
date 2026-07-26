@@ -1,15 +1,26 @@
+"""
+Esan ERP Database Models
+Nile Harvest Foods Ltd.
+"""
+
+from datetime import datetime
+
 from sqlalchemy import (
     Column,
     Integer,
     String,
+    Float,
     Boolean,
     DateTime
 )
 
-from datetime import datetime
-
 from database import Base
 
+
+
+# ==========================
+# USER MANAGEMENT
+# ==========================
 
 class User(Base):
 
@@ -51,46 +62,10 @@ class User(Base):
     )
 
 
-class Supplier(Base):
 
-    __tablename__ = "suppliers"
-
-    id = Column(
-        Integer,
-        primary_key=True
-    )
-
-    name = Column(String)
-
-    phone = Column(String)
-
-
-class Inventory(Base):
-
-    __tablename__ = "inventory"
-
-    id = Column(
-        Integer,
-        primary_key=True
-    )
-
-    product = Column(String)
-
-    quantity = Column(
-        Integer,
-        default=0
-    )
-
-from datetime import datetime
-
-from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-    Float,
-    DateTime
-)
-
+# ==========================
+# SUPPLIERS
+# ==========================
 
 class Supplier(Base):
 
@@ -129,6 +104,10 @@ class Supplier(Base):
     )
 
 
+
+# ==========================
+# PURCHASE ORDERS
+# ==========================
 
 class PurchaseOrder(Base):
 
@@ -172,6 +151,10 @@ class PurchaseOrder(Base):
 
 
 
+# ==========================
+# DELIVERIES
+# ==========================
+
 class Delivery(Base):
 
     __tablename__ = "deliveries"
@@ -204,6 +187,48 @@ class Delivery(Base):
     )
 
     received_date = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+
+
+# ==========================
+# INVENTORY
+# ==========================
+
+class Inventory(Base):
+
+    __tablename__ = "inventory"
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+    product = Column(
+        String
+    )
+
+    category = Column(
+        String
+    )
+
+    quantity = Column(
+        Float,
+        default=0
+    )
+
+    unit = Column(
+        String,
+        default="Tonnes"
+    )
+
+    location = Column(
+        String
+    )
+
+    updated_at = Column(
         DateTime,
         default=datetime.utcnow
     )
