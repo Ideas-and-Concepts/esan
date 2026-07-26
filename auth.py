@@ -1,9 +1,4 @@
-"""
-Esan ERP Authentication
-"""
-
 import hashlib
-
 
 
 def hash_password(password):
@@ -14,9 +9,9 @@ def hash_password(password):
 
 
 
-def verify_password(
-        password,
-        stored_hash
-):
+def verify_password(password, password_hash):
 
-    return hash_password(password) == stored_hash
+    return (
+        hash_password(password)
+        == password_hash
+    )
