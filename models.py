@@ -362,3 +362,83 @@ class Machine(Base):
     last_maintenance = Column(
         String
     )
+
+# ==========================
+# PACKAGING MANAGEMENT
+# ==========================
+
+class PackagingBatch(Base):
+
+    __tablename__ = "packaging_batches"
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+    batch_number = Column(
+        String,
+        unique=True
+    )
+
+    product = Column(
+        String
+    )
+
+    input_quantity = Column(
+        Float
+    )
+
+    package_size = Column(
+        Float
+    )
+
+    number_of_packages = Column(
+        Integer
+    )
+
+    packaging_line = Column(
+        String
+    )
+
+    status = Column(
+        String,
+        default="Planned"
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+
+
+class PackagingMaterial(Base):
+
+    __tablename__ = "packaging_materials"
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+    material_name = Column(
+        String
+    )
+
+    quantity = Column(
+        Float
+    )
+
+    unit = Column(
+        String
+    )
+
+    location = Column(
+        String
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
