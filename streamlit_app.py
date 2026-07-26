@@ -98,6 +98,23 @@ with status2:
         "Warning"
     )
 
+st.subheader(
+    "🔔 Notifications"
+)
+
+
+alerts = [
+    "New maize delivery expected today",
+    "Packaging material below reorder level",
+    "Production batch MB-001 completed",
+    "Truck scheduled for Juba dispatch"
+]
+
+
+for alert in alerts:
+
+    notification(alert)
+
 # =====================================
 # DATABASE INITIALIZATION
 # =====================================
