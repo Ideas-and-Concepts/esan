@@ -1,0 +1,43 @@
+esan/
+│
+├── app.py
+├── requirements.txt
+├── README.md
+├── .gitignore
+├── .env.example
+├── config.py
+├── database.py
+├── auth.py
+├── models.py
+├── utils.py
+│
+├── assets/
+│   ├── logo.png
+│   ├── favicon.png
+│   └── styles.css
+│
+├── data/
+│   └── esan.db
+│
+├── pages/
+│   ├── Dashboard.py
+│   ├── Procurement.py
+│   ├── Warehouse.py
+│   ├── Milling.py
+│   ├── Packaging.py
+│   ├── Sales.py
+│   ├── Finance.py
+│   ├── Logistics.py
+│   ├── HR.py
+│   ├── Maintenance.py
+│   ├── AI_Assistant.py
+│   ├── Reports.py
+│   └── Settings.py
+│
+├── api/
+├── services/
+├── models/
+├── reports/
+├── docs/
+├── tests/
+└── scripts/
