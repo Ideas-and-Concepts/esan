@@ -21,6 +21,10 @@ from database import (
     SessionLocal
 )
 
+from models import User
+
+from auth import verify_password
+
 from services.user_service import create_admin
 
 
@@ -47,13 +51,119 @@ except Exception as e:
 st.set_page_config(
     page_title=APP_NAME,
     page_icon="🌾",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
 
 # =====================================
-# HEADER
+# SESSION STATE
+# =====================================
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if "username" not in st.session_state:
+    st.session_state.username = None
+
+if "role" not in st.session_state:
+    st.session_state.role = None
+
+
+# =====================================
+# LOGIN FUNCTION
+# =====================================
+
+def login(username, password):
+
+    db = SessionLocal()
+
+    user = (
+        db.query(User)
+        .filter(
+            User.username == username
+        )
+        .first()
+    )
+
+    db.close()
+
+
+    if user:
+
+        if verify_password(
+            password,
+            user.password_hash
+        ):
+
+            st.session_state.logged_in = True
+            st.session_state.username = user.username
+            st.session_state.role = user.role
+
+            return True
+
+    return False
+
+
+
+# =====================================
+# LOGIN PAGE
+# =====================================
+
+if not st.session_state.logged_in:
+
+    st.title("🌾 Esan ERP")
+
+    st.subheader(
+        COMPANY_NAME
+    )
+
+    st.write(
+        "Please login to access the management system."
+    )
+
+
+    username = st.text_input(
+        "Username"
+    )
+
+
+    password = st.text_input(
+        "Password",
+        type="password"
+    )
+
+
+    if st.button("Login"):
+
+        if login(
+            username,
+            password
+        ):
+
+            st.success(
+                "Login successful"
+            )
+
+            st.rerun()
+
+        else:
+
+            st.error(
+                "Invalid username or password"
+            )
+
+
+    st.info(
+        "Default administrator: admin / admin123"
+    )
+
+
+    st.stop()
+
+
+
+# =====================================
+# MAIN APPLICATION
 # =====================================
 
 st.title("🌾 Esan ERP")
@@ -62,34 +172,29 @@ st.subheader(
     COMPANY_NAME
 )
 
-st.caption(
-    f"Enterprise Milling & Packaging Management System | {VERSION}"
+
+st.sidebar.success(
+    f"User: {st.session_state.username}"
+)
+
+st.sidebar.info(
+    f"Role: {st.session_state.role}"
 )
 
 
+if st.sidebar.button("Logout"):
+
+    st.session_state.logged_in = False
+    st.session_state.username = None
+    st.session_state.role = None
+
+    st.rerun()
+
+
+
 # =====================================
-# SIDEBAR
+# NAVIGATION
 # =====================================
-
-logo_path = "assets/logo.png"
-
-if os.path.exists(logo_path):
-    st.sidebar.image(
-        logo_path,
-        width=150
-    )
-else:
-    st.sidebar.markdown(
-        "🌾 **ESAN ERP**"
-    )
-
-
-st.sidebar.divider()
-
-st.sidebar.title(
-    "Esan Control Centre"
-)
-
 
 menu = st.sidebar.selectbox(
     "Navigate",
@@ -101,14 +206,11 @@ menu = st.sidebar.selectbox(
         "Packaging",
         "Sales",
         "Finance",
-        "Logistics",
-        "HR",
-        "Maintenance",
         "Reports",
-        "AI Assistant",
         "Settings"
     ]
 )
+
 
 
 # =====================================
@@ -122,72 +224,29 @@ if menu == "Dashboard":
     )
 
 
-    col1, col2, col3, col4 = st.columns(4)
+    c1, c2, c3, c4 = st.columns(4)
 
 
-    with col1:
-        st.metric(
-            "Production Today",
-            "0 Tonnes"
-        )
-
-
-    with col2:
-        st.metric(
-            "Raw Material Stock",
-            "0 Tonnes"
-        )
-
-
-    with col3:
-        st.metric(
-            "Sales Today",
-            "UGX 0"
-        )
-
-
-    with col4:
-        st.metric(
-            "Machine Status",
-            "Online"
-        )
-
-
-    st.divider()
-
-
-    st.subheader(
-        "🏭 Plant Operations"
+    c1.metric(
+        "Production Today",
+        "0 Tonnes"
     )
 
-
-    operations = {
-        "Department": [
-            "Procurement",
-            "Warehouse",
-            "Milling",
-            "Packaging",
-            "Distribution"
-        ],
-
-        "Status": [
-            "Ready",
-            "Ready",
-            "Ready",
-            "Ready",
-            "Ready"
-        ]
-    }
-
-
-    st.table(
-        operations
+    c2.metric(
+        "Raw Materials",
+        "0 Tonnes"
     )
 
+    c3.metric(
+        "Sales",
+        "UGX 0"
+    )
 
-# =====================================
-# OTHER MODULES
-# =====================================
+    c4.metric(
+        "Machine Status",
+        "Online"
+    )
+
 
 else:
 
@@ -196,16 +255,13 @@ else:
     )
 
     st.info(
-        f"{menu} module will be activated in the next Esan development sprint."
+        f"{menu} module will be developed in the next phase."
     )
 
 
-# =====================================
-# FOOTER
-# =====================================
 
 st.divider()
 
 st.caption(
-    f"© {datetime.now().year} Nile Harvest Foods Ltd. | Powered by Esan ERP"
+    f"© {datetime.now().year} Nile Harvest Foods Ltd. | Esan ERP"
 )
