@@ -4,8 +4,10 @@ Nile Harvest Foods Ltd.
 Version 1.0.0 Alpha
 """
 
-import streamlit as st
+import os
 from datetime import datetime
+
+import streamlit as st
 
 from config import (
     APP_NAME,
@@ -13,33 +15,34 @@ from config import (
     VERSION
 )
 
-from database import Base, engine
+from database import (
+    Base,
+    engine,
+    SessionLocal
+)
 
-from database import Base, engine, SessionLocal
 from services.user_service import create_admin
 
-Base.metadata.create_all(bind=engine)
 
-db = SessionLocal()
-
-create_admin(db)
-
-db.close()
-
-# -----------------------------
-# Database Initialisation
-# -----------------------------
+# =====================================
+# DATABASE INITIALIZATION
+# =====================================
 
 try:
     Base.metadata.create_all(bind=engine)
+
+    db = SessionLocal()
+    create_admin(db)
+    db.close()
+
 except Exception as e:
     st.error("Database initialization failed")
     st.exception(e)
 
 
-# -----------------------------
-# Page Configuration
-# -----------------------------
+# =====================================
+# PAGE CONFIGURATION
+# =====================================
 
 st.set_page_config(
     page_title=APP_NAME,
@@ -49,9 +52,9 @@ st.set_page_config(
 )
 
 
-# -----------------------------
-# Company Header
-# -----------------------------
+# =====================================
+# HEADER
+# =====================================
 
 st.title("🌾 Esan ERP")
 
@@ -64,14 +67,24 @@ st.caption(
 )
 
 
-# -----------------------------
-# Sidebar Navigation
-# -----------------------------
+# =====================================
+# SIDEBAR
+# =====================================
 
-st.sidebar.image(
-    "assets/logo.png",
-    width=150
-)
+logo_path = "assets/logo.png"
+
+if os.path.exists(logo_path):
+    st.sidebar.image(
+        logo_path,
+        width=150
+    )
+else:
+    st.sidebar.markdown(
+        "🌾 **ESAN ERP**"
+    )
+
+
+st.sidebar.divider()
 
 st.sidebar.title(
     "Esan Control Centre"
@@ -98,9 +111,9 @@ menu = st.sidebar.selectbox(
 )
 
 
-# -----------------------------
-# Dashboard
-# -----------------------------
+# =====================================
+# DASHBOARD
+# =====================================
 
 if menu == "Dashboard":
 
@@ -115,14 +128,14 @@ if menu == "Dashboard":
     with col1:
         st.metric(
             "Production Today",
-            "0 tonnes"
+            "0 Tonnes"
         )
 
 
     with col2:
         st.metric(
             "Raw Material Stock",
-            "0 tonnes"
+            "0 Tonnes"
         )
 
 
@@ -144,18 +157,21 @@ if menu == "Dashboard":
 
 
     st.subheader(
-        "Operational Summary"
+        "🏭 Plant Operations"
     )
 
 
-    data = {
-        "Area": [
+    operations = {
+        "Department": [
+            "Procurement",
+            "Warehouse",
             "Milling",
             "Packaging",
-            "Warehouse",
             "Distribution"
         ],
+
         "Status": [
+            "Ready",
             "Ready",
             "Ready",
             "Ready",
@@ -164,12 +180,14 @@ if menu == "Dashboard":
     }
 
 
-    st.table(data)
+    st.table(
+        operations
+    )
 
 
-# -----------------------------
-# Other Modules
-# -----------------------------
+# =====================================
+# OTHER MODULES
+# =====================================
 
 else:
 
@@ -177,15 +195,14 @@ else:
         f"📁 {menu}"
     )
 
-
     st.info(
-        f"{menu} module is under development."
+        f"{menu} module will be activated in the next Esan development sprint."
     )
 
 
-# -----------------------------
-# Footer
-# -----------------------------
+# =====================================
+# FOOTER
+# =====================================
 
 st.divider()
 
