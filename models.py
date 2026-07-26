@@ -522,3 +522,127 @@ class PackagingMaterial(Base):
         DateTime,
         default=datetime.utcnow
     )
+
+# ==========================
+# SALES MANAGEMENT
+# ==========================
+
+class Customer(Base):
+
+    __tablename__ = "customers"
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+    customer_code = Column(
+        String,
+        unique=True
+    )
+
+    name = Column(
+        String,
+        nullable=False
+    )
+
+    country = Column(
+        String
+    )
+
+    phone = Column(
+        String
+    )
+
+    customer_type = Column(
+        String
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+
+
+class SalesOrder(Base):
+
+    __tablename__ = "sales_orders"
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+    order_number = Column(
+        String,
+        unique=True
+    )
+
+    customer = Column(
+        String
+    )
+
+    product = Column(
+        String
+    )
+
+    quantity = Column(
+        Float
+    )
+
+    package_size = Column(
+        String
+    )
+
+    destination = Column(
+        String
+    )
+
+    status = Column(
+        String,
+        default="Pending"
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+
+
+class Shipment(Base):
+
+    __tablename__ = "shipments"
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+    shipment_number = Column(
+        String,
+        unique=True
+    )
+
+    order_number = Column(
+        String
+    )
+
+    truck_number = Column(
+        String
+    )
+
+    route = Column(
+        String
+    )
+
+    status = Column(
+        String,
+        default="Preparing"
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
