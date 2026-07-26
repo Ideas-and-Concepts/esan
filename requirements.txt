@@ -1,10 +1,5 @@
 streamlit
-sqlalchemy
-python-dotenv
 pandas
 plotly
-openpyxl
-bcrypt
-passlib
-fastapi
-uvicorn
+sqlalchemy
+python-dotenv
