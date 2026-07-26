@@ -20,7 +20,11 @@ from database import Base, engine
 # Database Initialisation
 # -----------------------------
 
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    st.error("Database initialization failed")
+    st.exception(e)
 
 
 # -----------------------------
