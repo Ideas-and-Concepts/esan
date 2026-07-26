@@ -55,6 +55,49 @@ from components.dashboard_cards import (
     notification
 )
 
+st.subheader(
+    "🏭 Factory Control Centre"
+)
+
+
+status1, status2 = st.columns(2)
+
+
+with status1:
+
+    factory_status(
+        "Milling Line 1",
+        "Running"
+    )
+
+    factory_status(
+        "Milling Line 2",
+        "Running"
+    )
+
+    factory_status(
+        "Packaging Line",
+        "Warning"
+    )
+
+
+with status2:
+
+    factory_status(
+        "Raw Material Warehouse",
+        "Running"
+    )
+
+    factory_status(
+        "Dispatch Yard",
+        "Running"
+    )
+
+    factory_status(
+        "Maintenance",
+        "Warning"
+    )
+
 # =====================================
 # DATABASE INITIALIZATION
 # =====================================
