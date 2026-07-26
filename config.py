@@ -14,7 +14,8 @@ VERSION = "1.0.0 Alpha"
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "sqlite:///data/esan.db"
+    "sqlite:///esan.db"
+)
 )
 
 SECRET_KEY = os.getenv(
