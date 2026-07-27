@@ -511,3 +511,54 @@ class Quotation(Base):
         DateTime,
         default=datetime.now
     )
+
+
+# =====================================
+# SalesOrders
+# =====================================
+
+class SalesOrder(Base):
+
+    __tablename__ = "sales_orders"
+
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+
+    customer_name = Column(
+        String
+    )
+
+
+    product_name = Column(
+        String
+    )
+
+
+    quantity = Column(
+        Integer
+    )
+
+
+    unit_price = Column(
+        Float
+    )
+
+
+    total_amount = Column(
+        Float
+    )
+
+
+    status = Column(
+        String,
+        default="Pending"
+    )
+
+
+    created_at = Column(
+        DateTime
+    )
