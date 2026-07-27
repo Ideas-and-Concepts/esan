@@ -1,70 +1,320 @@
+"""
+Esan ERP Executive Dashboard
+Nile Harvest Foods Ltd.
+"""
+
 import streamlit as st
+
+from database import SessionLocal
+
+from models import (
+    Customer,
+    SalesOrder,
+    Invoice,
+    Payment,
+    Product,
+    MillingBatch,
+    PackagingBatch,
+    FinanceTransaction
+)
+
 
 
 def dashboard_home():
+
 
     st.header(
         "📊 Executive Dashboard"
     )
 
 
-    col1, col2, col3, col4 = st.columns(4)
+    db = SessionLocal()
 
 
-    with col1:
+    try:
 
-        st.metric(
-            "🌾 Production",
-            "128 Tonnes",
-            "+12%"
+
+        # ===============================
+        # DATABASE COUNTS
+        # ===============================
+
+
+        customers = (
+            db.query(Customer)
+            .count()
         )
 
 
-    with col2:
-
-        st.metric(
-            "📦 Inventory",
-            "685 Tonnes",
-            "+5%"
+        orders = (
+            db.query(SalesOrder)
+            .count()
         )
 
 
-    with col3:
-
-        st.metric(
-            "🚚 Orders",
-            "24",
-            "+3"
+        invoices = (
+            db.query(Invoice)
+            .count()
         )
 
 
-    with col4:
-
-        st.metric(
-            "💰 Sales",
-            "UGX 45.2M",
-            "+8%"
+        payments = (
+            db.query(Payment)
+            .count()
         )
 
 
-    st.divider()
+        products = (
+            db.query(Product)
+            .count()
+        )
 
 
-    st.subheader(
-        "🏭 Factory Status"
-    )
+        milling = (
+            db.query(MillingBatch)
+            .count()
+        )
 
 
-    st.success(
-        "🟢 Milling Line 1 Running"
-    )
+        packaging = (
+            db.query(PackagingBatch)
+            .count()
+        )
 
 
-    st.success(
-        "🟢 Warehouse Operational"
-    )
+        revenue = (
+
+            db.query(
+                FinanceTransaction
+            )
+
+            .filter(
+                FinanceTransaction.transaction_type
+                == "Income"
+            )
+
+            .all()
+
+        )
 
 
-    st.warning(
-        "🟡 Packaging Line Maintenance Scheduled"
-    )
+        total_revenue = sum(
+
+            item.amount or 0
+
+            for item in revenue
+
+        )
+
+
+
+        # ===============================
+        # KPI CARDS
+        # ===============================
+
+
+        col1, col2, col3, col4 = st.columns(4)
+
+
+
+        with col1:
+
+            st.metric(
+
+                "👥 Customers",
+
+                customers
+
+            )
+
+
+
+        with col2:
+
+            st.metric(
+
+                "🚚 Sales Orders",
+
+                orders
+
+            )
+
+
+
+        with col3:
+
+            st.metric(
+
+                "📦 Products",
+
+                products
+
+            )
+
+
+
+        with col4:
+
+            st.metric(
+
+                "💰 Revenue",
+
+                f"UGX {total_revenue:,.0f}"
+
+            )
+
+
+
+        st.divider()
+
+
+
+        # ===============================
+        # PRODUCTION SUMMARY
+        # ===============================
+
+
+        st.subheader(
+            "🏭 Production Overview"
+        )
+
+
+        p1, p2, p3 = st.columns(3)
+
+
+        with p1:
+
+            st.metric(
+
+                "🌾 Milling Batches",
+
+                milling
+
+            )
+
+
+        with p2:
+
+            st.metric(
+
+                "📦 Packaging Batches",
+
+                packaging
+
+            )
+
+
+        with p3:
+
+            st.metric(
+
+                "🧾 Invoices",
+
+                invoices
+
+            )
+
+
+
+        st.divider()
+
+
+
+        # ===============================
+        # FINANCE SUMMARY
+        # ===============================
+
+
+        st.subheader(
+            "💰 Finance Overview"
+        )
+
+
+        f1, f2, f3 = st.columns(3)
+
+
+
+        with f1:
+
+            st.metric(
+
+                "Payments Received",
+
+                payments
+
+            )
+
+
+
+        with f2:
+
+            st.metric(
+
+                "Outstanding Invoices",
+
+                invoices - payments
+
+            )
+
+
+
+        with f3:
+
+            st.metric(
+
+                "Sales Value",
+
+                f"UGX {total_revenue:,.0f}"
+
+            )
+
+
+
+        st.divider()
+
+
+
+        # ===============================
+        # FACTORY STATUS
+        # ===============================
+
+
+        st.subheader(
+            "🏭 Factory Status"
+        )
+
+
+        st.success(
+            "🟢 Milling Operations Connected"
+        )
+
+
+        st.success(
+            "🟢 Warehouse System Online"
+        )
+
+
+        st.success(
+            "🟢 Sales & Distribution Active"
+        )
+
+
+        st.info(
+            "Production, inventory and finance modules will update automatically as transactions are recorded."
+        )
+
+
+
+    except Exception as e:
+
+
+        st.error(
+            "Dashboard loading error"
+        )
+
+        st.exception(e)
+
+
+
+    finally:
+
+        db.close()
