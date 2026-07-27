@@ -1,6 +1,61 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime
+"""
+Esan ERP Database Models
+Nile Harvest Foods Ltd.
+"""
+
 from datetime import datetime
 
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Float,
+    DateTime,
+    Boolean
+)
+
+from database import Base
+
+
+
+# =====================================
+# USER MODEL
+# =====================================
+
+class User(Base):
+
+    __tablename__ = "users"
+
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+
+    username = Column(
+        String,
+        unique=True,
+        nullable=False
+    )
+
+
+    password_hash = Column(
+        String,
+        nullable=False
+    )
+
+
+    role = Column(
+        String,
+        default="user"
+    )
+
+
+
+# =====================================
+# SUPPLIERS
+# =====================================
 
 class Supplier(Base):
 
@@ -19,16 +74,31 @@ class Supplier(Base):
     )
 
 
-    location = Column(
-        String
-    )
-
-
     phone = Column(
         String
     )
 
 
+    location = Column(
+        String
+    )
+
+
+    country = Column(
+        String
+    )
+
+
+    active = Column(
+        Boolean,
+        default=True
+    )
+
+
+
+# =====================================
+# PROCUREMENT
+# =====================================
 
 class PurchaseOrder(Base):
 
@@ -56,16 +126,32 @@ class PurchaseOrder(Base):
     )
 
 
-    cost = Column(
+    unit_cost = Column(
+        Float
+    )
+
+
+    total_cost = Column(
         Float
     )
 
 
     status = Column(
-        String
+        String,
+        default="Pending"
     )
 
 
+    created_at = Column(
+        DateTime,
+        default=datetime.now
+    )
+
+
+
+# =====================================
+# INVENTORY
+# =====================================
 
 class Inventory(Base):
 
@@ -78,7 +164,7 @@ class Inventory(Base):
     )
 
 
-    item = Column(
+    item_name = Column(
         String
     )
 
@@ -98,6 +184,21 @@ class Inventory(Base):
     )
 
 
+    location = Column(
+        String
+    )
+
+
+    updated_at = Column(
+        DateTime,
+        default=datetime.now
+    )
+
+
+
+# =====================================
+# MILLING PRODUCTION
+# =====================================
 
 class ProductionBatch(Base):
 
@@ -115,6 +216,11 @@ class ProductionBatch(Base):
     )
 
 
+    raw_material = Column(
+        String
+    )
+
+
     input_quantity = Column(
         Float
     )
@@ -125,12 +231,63 @@ class ProductionBatch(Base):
     )
 
 
+    waste_quantity = Column(
+        Float
+    )
+
+
+    production_date = Column(
+        DateTime,
+        default=datetime.now
+    )
+
+
+
+# =====================================
+# PACKAGING
+# =====================================
+
+class PackagingRecord(Base):
+
+    __tablename__ = "packaging_records"
+
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+
+    product = Column(
+        String
+    )
+
+
+    quantity = Column(
+        Float
+    )
+
+
+    packaging_size = Column(
+        String
+    )
+
+
+    batch_number = Column(
+        String
+    )
+
+
     date = Column(
         DateTime,
         default=datetime.now
     )
 
 
+
+# =====================================
+# CUSTOMERS
+# =====================================
 
 class Customer(Base):
 
@@ -144,7 +301,8 @@ class Customer(Base):
 
 
     name = Column(
-        String
+        String,
+        nullable=False
     )
 
 
@@ -163,6 +321,15 @@ class Customer(Base):
     )
 
 
+    customer_type = Column(
+        String
+    )
+
+
+
+# =====================================
+# SALES ORDERS
+# =====================================
 
 class SalesOrder(Base):
 
@@ -196,5 +363,54 @@ class SalesOrder(Base):
 
 
     status = Column(
+        String,
+        default="Pending"
+    )
+
+
+    order_date = Column(
+        DateTime,
+        default=datetime.now
+    )
+
+
+
+# =====================================
+# PAYMENTS
+# =====================================
+
+class Payment(Base):
+
+    __tablename__ = "payments"
+
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+
+    customer = Column(
         String
+    )
+
+
+    invoice_number = Column(
+        String
+    )
+
+
+    amount = Column(
+        Float
+    )
+
+
+    status = Column(
+        String
+    )
+
+
+    payment_date = Column(
+        DateTime,
+        default=datetime.now
     )
