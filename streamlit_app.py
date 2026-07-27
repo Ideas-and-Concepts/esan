@@ -450,10 +450,7 @@ if menu == "Dashboard":
 # OTHER MODULES
 # =====================================
 
-else:
-
-
-    elif menu == "Sales":
+elif menu == "Sales":
 
     sales_dashboard()
 
@@ -467,7 +464,7 @@ else:
     st.info(
         f"{menu} module will be developed in the next phase."
     )
-
+    
 # =====================================
 # FOOTER
 # =====================================
