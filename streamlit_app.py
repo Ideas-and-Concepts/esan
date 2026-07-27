@@ -30,6 +30,7 @@ from database import (
 
 from models import User
 
+st.write(User.__table__.columns.keys())
 
 from auth import verify_password
 
