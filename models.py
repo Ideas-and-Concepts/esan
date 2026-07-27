@@ -1005,3 +1005,54 @@ class SystemSetting(Base):
         DateTime,
         default=datetime.utcnow
     )
+
+
+
+
+# ==================================================
+# STOCK RESERVATION 
+# ==================================================
+
+
+class StockReservation(Base):
+
+    __tablename__ = "stock_reservations"
+
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+
+    sales_order_id = Column(
+        Integer,
+        ForeignKey(
+            "sales_orders.id"
+        )
+    )
+
+
+    product_id = Column(
+        Integer,
+        ForeignKey(
+            "products.id"
+        )
+    )
+
+
+    quantity = Column(
+        Float
+    )
+
+
+    status = Column(
+        String,
+        default="Reserved"
+    )
+
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
