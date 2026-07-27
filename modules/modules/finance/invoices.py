@@ -1,0 +1,212 @@
+"""
+Invoicing Module
+Nile Harvest Foods Ltd.
+Esan ERP - Invoice Management
+"""
+
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+from database import SessionLocal
+from models import Invoice, SalesOrder, Customer, Payment
+
+def get_db():
+    return SessionLocal()
+
+def generate_invoice_number():
+    """Generate a unique invoice number."""
+    db = get_db()
+    count = db.query(Invoice).count()
+    db.close()
+    return f"INV-{datetime.now().strftime('%Y%m')}-{count + 1:04d}"
+
+def invoices_page():
+    """Main invoices page."""
+    st.title("🧾 Invoice Management")
+    
+    tab1, tab2, tab3 = st.tabs(["Create Invoice", "View Invoices", "Invoice Details"])
+    
+    with tab1:
+        create_invoice()
+    
+    with tab2:
+        view_invoices()
+    
+    with tab3:
+        view_invoice_details()
+
+def create_invoice():
+    """Create a new invoice."""
+    st.subheader("Generate New Invoice")
+    
+    db = get_db()
+    
+    try:
+        # Get delivered orders
+        orders = db.query(SalesOrder).filter(
+            SalesOrder.status == "Delivered"
+        ).all()
+        
+        if not orders:
+            st.warning("No delivered orders available for invoicing.")
+            return
+        
+        order_options = {f"{o.order_number}": o.id for o in orders}
+        
+        with st.form("invoice_form"):
+            selected_order = st.selectbox("Sales Order", list(order_options.keys()))
+            
+            # Get order details
+            order = db.query(SalesOrder).filter(
+                SalesOrder.id == order_options[selected_order]
+            ).first()
+            
+            if order:
+                customer = db.query(Customer).filter(Customer.id == order.customer_id).first()
+                st.info(f"Customer: {customer.name if customer else 'N/A'}")
+                st.info(f"Order Total: ${order.total_amount:,.2f}")
+            
+            invoice_date = st.date_input("Invoice Date", datetime.now().date())
+            due_date = st.date_input("Due Date", datetime.now().date())
+            
+            if st.form_submit_button("Generate Invoice"):
+                try:
+                    invoice_number = generate_invoice_number()
+                    
+                    new_invoice = Invoice(
+                        invoice_number=invoice_number,
+                        customer_id=order.customer_id,
+                        order_id=order.id,
+                        amount=order.total_amount,
+                        status="Unpaid",
+                        created_at=datetime.utcnow()
+                    )
+                    db.add(new_invoice)
+                    db.commit()
+                    
+                    st.success(f"Invoice {invoice_number} generated successfully!")
+                    st.rerun()
+                    
+                except Exception as e:
+                    db.rollback()
+                    st.error(f"Error generating invoice: {str(e)}")
+    
+    finally:
+        db.close()
+
+def view_invoices():
+    """View all invoices."""
+    st.subheader("All Invoices")
+    
+    db = get_db()
+    
+    try:
+        invoices = db.query(Invoice).order_by(Invoice.created_at.desc()).all()
+        
+        if invoices:
+            data = []
+            for invoice in invoices:
+                customer = db.query(Customer).filter(Customer.id == invoice.customer_id).first()
+                
+                # Calculate paid amount
+                payments = db.query(Payment).filter(Payment.invoice_id == invoice.id).all()
+                paid_amount = sum(p.amount for p in payments)
+                balance = invoice.amount - paid_amount
+                
+                data.append({
+                    'Invoice #': invoice.invoice_number,
+                    'Customer': customer.name if customer else 'N/A',
+                    'Amount': f"${invoice.amount:,.2f}",
+                    'Paid': f"${paid_amount:,.2f}",
+                    'Balance': f"${balance:,.2f}",
+                    'Status': invoice.status,
+                    'Date': invoice.created_at.strftime('%Y-%m-%d') if invoice.created_at else 'N/A'
+                })
+            
+            df = pd.DataFrame(data)
+            st.dataframe(df, use_container_width=True)
+            
+            # Summary metrics
+            st.markdown("---")
+            total_invoiced = sum(invoice.amount for invoice in invoices)
+            total_paid = sum(
+                sum(p.amount for p in db.query(Payment).filter(Payment.invoice_id == inv.id).all())
+                for inv in invoices
+            )
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Invoiced", f"${total_invoiced:,.2f}")
+            with col2:
+                st.metric("Total Paid", f"${total_paid:,.2f}")
+            with col3:
+                st.metric("Outstanding", f"${total_invoiced - total_paid:,.2f}")
+        else:
+            st.info("No invoices found.")
+    
+    finally:
+        db.close()
+
+def view_invoice_details():
+    """View detailed invoice information."""
+    st.subheader("Invoice Details")
+    
+    db = get_db()
+    
+    try:
+        invoices = db.query(Invoice).order_by(Invoice.created_at.desc()).all()
+        
+        if invoices:
+            invoice_options = {inv.invoice_number: inv.id for inv in invoices}
+            selected_invoice_num = st.selectbox("Select Invoice", list(invoice_options.keys()))
+            
+            if selected_invoice_num:
+                invoice = db.query(Invoice).filter(
+                    Invoice.id == invoice_options[selected_invoice_num]
+                ).first()
+                
+                if invoice:
+                    customer = db.query(Customer).filter(Customer.id == invoice.customer_id).first()
+                    order = db.query(SalesOrder).filter(SalesOrder.id == invoice.order_id).first()
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown(f"**Invoice Number:** {invoice.invoice_number}")
+                        st.markdown(f"**Customer:** {customer.name if customer else 'N/A'}")
+                        st.markdown(f"**Order:** {order.order_number if order else 'N/A'}")
+                    with col2:
+                        st.markdown(f"**Amount:** ${invoice.amount:,.2f}")
+                        st.markdown(f"**Status:** {invoice.status}")
+                        st.markdown(f"**Date:** {invoice.created_at.strftime('%Y-%m-%d')}")
+                    
+                    # Show payments for this invoice
+                    st.markdown("---")
+                    st.subheader("Payment History")
+                    
+                    payments = db.query(Payment).filter(
+                        Payment.invoice_id == invoice.id
+                    ).order_by(Payment.created_at.desc()).all()
+                    
+                    if payments:
+                        payments_data = []
+                        total_paid = 0
+                        for payment in payments:
+                            payments_data.append({
+                                'Date': payment.created_at.strftime('%Y-%m-%d'),
+                                'Amount': f"${payment.amount:,.2f}",
+                                'Method': payment.payment_method,
+                                'Reference': payment.reference or 'N/A',
+                                'Status': payment.status
+                            })
+                            total_paid += payment.amount
+                        
+                        st.dataframe(pd.DataFrame(payments_data), use_container_width=True)
+                        st.markdown(f"**Total Paid:** ${total_paid:,.2f}")
+                        st.markdown(f"**Balance Due:** ${invoice.amount - total_paid:,.2f}")
+                    else:
+                        st.info("No payments recorded yet.")
+        else:
+            st.info("No invoices available.")
+    
+    finally:
+        db.close()
