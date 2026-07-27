@@ -610,6 +610,9 @@ else:
         "Select a module from the navigation menu."
     )
 
+elif sales_menu == "Quotations":
+
+    quotations_page()
 
 
 
