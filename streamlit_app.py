@@ -278,25 +278,10 @@ unsafe_allow_html=True
 
 
 
-
 # =====================================
 # DATABASE INITIALIZATION (with auto-repair)
 # =====================================
-
-def rebuild_database():
-    """Delete old database file and recreate tables from models."""
-    try:
-        if "sqlite:///" in DATABASE_URL:
-            db_path = DATABASE_URL.replace("sqlite:///", "")
-            if os.path.exists(db_path):
-                os.remove(db_path)
-    except Exception:
-        pass
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-
 try:
-
     needs_rebuild = False
     inspector = inspect(engine)
     existing_tables = inspector.get_table_names()
@@ -312,37 +297,28 @@ try:
 
     if needs_rebuild:
         st.warning("🔄 Database schema updated. Rebuilding with fresh tables...")
-        rebuild_database()
-    else:
-        Base.metadata.create_all(bind=engine)
-
+        try:
+            if "sqlite:///" in DATABASE_URL:
+                db_path = DATABASE_URL.replace("sqlite:///", "")
+                if os.path.exists(db_path):
+                    os.remove(db_path)
+        except Exception:
+            pass
+        Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
 
     db = SessionLocal()
-
-
     create_admin(db)
-
-
     db.close()
 
-
-
     if load_seed_data:
-
         load_seed_data()
 
-
-
 except Exception as e:
-
-
-    st.error(
-        "Database initialization failed"
-    )
-
+    st.error("Database initialization failed")
     st.exception(e)
-
-
+  
+    
 
 # =====================================
 # SESSION STATE
