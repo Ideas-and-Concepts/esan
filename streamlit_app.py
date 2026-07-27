@@ -454,18 +454,29 @@ if menu == "Dashboard":
 
 elif menu == "Sales":
 
-    sales_dashboard()
+    sales_menu = st.radio(
 
+        "Sales Navigation",
 
-else:
+        [
 
-    st.header(
-        f"📁 {menu}"
+            "Dashboard",
+
+            "Customers"
+
+        ]
+
     )
 
-    st.info(
-        f"{menu} module will be developed in the next phase."
-    )
+
+    if sales_menu == "Dashboard":
+
+        sales_dashboard()
+
+
+    elif sales_menu == "Customers":
+
+        customers_page()
     
 # =====================================
 # FOOTER
