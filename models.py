@@ -414,3 +414,43 @@ class Payment(Base):
         DateTime,
         default=datetime.now
     )
+
+
+# =====================================
+# CUSTOMERS
+# =====================================
+
+class Customer(Base):
+
+    __tablename__ = "customers"
+
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+
+    name = Column(
+        String
+    )
+
+
+    phone = Column(
+        String
+    )
+
+
+    location = Column(
+        String
+    )
+
+
+    country = Column(
+        String
+    )
+
+
+    customer_type = Column(
+        String
+    )
