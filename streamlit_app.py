@@ -429,7 +429,8 @@ elif menu == "🚚 Sales & Distribution":
     customers_page()
 
 
-elif sales_menu == "Sales Orders":
+elif sales_menu == 
+"Sales Orders":
 
     sales_orders_page()
 
