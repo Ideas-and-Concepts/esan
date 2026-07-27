@@ -48,6 +48,7 @@ from modules.sales.customers import customers_page
 
 from modules.sales.orders import sales_orders_page
 
+from seed.seed_data import load_seed_data
 
 
 # =====================================
