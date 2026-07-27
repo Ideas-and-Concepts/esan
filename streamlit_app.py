@@ -1,34 +1,11 @@
 """
-Esan ERP - Streamlit Application
+Esan ERP Controller
 Nile Harvest Foods Ltd.
-Version 1.0.0 Alpha
+Version 1.1.0 Alpha
 """
-
-from datetime import datetime
-from pathlib import Path
 
 import streamlit as st
 
-from modules.sales.dashboard import sales_dashboard
-
-from modules.sales.customers import customers_page
-
-from modules.sales.customers import customers_page
-
-# =====================================
-# PAGE CONFIGURATION
-# =====================================
-
-st.set_page_config(
-    page_title="Esan ERP",
-    page_icon="🌾",
-    layout="wide"
-)
-
-
-# =====================================
-# IMPORTS
-# =====================================
 
 from config import (
     APP_NAME,
@@ -36,53 +13,97 @@ from config import (
     VERSION
 )
 
+
 from database import (
     Base,
     engine,
     SessionLocal
 )
 
+
 from models import User
+
 
 from auth import verify_password
 
+
 from services.user_service import create_admin
 
-try:
 
-    from components.dashboard_cards import (
-        kpi_card,
-        factory_status,
-        notification
-    )
-
-except Exception as e:
-
-    st.error(
-        "Dashboard components failed to load"
-    )
-
-    st.exception(e)
+from components.navigation import esan_navigation
 
 
-# =====================================
-# LOAD CSS THEME
-# =====================================
+from components.themes import esan_theme
 
-css_file = Path("assets/style.css")
 
-if css_file.exists():
+# Dashboard
+from modules.dashboard.home import dashboard_home
 
-    with open(css_file) as f:
 
-        st.markdown(
-            f"<style>{f.read()}</style>",
-            unsafe_allow_html=True
-        )
+# Sales
+from modules.sales.dashboard import sales_dashboard
+from modules.sales.customers import customers_page
+
 
 
 # =====================================
-# DATABASE INITIALIZATION
+# PAGE CONFIGURATION
+# =====================================
+
+st.set_page_config(
+
+    page_title="Esan ERP",
+
+    page_icon="🌾",
+
+    layout="wide"
+
+)
+
+
+
+# =====================================
+# REMOVE STREAMLIT BRANDING
+# =====================================
+
+st.markdown(
+
+"""
+<style>
+
+#MainMenu {
+
+visibility:hidden;
+
+}
+
+
+footer {
+
+visibility:hidden;
+
+}
+
+
+header {
+
+visibility:hidden;
+
+}
+
+
+</style>
+
+""",
+
+unsafe_allow_html=True
+
+)
+
+
+
+# =====================================
+# DATABASE STARTUP
 # =====================================
 
 try:
@@ -90,6 +111,7 @@ try:
     Base.metadata.create_all(
         bind=engine
     )
+
 
     db = SessionLocal()
 
@@ -101,7 +123,7 @@ try:
 except Exception as e:
 
     st.error(
-        "Database initialization failed"
+        "Database startup failed"
     )
 
     st.exception(e)
@@ -129,34 +151,50 @@ if "role" not in st.session_state:
 
 
 # =====================================
-# LOGIN FUNCTION
+# LOGIN
 # =====================================
+
 
 def login(username, password):
 
+
     db = SessionLocal()
 
+
     user = (
+
         db.query(User)
+
         .filter(
             User.username == username
         )
+
         .first()
+
     )
+
 
     db.close()
 
 
     if user:
 
+
         if verify_password(
+
             password,
+
             user.password_hash
+
         ):
 
+
             st.session_state.logged_in = True
+
             st.session_state.username = user.username
+
             st.session_state.role = user.role
+
 
             return True
 
@@ -165,25 +203,34 @@ def login(username, password):
 
 
 
+
 # =====================================
 # LOGIN SCREEN
 # =====================================
 
+
 if not st.session_state.logged_in:
 
 
-    st.title(
-        "🌾 Esan ERP"
-    )
+    st.markdown(
 
+    """
+    <h1 style="text-align:center;">
+    🌾 Esan ERP
+    </h1>
 
-    st.subheader(
-        COMPANY_NAME
-    )
+    <h3 style="text-align:center;">
+    Nile Harvest Foods Ltd.
+    </h3>
 
+    <p style="text-align:center;">
+    Enterprise Milling & Packaging Management System
+    </p>
 
-    st.write(
-        "Enterprise Milling & Packaging Management System"
+    """,
+
+    unsafe_allow_html=True
+
     )
 
 
@@ -193,8 +240,11 @@ if not st.session_state.logged_in:
 
 
     password = st.text_input(
+
         "Password",
+
         type="password"
+
     )
 
 
@@ -208,8 +258,9 @@ if not st.session_state.logged_in:
             password
         ):
 
+
             st.success(
-                "Login successful"
+                "Welcome to Esan ERP"
             )
 
             st.rerun()
@@ -217,13 +268,14 @@ if not st.session_state.logged_in:
 
         else:
 
+
             st.error(
-                "Invalid username or password"
+                "Invalid login details"
             )
 
 
     st.info(
-        "Default administrator: admin / admin123"
+        "Default admin: admin / admin123"
     )
 
 
@@ -232,35 +284,71 @@ if not st.session_state.logged_in:
 
 
 # =====================================
-# MAIN HEADER
+# APPLICATION HEADER
 # =====================================
+
 
 st.title(
     "🌾 Esan ERP"
 )
 
 
-st.subheader(
-    COMPANY_NAME
+st.caption(
+
+f"{COMPANY_NAME} | Version {VERSION}"
+
 )
 
 
+
 # =====================================
-# SIDEBAR
+# THEME
 # =====================================
+
+
+theme = st.sidebar.selectbox(
+
+    "Theme",
+
+    [
+
+        "Light",
+
+        "Dark"
+
+    ]
+
+)
+
+
+esan_theme(theme)
+
+
+
+# =====================================
+# USER PANEL
+# =====================================
+
 
 st.sidebar.success(
-    f"User: {st.session_state.username}"
+
+f"User: {st.session_state.username}"
+
 )
 
+
 st.sidebar.info(
-    f"Role: {st.session_state.role}"
+
+f"Role: {st.session_state.role}"
+
 )
+
 
 
 if st.sidebar.button(
     "Logout"
 ):
+
 
     st.session_state.logged_in = False
 
@@ -268,207 +356,66 @@ if st.sidebar.button(
 
     st.session_state.role = None
 
+
     st.rerun()
 
 
 
-menu = st.sidebar.selectbox(
+# =====================================
+# MAIN NAVIGATION
+# =====================================
 
-    "Navigate",
 
-    [
-
-        "Dashboard",
-
-        "Procurement",
-
-        "Warehouse",
-
-        "Milling",
-
-        "Packaging",
-
-        "Sales",
-
-        "Finance",
-
-        "Reports",
-
-        "Settings"
-
-    ]
-)
+menu = esan_navigation()
 
 
 
 # =====================================
-# DASHBOARD
+# MODULE ROUTER
 # =====================================
 
-if menu == "Dashboard":
+
+if menu == "🏠 Dashboard":
+
+
+    dashboard_home()
+
+
+
+elif menu == "🚚 Sales & Distribution":
 
 
     st.header(
-        "📊 Executive Dashboard"
+        "🚚 Sales & Distribution"
     )
 
-
-    # KPI CARDS
-
-    st.subheader(
-        "Business Overview"
-    )
-
-
-    col1, col2, col3, col4 = st.columns(4)
-
-
-    with col1:
-
-        kpi_card(
-            "Production",
-            "128 Tonnes",
-            "+12%",
-            "🌾"
-        )
-
-
-    with col2:
-
-        kpi_card(
-            "Sales Today",
-            "UGX 45.2M",
-            "+8%",
-            "💰"
-        )
-
-
-    with col3:
-
-        kpi_card(
-            "Inventory",
-            "685 Tonnes",
-            "+5%",
-            "📦"
-        )
-
-
-    with col4:
-
-        kpi_card(
-            "Orders",
-            "24",
-            "+3",
-            "🚚"
-        )
-
-
-
-    st.divider()
-
-
-    # FACTORY STATUS
-
-    st.subheader(
-        "🏭 Factory Control Centre"
-    )
-
-
-    status1, status2 = st.columns(2)
-
-
-    with status1:
-
-        factory_status(
-            "Milling Line 1",
-            "Running"
-        )
-
-
-        factory_status(
-            "Milling Line 2",
-            "Running"
-        )
-
-
-        factory_status(
-            "Packaging Line",
-            "Warning"
-        )
-
-
-
-    with status2:
-
-        factory_status(
-            "Raw Material Warehouse",
-            "Running"
-        )
-
-
-        factory_status(
-            "Dispatch Yard",
-            "Running"
-        )
-
-
-        factory_status(
-            "Maintenance",
-            "Warning"
-        )
-
-
-
-    st.divider()
-
-
-    # NOTIFICATIONS
-
-    st.subheader(
-        "🔔 Notifications"
-    )
-
-
-    alerts = [
-
-        "New maize delivery expected today",
-
-        "Packaging material below reorder level",
-
-        "Production batch MB-001 completed",
-
-        "Truck scheduled for Juba dispatch"
-
-    ]
-
-
-    for alert in alerts:
-
-        notification(
-            alert
-        )
-
-
-
-# =====================================
-# OTHER MODULES
-# =====================================
-
-elif menu == "Sales":
 
     sales_menu = st.radio(
 
-        "Sales Navigation",
+        "Sales Module",
 
         [
 
             "Dashboard",
 
-            "Customers"
+            "Customers",
+
+            "Quotations",
+
+            "Sales Orders",
+
+            "Dispatch",
+
+            "Deliveries",
+
+            "Invoices",
+
+            "Payments"
 
         ]
 
     )
+
 
 
     if sales_menu == "Dashboard":
@@ -476,17 +423,47 @@ elif menu == "Sales":
         sales_dashboard()
 
 
+
     elif sales_menu == "Customers":
 
         customers_page()
-    
+
+
+
+    else:
+
+        st.info(
+
+        f"{sales_menu} module is coming next."
+
+        )
+
+
+
+else:
+
+
+    st.header(
+        menu
+    )
+
+
+    st.info(
+        "Module development in progress."
+    )
+
+
+
 # =====================================
 # FOOTER
 # =====================================
+
 
 st.divider()
 
 
 st.caption(
-    f"© {datetime.now().year} Nile Harvest Foods Ltd. | Esan ERP | Version {VERSION}"
+
+"© Nile Harvest Foods Ltd. | Esan ERP Enterprise Platform"
+
 )
