@@ -35,9 +35,7 @@ from services.user_service import create_admin
 
 from components.navigation import esan_navigation
 
-
 from components.themes import esan_theme
-
 
 
 # =====================================
@@ -55,72 +53,15 @@ except Exception:
 
 
 # =====================================
-# DASHBOARD MODULES
+# MODULE IMPORTS
 # =====================================
+
 
 from modules.dashboard.home import dashboard_home
 
 
 
-# =====================================
-# PROCUREMENT
-# =====================================
-
-try:
-
-    from modules.procurement.dashboard import procurement_dashboard
-
-except Exception:
-
-    procurement_dashboard = None
-
-
-
-# =====================================
-# WAREHOUSE
-# =====================================
-
-try:
-
-    from modules.warehouse.dashboard import warehouse_dashboard
-
-except Exception:
-
-    warehouse_dashboard = None
-
-
-
-# =====================================
-# MILLING
-# =====================================
-
-try:
-
-    from modules.milling.dashboard import milling_dashboard
-
-except Exception:
-
-    milling_dashboard = None
-
-
-
-# =====================================
-# PACKAGING
-# =====================================
-
-try:
-
-    from modules.packaging.dashboard import packaging_dashboard
-
-except Exception:
-
-    packaging_dashboard = None
-
-
-
-# =====================================
-# SALES
-# =====================================
+# Sales
 
 from modules.sales.dashboard import sales_dashboard
 
@@ -130,37 +71,53 @@ from modules.sales.orders import sales_orders_page
 
 
 
-# =====================================
-# FINANCE
-# =====================================
+
+# Optional modules
 
 try:
-
-    from modules.finance.dashboard import finance_dashboard
-
+    from modules.procurement.dashboard import procurement_dashboard
 except Exception:
+    procurement_dashboard = None
 
+
+
+try:
+    from modules.warehouse.dashboard import warehouse_dashboard
+except Exception:
+    warehouse_dashboard = None
+
+
+
+try:
+    from modules.milling.dashboard import milling_dashboard
+except Exception:
+    milling_dashboard = None
+
+
+
+try:
+    from modules.packaging.dashboard import packaging_dashboard
+except Exception:
+    packaging_dashboard = None
+
+
+
+try:
+    from modules.finance.dashboard import finance_dashboard
+except Exception:
     finance_dashboard = None
 
 
 
-# =====================================
-# REPORTS
-# =====================================
-
 try:
-
     from modules.reports.dashboard import reports_dashboard
-
 except Exception:
-
     reports_dashboard = None
 
 
 
-
 # =====================================
-# PAGE SETTINGS
+# PAGE CONFIGURATION
 # =====================================
 
 st.set_page_config(
@@ -170,6 +127,37 @@ st.set_page_config(
     page_icon="🌾",
 
     layout="wide"
+
+)
+
+
+
+# =====================================
+# HIDE STREAMLIT UI
+# =====================================
+
+st.markdown(
+
+"""
+<style>
+
+#MainMenu {
+display:none;
+}
+
+footer {
+display:none;
+}
+
+header {
+display:none;
+}
+
+</style>
+
+""",
+
+unsafe_allow_html=True
 
 )
 
@@ -203,7 +191,7 @@ try:
 except Exception as e:
 
     st.error(
-        "Database startup failed"
+        "Database initialization failed"
     )
 
     st.exception(e)
@@ -212,7 +200,7 @@ except Exception as e:
 
 
 # =====================================
-# SESSION
+# SESSION STATE
 # =====================================
 
 if "logged_in" not in st.session_state:
@@ -220,9 +208,11 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
 
+
 if "username" not in st.session_state:
 
     st.session_state.username = None
+
 
 
 if "role" not in st.session_state:
@@ -233,10 +223,10 @@ if "role" not in st.session_state:
 
 
 # =====================================
-# LOGIN
+# LOGIN FUNCTION
 # =====================================
 
-def login(username,password):
+def login(username, password):
 
 
     db = SessionLocal()
@@ -257,20 +247,26 @@ def login(username,password):
         )
 
 
-        if user and verify_password(
-            password,
-            user.password_hash
-        ):
+        if user:
 
 
-            st.session_state.logged_in=True
+            if verify_password(
 
-            st.session_state.username=user.username
+                password,
 
-            st.session_state.role=user.role
+                user.password_hash
+
+            ):
 
 
-            return True
+                st.session_state.logged_in = True
+
+                st.session_state.username = user.username
+
+                st.session_state.role = user.role
+
+
+                return True
 
 
         return False
@@ -284,31 +280,48 @@ def login(username,password):
 
 
 # =====================================
-# LOGIN SCREEN
+# LOGIN PAGE
 # =====================================
 
 if not st.session_state.logged_in:
 
 
-    st.title(
-        "🌾 Esan ERP"
+    st.markdown(
+
+    """
+    <div style="text-align:center">
+
+    <h1>🌾 Esan ERP</h1>
+
+    <h3>Nile Harvest Foods Ltd.</h3>
+
+    <p>
+    Enterprise Milling & Packaging Management System
+    </p>
+
+    </div>
+
+    """,
+
+    unsafe_allow_html=True
+
     )
 
 
-    st.subheader(
-        COMPANY_NAME
-    )
 
-
-    username=st.text_input(
+    username = st.text_input(
         "Username"
     )
 
 
-    password=st.text_input(
+    password = st.text_input(
+
         "Password",
+
         type="password"
+
     )
+
 
 
     if st.button(
@@ -319,20 +332,22 @@ if not st.session_state.logged_in:
         if login(username,password):
 
             st.success(
-                "Welcome to Esan ERP"
+                "Login successful"
             )
 
             st.rerun()
 
+
         else:
 
             st.error(
-                "Invalid login"
+                "Invalid username or password"
             )
 
 
+
     st.info(
-        "Default admin: admin / admin123"
+        "Default administrator: admin / admin123"
     )
 
 
@@ -342,7 +357,7 @@ if not st.session_state.logged_in:
 
 
 # =====================================
-# MAIN APP
+# HEADER
 # =====================================
 
 st.title(
@@ -351,18 +366,27 @@ st.title(
 
 
 st.caption(
-    f"{COMPANY_NAME} | Version {VERSION}"
+
+f"{COMPANY_NAME} | Version {VERSION}"
+
 )
 
 
 
+# =====================================
+# THEME
+# =====================================
+
 theme = st.sidebar.selectbox(
 
-    "Theme",
+    "Appearance",
 
     [
+
         "Light",
+
         "Dark"
+
     ]
 
 )
@@ -372,9 +396,21 @@ esan_theme(theme)
 
 
 
+
+# =====================================
+# USER PANEL
+# =====================================
+
 st.sidebar.success(
 
-    f"User: {st.session_state.username}"
+f"User: {st.session_state.username}"
+
+)
+
+
+st.sidebar.info(
+
+f"Role: {st.session_state.role}"
 
 )
 
@@ -384,7 +420,12 @@ if st.sidebar.button(
     "Logout"
 ):
 
-    st.session_state.logged_in=False
+    st.session_state.logged_in = False
+
+    st.session_state.username = None
+
+    st.session_state.role = None
+
 
     st.rerun()
 
@@ -401,7 +442,7 @@ menu = esan_navigation()
 
 
 # =====================================
-# ROUTER
+# ERP ROUTER
 # =====================================
 
 
@@ -421,7 +462,7 @@ elif menu == "🌾 Procurement":
     else:
 
         st.warning(
-            "Procurement module not installed."
+            "Procurement module not available yet."
         )
 
 
@@ -436,7 +477,7 @@ elif menu == "📦 Warehouse":
     else:
 
         st.warning(
-            "Warehouse module not installed."
+            "Warehouse module not available yet."
         )
 
 
@@ -451,7 +492,7 @@ elif menu == "🏭 Milling":
     else:
 
         st.warning(
-            "Milling module not installed."
+            "Milling module not available yet."
         )
 
 
@@ -466,7 +507,7 @@ elif menu == "📦 Packaging":
     else:
 
         st.warning(
-            "Packaging module not installed."
+            "Packaging module not available yet."
         )
 
 
@@ -481,7 +522,7 @@ elif menu == "🚚 Sales & Distribution":
 
     sales_menu = st.radio(
 
-        "Sales Menu",
+        "Sales Module",
 
         [
 
@@ -489,27 +530,46 @@ elif menu == "🚚 Sales & Distribution":
 
             "Customers",
 
-            "Sales Orders"
+            "Sales Orders",
+
+            "Quotations",
+
+            "Dispatch",
+
+            "Deliveries",
+
+            "Invoices",
+
+            "Payments"
 
         ]
 
     )
 
 
-    if sales_menu=="Dashboard":
+    if sales_menu == "Dashboard":
 
         sales_dashboard()
 
 
-    elif sales_menu=="Customers":
+
+    elif sales_menu == "Customers":
 
         customers_page()
 
 
-    elif sales_menu=="Sales Orders":
+
+    elif sales_menu == "Sales Orders":
 
         sales_orders_page()
 
+
+
+    else:
+
+        st.info(
+            f"{sales_menu} module will be developed next."
+        )
 
 
 
@@ -523,9 +583,8 @@ elif menu == "💰 Finance":
     else:
 
         st.warning(
-            "Finance module not installed."
+            "Finance module not available yet."
         )
-
 
 
 
@@ -539,8 +598,16 @@ elif menu == "📊 Reports":
     else:
 
         st.warning(
-            "Reports module not installed."
+            "Reports module not available yet."
         )
+
+
+
+else:
+
+    st.info(
+        "Select a module from the navigation menu."
+    )
 
 
 
@@ -551,6 +618,9 @@ elif menu == "📊 Reports":
 
 st.divider()
 
+
 st.caption(
+
 "© Nile Harvest Foods Ltd. | Esan ERP Enterprise Platform"
+
 )
