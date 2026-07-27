@@ -6,161 +6,269 @@ Enterprise Milling & Packaging Management System
 Version 1.2.0 Alpha
 """
 
+
 import streamlit as st
-import os
-from config import COMPANY_NAME, VERSION
-from database import Base, engine, SessionLocal, DATABASE_URL
+import os                                     # ← added for database rebuild
+from sqlalchemy import inspect                # ← added for schema check
+
+
+# =====================================
+# CORE IMPORTS
+# =====================================
+
+from config import (
+    COMPANY_NAME,
+    VERSION
+)
+
+
+from database import (
+    Base,
+    engine,
+    SessionLocal,
+    DATABASE_URL                             # ← added for rebuild
+)
+
+
 from models import User
+
+
 from auth import verify_password
-from sqlalchemy import inspect
 
-# =====================================
-# CRITICAL SERVICE / COMPONENT IMPORTS
-# =====================================
-try:
-    from services.user_service import create_admin
-except ImportError:
-    def create_admin(db):
-        admin = db.query(User).filter(User.username == "admin").first()
-        if not admin:
-            from auth import hash_password
-            admin = User(
-                username="admin",
-                password_hash=hash_password("admin123"),
-                role="admin",
-                email="admin@nileharvest.com"
-            )
-            db.add(admin)
-            db.commit()
 
-try:
-    from components.navigation import esan_navigation
-except ImportError:
-    def esan_navigation():
-        """Fallback sidebar navigation."""
-        menu_options = [
-            "Overview", "🌾 Procurement", "📦 Warehouse", "🏭 Milling",
-            "📦 Packaging", "🚚 Sales", "💰 Finance", "📊 Reports"
-        ]
-        return st.sidebar.selectbox("Navigation", menu_options)
+from services.user_service import create_admin
 
-try:
-    from components.themes import esan_theme
-except ImportError:
-    def esan_theme(theme):
-        pass
+
+from components.navigation import esan_navigation
+
+
+from components.themes import esan_theme
+
+
+
 
 # =====================================
 # OPTIONAL SEED DATA
 # =====================================
+
 try:
+
     from seed.seed_data import load_seed_data
-except ImportError:
+
+except Exception:
+
     load_seed_data = None
 
+
+
+
 # =====================================
-# MODULE IMPORTS (with fallbacks)
+# MODULE IMPORTS
 # =====================================
-module_functions = {
-    "Overview": None,
-    "🌾 Procurement": None,
-    "📦 Warehouse": None,
-    "🏭 Milling": None,
-    "📦 Packaging": None,
-    "🚚 Sales": None,
-    "💰 Finance": None,
-    "📊 Reports": None,
-}
+
 
 try:
+
     from modules.dashboard.home import dashboard_home
-    module_functions["Overview"] = dashboard_home
-except ImportError:
-    pass
+
+except Exception:
+
+    dashboard_home = None
+
+
+
+
+# SALES
 
 try:
-    from modules.procurement.dashboard import procurement_dashboard
-    module_functions["🌾 Procurement"] = procurement_dashboard
-except ImportError:
-    pass
 
-try:
-    from modules.warehouse.dashboard import warehouse_dashboard
-    module_functions["📦 Warehouse"] = warehouse_dashboard
-except ImportError:
-    pass
-
-try:
-    from modules.milling.dashboard import milling_dashboard
-    module_functions["🏭 Milling"] = milling_dashboard
-except ImportError:
-    pass
-
-try:
-    from modules.packaging.dashboard import packaging_dashboard
-    module_functions["📦 Packaging"] = packaging_dashboard
-except ImportError:
-    pass
-
-try:
     from modules.sales.dashboard import sales_dashboard
-    module_functions["🚚 Sales"] = sales_dashboard
-except ImportError:
-    pass
+
+except Exception:
+
+    sales_dashboard = None
+
+
 
 try:
+
+    from modules.sales.customers import customers_page
+
+except Exception:
+
+    customers_page = None
+
+
+
+try:
+
+    from modules.sales.orders import sales_orders_page
+
+except Exception:
+
+    sales_orders_page = None
+
+
+
+try:
+
+    from modules.sales.quotations import quotations_page
+
+except Exception:
+
+    quotations_page = None
+
+
+
+
+# PROCUREMENT
+
+try:
+
+    from modules.procurement.dashboard import procurement_dashboard
+
+except Exception:
+
+    procurement_dashboard = None
+
+
+
+
+# WAREHOUSE
+
+try:
+
+    from modules.warehouse.dashboard import warehouse_dashboard
+
+except Exception:
+
+    warehouse_dashboard = None
+
+
+
+
+# MILLING
+
+try:
+
+    from modules.milling.dashboard import milling_dashboard
+
+except Exception:
+
+    milling_dashboard = None
+
+
+
+
+# PACKAGING
+
+try:
+
+    from modules.packaging.dashboard import packaging_dashboard
+
+except Exception:
+
+    packaging_dashboard = None
+
+
+
+
+# FINANCE
+
+try:
+
     from modules.finance.dashboard import finance_dashboard
-    module_functions["💰 Finance"] = finance_dashboard
-except ImportError:
-    pass
+
+except Exception:
+
+    finance_dashboard = None
+
+
+
+
+# REPORTS
 
 try:
+
     from modules.reports.dashboard import reports_dashboard
-    module_functions["📊 Reports"] = reports_dashboard
-except ImportError:
-    pass
+
+except Exception:
+
+    reports_dashboard = None
+
+
+
 
 # =====================================
 # PAGE CONFIGURATION
 # =====================================
+
 st.set_page_config(
+
     page_title="Esan ERP",
+
     page_icon="🌾",
-    layout="wide",
-    initial_sidebar_state="expanded"
+
+    layout="wide"
+
 )
 
-# =====================================
-# CLEAN UI – hide only header/footer/menu
-# =====================================
-st.markdown("""
-<style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    .block-container { padding-top: 2rem; padding-bottom: 1rem; }
-</style>
-""", unsafe_allow_html=True)
+
+
 
 # =====================================
-# DATABASE REBUILD IF SCHEMA CHANGED
+# STREAMLIT CLEAN UI
 # =====================================
+
+st.markdown(
+
+"""
+<style>
+
+#MainMenu {
+display:none;
+}
+
+
+footer {
+display:none;
+}
+
+
+header {
+display:none;
+}
+
+</style>
+""",
+
+unsafe_allow_html=True
+
+)
+
+
+
+
+# =====================================
+# DATABASE INITIALIZATION (with auto-repair)
+# =====================================
+
 def rebuild_database():
+    """Delete old database file and recreate tables from models."""
     try:
         if "sqlite:///" in DATABASE_URL:
             db_path = DATABASE_URL.replace("sqlite:///", "")
             if os.path.exists(db_path):
                 os.remove(db_path)
-                st.warning("🔄 Database schema updated. Rebuilding...")
+                st.warning("🔄 Database schema updated. Rebuilding with fresh tables...")
     except Exception:
         pass
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 
-# =====================================
-# DATABASE INITIALIZATION
-# =====================================
 try:
+
+    # Check for missing columns before seeding
     needs_rebuild = False
     inspector = inspect(engine)
     existing_tables = inspector.get_table_names()
@@ -180,143 +288,507 @@ try:
         Base.metadata.create_all(bind=engine)
 
     db = SessionLocal()
-    try:
-        create_admin(db)
-    finally:
-        db.close()
+    create_admin(db)
+    db.close()
 
     if load_seed_data:
         load_seed_data()
+
 except Exception as e:
-    st.error("Database initialization failed")
+
+    st.error(
+        "Database initialization failed"
+    )
+
     st.exception(e)
+
+
 
 # =====================================
 # SESSION STATE
 # =====================================
+
 if "logged_in" not in st.session_state:
+
     st.session_state.logged_in = False
+
+
+
+if "username" not in st.session_state:
+
     st.session_state.username = None
+
+
+
+if "role" not in st.session_state:
+
     st.session_state.role = None
 
-def login(username, password):
+
+
+
+# =====================================
+# LOGIN FUNCTION
+# =====================================
+
+def login(username,password):
+
+
     db = SessionLocal()
+
+
     try:
-        user = db.query(User).filter(User.username == username).first()
-        if user and verify_password(password, user.password_hash):
-            st.session_state.logged_in = True
-            st.session_state.username = user.username
-            st.session_state.role = user.role
-            return True
+
+
+        user = (
+
+            db.query(User)
+
+            .filter(
+                User.username == username
+            )
+
+            .first()
+
+        )
+
+
+
+        if user:
+
+
+            if verify_password(
+
+                password,
+
+                user.password_hash
+
+            ):
+
+
+                st.session_state.logged_in = True
+
+                st.session_state.username = user.username
+
+                st.session_state.role = user.role
+
+
+                return True
+
+
+
         return False
+
+
+
     finally:
+
         db.close()
 
 # =====================================
-# LOGIN SCREEN (no sidebar before login)
+# LOGIN SCREEN
 # =====================================
-if not st.session_state.logged_in:
-    st.markdown("""
-    <div style="text-align:center; margin-top: 10vh;">
-        <h1>🌾 Esan ERP</h1>
-        <h3>Nile Harvest Foods Ltd.</h3>
-        <p>Enterprise Milling & Packaging Management System</p>
-    </div>
-    """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        if st.button("Login", use_container_width=True):
-            if login(username, password):
-                st.success("Login successful")
-                st.rerun()
-            else:
-                st.error("Invalid username or password")
-        st.info("Default administrator: admin / admin123")
+if not st.session_state.logged_in:
+
+
+    st.markdown(
+
+    """
+    <div style="text-align:center">
+
+    <h1>🌾 Esan ERP</h1>
+
+    <h3>Nile Harvest Foods Ltd.</h3>
+
+    <p>
+    Enterprise Milling & Packaging Management System
+    </p>
+
+    </div>
+    """,
+
+    unsafe_allow_html=True
+
+    )
+
+
+    username = st.text_input(
+        "Username"
+    )
+
+
+    password = st.text_input(
+        "Password",
+        type="password"
+    )
+
+
+
+    if st.button(
+        "Login"
+    ):
+
+
+        if login(
+            username,
+            password
+        ):
+
+            st.success(
+                "Login successful"
+            )
+
+            st.rerun()
+
+
+        else:
+
+            st.error(
+                "Invalid username or password"
+            )
+
+
+    st.info(
+        "Default administrator: admin / admin123"
+    )
+
+
     st.stop()
 
-# =====================================
-# MAIN APP (after login)
-# =====================================
-st.title("🌾 Esan ERP")
-st.caption(f"{COMPANY_NAME} | Version {VERSION}")
+
+
 
 # =====================================
-# SIDEBAR – USER, THEME, LOGOUT, NAVIGATION
+# APPLICATION HEADER
 # =====================================
-with st.sidebar:
-    st.markdown("## 👤 User Panel")
-    st.success(f"User: **{st.session_state.username}**")
-    st.info(f"Role: **{st.session_state.role}**")
 
-    theme = st.selectbox("🎨 Appearance", ["Light", "Dark"])
-    esan_theme(theme)
+st.title(
+    "🌾 Esan ERP"
+)
 
-    if st.button("🚪 Logout"):
-        st.session_state.logged_in = False
-        st.session_state.username = None
-        st.session_state.role = None
-        st.rerun()
 
-    st.divider()
-    st.markdown("## 📋 Navigation")
-    menu = esan_navigation()   # renders navigation inside sidebar
+st.caption(
+    f"{COMPANY_NAME} | Version {VERSION}"
+)
+
+
+
+
+# =====================================
+# THEME
+# =====================================
+
+theme = st.sidebar.selectbox(
+
+    "Appearance",
+
+    [
+        "Light",
+        "Dark"
+    ]
+
+)
+
+
+esan_theme(theme)
+
+
+
+
+# =====================================
+# USER PANEL
+# =====================================
+
+st.sidebar.success(
+
+    f"User: {st.session_state.username}"
+
+)
+
+
+st.sidebar.info(
+
+    f"Role: {st.session_state.role}"
+
+)
+
+
+
+if st.sidebar.button(
+    "Logout"
+):
+
+
+    st.session_state.logged_in = False
+
+    st.session_state.username = None
+
+    st.session_state.role = None
+
+    st.rerun()
+
+
+
+
+# =====================================
+# NAVIGATION
+# =====================================
+
+menu = esan_navigation()
+
+
+
 
 # =====================================
 # ERP MODULE ROUTER
 # =====================================
+
+
 if menu == "Overview":
-    if module_functions["Overview"]:
-        module_functions["Overview"]()
+
+
+    if dashboard_home:
+
+        dashboard_home()
+
     else:
-        st.info("Dashboard module not available.")
+
+        st.info(
+            "Dashboard module not available."
+        )
+
+
+
 
 elif menu == "🌾 Procurement":
-    if module_functions["🌾 Procurement"]:
-        module_functions["🌾 Procurement"]()
+
+
+    if procurement_dashboard:
+
+        procurement_dashboard()
+
     else:
-        st.warning("Procurement module not available.")
+
+        st.warning(
+            "Procurement module not available."
+        )
+
+
+
 
 elif menu == "📦 Warehouse":
-    if module_functions["📦 Warehouse"]:
-        module_functions["📦 Warehouse"]()
+
+
+    if warehouse_dashboard:
+
+        warehouse_dashboard()
+
     else:
-        st.warning("Warehouse module not available.")
+
+        st.warning(
+            "Warehouse module not available."
+        )
+
+
+
 
 elif menu == "🏭 Milling":
-    if module_functions["🏭 Milling"]:
-        module_functions["🏭 Milling"]()
+
+
+    if milling_dashboard:
+
+        milling_dashboard()
+
     else:
-        st.warning("Milling module not available.")
+
+        st.warning(
+            "Milling module not available."
+        )
+
+
+
 
 elif menu == "📦 Packaging":
-    if module_functions["📦 Packaging"]:
-        module_functions["📦 Packaging"]()
-    else:
-        st.warning("Packaging module not available.")
 
-elif menu == "🚚 Sales":
-    if module_functions["🚚 Sales"]:
-        module_functions["🚚 Sales"]()
+
+    if packaging_dashboard:
+
+        packaging_dashboard()
+
     else:
-        st.info("Sales module under development.")
+
+        st.warning(
+            "Packaging module not available."
+        )
+
+
+
+
+elif menu == "🚚 Sales & Distribution":
+
+
+    st.header(
+        "🚚 Sales & Distribution"
+    )
+
+
+    sales_menu = st.radio(
+
+        "Sales Module",
+
+        [
+
+            "Dashboard",
+
+            "Customers",
+
+            "Quotations",
+
+            "Sales Orders",
+
+            "Dispatch",
+
+            "Deliveries",
+
+            "Invoices",
+
+            "Payments"
+
+        ]
+
+    )
+
+
+
+    if sales_menu == "Dashboard":
+
+
+        if sales_dashboard:
+
+            sales_dashboard()
+
+        else:
+
+            st.warning(
+                "Sales dashboard unavailable."
+            )
+
+
+
+
+    elif sales_menu == "Customers":
+
+
+        if customers_page:
+
+            customers_page()
+
+        else:
+
+            st.warning(
+                "Customers module unavailable."
+            )
+
+
+
+
+    elif sales_menu == "Quotations":
+
+
+        if quotations_page:
+
+            quotations_page()
+
+        else:
+
+            st.warning(
+                "Quotation module unavailable."
+            )
+
+
+
+
+    elif sales_menu == "Sales Orders":
+
+
+        if sales_orders_page:
+
+            sales_orders_page()
+
+        else:
+
+            st.warning(
+                "Sales Orders module unavailable."
+            )
+
+
+
+
+    else:
+
+
+        st.info(
+
+            f"{sales_menu} module will be developed next."
+
+        )
+
+
+
+
 
 elif menu == "💰 Finance":
-    if module_functions["💰 Finance"]:
-        module_functions["💰 Finance"]()
+
+
+    if finance_dashboard:
+
+        finance_dashboard()
+
     else:
-        st.warning("Finance module not available.")
+
+        st.warning(
+            "Finance module unavailable."
+        )
+
+
+
 
 elif menu == "📊 Reports":
-    if module_functions["📊 Reports"]:
-        module_functions["📊 Reports"]()
+
+
+    if reports_dashboard:
+
+        reports_dashboard()
+
     else:
-        st.warning("Reports module not available.")
+
+        st.warning(
+            "Reports module unavailable."
+        )
+
+
+
 
 else:
-    st.info("Select a module from the sidebar.")
+
+
+    st.info(
+        "Select a module from the navigation menu."
+    )
+
+
+
+
+# =====================================
+# FOOTER
+# =====================================
 
 st.divider()
-st.caption("© Nile Harvest Foods Ltd. | Esan ERP Enterprise Platform")
+
+
+st.caption(
+
+"© Nile Harvest Foods Ltd. | Esan ERP Enterprise Platform"
+
+)
