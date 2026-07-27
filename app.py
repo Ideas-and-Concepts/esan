@@ -37,7 +37,12 @@ try:
     from components.navigation import esan_navigation
 except ImportError:
     def esan_navigation():
-        return "Overview"
+        """Fallback simple navigation."""
+        menu_options = [
+            "Overview", "🌾 Procurement", "📦 Warehouse", "🏭 Milling",
+            "📦 Packaging", "🚚 Sales", "💰 Finance", "📊 Reports"
+        ]
+        return st.sidebar.selectbox("Navigation", menu_options)
 
 try:
     from components.themes import esan_theme
@@ -54,7 +59,7 @@ except ImportError:
     load_seed_data = None
 
 # =====================================
-# MODULE IMPORTS (fallbacks)
+# MODULE IMPORTS (with fallbacks)
 # =====================================
 module_functions = {
     "Overview": None,
@@ -118,14 +123,34 @@ except ImportError:
 # =====================================
 # PAGE CONFIGURATION
 # =====================================
-st.set_page_config(page_title="Esan ERP", page_icon="🌾", layout="wide")
+st.set_page_config(page_title="Esan ERP", page_icon="🌾", layout="wide", initial_sidebar_state="expanded")
 
-# Clean Streamlit UI
+# =====================================
+# COMPLETELY CLEAN UI – HIDE ALL STREAMLIT BRANDING
+# =====================================
 st.markdown("""
 <style>
-#MainMenu {display:none;}
-footer {display:none;}
-header {display:none;}
+    /* Hide default Streamlit header, footer, and hamburger menu */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Hide the default sidebar toggle arrow (optional) */
+    [data-testid="stSidebar"] > div:first-child {
+        display: none;
+    }
+    
+    /* Make sidebar fully custom */
+    section[data-testid="stSidebar"] {
+        background-color: #f8f9fa;
+        padding-top: 1rem;
+    }
+    
+    /* Remove padding from the main area to maximize space */
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 1rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -135,31 +160,25 @@ header {display:none;}
 def rebuild_database():
     """Delete old database file and recreate from models."""
     try:
-        # Extract the file path from DATABASE_URL (sqlite:///esan_erp.db -> esan_erp.db)
         if "sqlite:///" in DATABASE_URL:
             db_path = DATABASE_URL.replace("sqlite:///", "")
             if os.path.exists(db_path):
                 os.remove(db_path)
                 st.warning("🔄 Database schema updated. Rebuilding with fresh tables...")
     except Exception:
-        pass  # If we can't delete the file, drop all tables via SQLAlchemy instead
-    
-    # Drop all existing tables
+        pass
     Base.metadata.drop_all(bind=engine)
-    # Create all tables from current model definitions
     Base.metadata.create_all(bind=engine)
 
 # =====================================
 # DATABASE INITIALIZATION
 # =====================================
 try:
-    # Check if database needs rebuilding
     needs_rebuild = False
     inspector = inspect(engine)
     existing_tables = inspector.get_table_names()
-    
+
     if existing_tables:
-        # Check if all required columns exist
         for table_name, table in Base.metadata.tables.items():
             if table_name in existing_tables:
                 existing_cols = {col['name'] for col in inspector.get_columns(table_name)}
@@ -167,21 +186,18 @@ try:
                 if model_cols - existing_cols:
                     needs_rebuild = True
                     break
-    
+
     if needs_rebuild:
         rebuild_database()
     else:
-        # Just create any missing tables
         Base.metadata.create_all(bind=engine)
 
-    # Create admin user
     db = SessionLocal()
     try:
         create_admin(db)
     finally:
         db.close()
 
-    # Load seed data
     if load_seed_data:
         load_seed_data()
 
@@ -196,7 +212,6 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.username = None
     st.session_state.role = None
-    st.session_state.page = "Overview"
 
 # =====================================
 # LOGIN FUNCTION
@@ -215,55 +230,56 @@ def login(username, password):
         db.close()
 
 # =====================================
-# LOGIN SCREEN
+# LOGIN SCREEN (before sidebar)
 # =====================================
 if not st.session_state.logged_in:
     st.markdown("""
-    <div style="text-align:center">
-    <h1>🌾 Esan ERP</h1>
-    <h3>Nile Harvest Foods Ltd.</h3>
-    <p>Enterprise Milling & Packaging Management System</p>
+    <div style="text-align:center; margin-top: 10vh;">
+        <h1>🌾 Esan ERP</h1>
+        <h3>Nile Harvest Foods Ltd.</h3>
+        <p>Enterprise Milling & Packaging Management System</p>
     </div>
     """, unsafe_allow_html=True)
 
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-
-    if st.button("Login"):
-        if login(username, password):
-            st.success("Login successful")
-            st.rerun()
-        else:
-            st.error("Invalid username or password")
-
-    st.info("Default administrator: admin / admin123")
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        if st.button("Login", use_container_width=True):
+            if login(username, password):
+                st.success("Login successful")
+                st.rerun()
+            else:
+                st.error("Invalid username or password")
+        st.info("Default administrator: admin / admin123")
     st.stop()
 
 # =====================================
-# APPLICATION HEADER
+# APP HEADER (after login)
 # =====================================
 st.title("🌾 Esan ERP")
 st.caption(f"{COMPANY_NAME} | Version {VERSION}")
 
 # =====================================
-# SIDEBAR: USER, THEME, NAVIGATION
+# SIDEBAR – USER, THEME, NAVIGATION
 # =====================================
-st.sidebar.success(f"User: {st.session_state.username}")
-st.sidebar.info(f"Role: {st.session_state.role}")
-
-theme = st.sidebar.selectbox("Appearance", ["Light", "Dark"])
-esan_theme(theme)
-
-if st.sidebar.button("Logout"):
-    st.session_state.logged_in = False
-    st.session_state.username = None
-    st.session_state.role = None
-    st.rerun()
-
-# Sidebar navigation
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📋 Navigation")
-menu = esan_navigation()
+with st.sidebar:
+    st.markdown("## 👤 User Panel")
+    st.success(f"User: **{st.session_state.username}**")
+    st.info(f"Role: **{st.session_state.role}**")
+    
+    theme = st.selectbox("🎨 Appearance", ["Light", "Dark"])
+    esan_theme(theme)
+    
+    if st.button("🚪 Logout"):
+        st.session_state.logged_in = False
+        st.session_state.username = None
+        st.session_state.role = None
+        st.rerun()
+    
+    st.divider()
+    st.markdown("## 📋 Navigation")
+    menu = esan_navigation()
 
 # =====================================
 # ERP MODULE ROUTER
@@ -298,8 +314,7 @@ elif menu == "📦 Packaging":
     else:
         st.warning("Packaging module not available.")
 
-elif menu == "🚚 Sales & Distribution":
-    st.header("🚚 Sales & Distribution")
+elif menu == "🚚 Sales":
     if module_functions["🚚 Sales"]:
         module_functions["🚚 Sales"]()
     else:
@@ -320,6 +335,6 @@ elif menu == "📊 Reports":
 else:
     st.info("Select a module from the sidebar.")
 
-# Footer
+# Footer (in main area)
 st.divider()
 st.caption("© Nile Harvest Foods Ltd. | Esan ERP Enterprise Platform")
