@@ -16,6 +16,9 @@ from sqlalchemy import (
 
 from database import Base
 
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
+from datetime import datetime
+
 
 
 # =====================================
