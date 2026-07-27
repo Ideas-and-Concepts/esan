@@ -37,6 +37,7 @@ from components.navigation import esan_navigation
 
 from components.themes import esan_theme
 
+from modules.sales.quotations import quotations_page
 
 # =====================================
 # SEED DATA
