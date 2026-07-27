@@ -521,6 +521,22 @@ if st.sidebar.button(
 
 menu = esan_navigation()
 
+menu = st.sidebar.radio(
+    "Navigation",
+    [
+        "Overview",
+        "🌾 Procurement",
+        "📦 Warehouse",
+        "🏭 Milling",
+        "📦 Packaging",
+        "🚚 Sales & Distribution",
+        "💰 Finance",
+        "📊 Reports"
+    ]
+)
+
+return menu
+
 
 
 
