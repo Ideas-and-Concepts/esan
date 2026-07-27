@@ -9,6 +9,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from modules.sales.dashboard import sales_dashboard
 
 # =====================================
 # PAGE CONFIGURATION
