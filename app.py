@@ -7,35 +7,22 @@ Version 1.2.0 Alpha
 """
 
 import streamlit as st
-
-# =====================================
-# CORE IMPORTS
-# =====================================
-from config import (
-    COMPANY_NAME,
-    VERSION
-)
-
-from database import (
-    Base,
-    engine,
-    SessionLocal
-)
-
+from config import COMPANY_NAME, VERSION
+from database import Base, engine, SessionLocal
 from models import User
-
 from auth import verify_password
 
-# Wrap critical service/component imports so missing modules won't crash the app
+# =====================================
+# CRITICAL SERVICE / COMPONENT IMPORTS
+# =====================================
 try:
     from services.user_service import create_admin
 except ImportError:
-    # Fallback: define a simple admin creation function
     def create_admin(db):
-        """Ensure a default admin user exists."""
+        """Fallback: create default admin if missing."""
         admin = db.query(User).filter(User.username == "admin").first()
         if not admin:
-            from auth import hash_password  # assumes hash_password exists in auth
+            from auth import hash_password
             admin = User(
                 username="admin",
                 password_hash=hash_password("admin123"),
@@ -46,17 +33,9 @@ except ImportError:
             db.commit()
 
 try:
-    from components.navigation import esan_navigation
-except ImportError:
-    def esan_navigation():
-        """Fallback navigation returning Overview."""
-        return "Overview"
-
-try:
     from components.themes import esan_theme
 except ImportError:
     def esan_theme(theme):
-        """No‑op theme fallback."""
         pass
 
 # =====================================
@@ -64,112 +43,131 @@ except ImportError:
 # =====================================
 try:
     from seed.seed_data import load_seed_data
-except Exception:
+except ImportError:
     load_seed_data = None
 
 # =====================================
-# MODULE IMPORTS
+# MODULE IMPORTS (with fallbacks)
 # =====================================
+module_functions = {
+    "Overview": None,
+    "🌾 Procurement": None,
+    "📦 Warehouse": None,
+    "🏭 Milling": None,
+    "📦 Packaging": None,
+    "🚚 Sales": None,
+    "💰 Finance": None,
+    "📊 Reports": None,
+}
 
 try:
     from modules.dashboard.home import dashboard_home
-except Exception:
-    dashboard_home = None
+    module_functions["Overview"] = dashboard_home
+except ImportError:
+    pass
 
-# SALES
-try:
-    from modules.sales.dashboard import sales_dashboard
-except Exception:
-    sales_dashboard = None
-
-try:
-    from modules.sales.customers import customers_page
-except Exception:
-    customers_page = None
-
-try:
-    from modules.sales.orders import sales_orders_page
-except Exception:
-    sales_orders_page = None
-
-try:
-    from modules.sales.quotations import quotations_page
-except Exception:
-    quotations_page = None
-
-# PROCUREMENT
 try:
     from modules.procurement.dashboard import procurement_dashboard
-except Exception:
-    procurement_dashboard = None
+    module_functions["🌾 Procurement"] = procurement_dashboard
+except ImportError:
+    pass
 
-# WAREHOUSE
 try:
     from modules.warehouse.dashboard import warehouse_dashboard
-except Exception:
-    warehouse_dashboard = None
+    module_functions["📦 Warehouse"] = warehouse_dashboard
+except ImportError:
+    pass
 
-# MILLING
 try:
     from modules.milling.dashboard import milling_dashboard
-except Exception:
-    milling_dashboard = None
+    module_functions["🏭 Milling"] = milling_dashboard
+except ImportError:
+    pass
 
-# PACKAGING
 try:
     from modules.packaging.dashboard import packaging_dashboard
-except Exception:
-    packaging_dashboard = None
+    module_functions["📦 Packaging"] = packaging_dashboard
+except ImportError:
+    pass
 
-# FINANCE
+try:
+    from modules.sales.dashboard import sales_dashboard
+    module_functions["🚚 Sales"] = sales_dashboard
+except ImportError:
+    pass
+
 try:
     from modules.finance.dashboard import finance_dashboard
-except Exception:
-    finance_dashboard = None
+    module_functions["💰 Finance"] = finance_dashboard
+except ImportError:
+    pass
 
-# REPORTS
 try:
     from modules.reports.dashboard import reports_dashboard
-except Exception:
-    reports_dashboard = None
+    module_functions["📊 Reports"] = reports_dashboard
+except ImportError:
+    pass
 
 # =====================================
 # PAGE CONFIGURATION
 # =====================================
-st.set_page_config(
-    page_title="Esan ERP",
-    page_icon="🌾",
-    layout="wide"
-)
+st.set_page_config(page_title="Esan ERP", page_icon="🌾", layout="wide")
 
-# =====================================
-# STREAMLIT CLEAN UI
-# =====================================
-st.markdown(
-    """
-    <style>
-    #MainMenu {display:none;}
-    footer {display:none;}
-    header {display:none;}
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+# Clean Streamlit UI & bottom nav spacing
+st.markdown("""
+<style>
+#MainMenu {display:none;}
+footer {display:none;}
+header {display:none;}
+
+.main > div {
+    padding-bottom: 90px;
+}
+
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: #f0f2f6;
+    padding: 10px 20px;
+    box-shadow: 0px -2px 5px rgba(0,0,0,0.1);
+    z-index: 999;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.bottom-nav button {
+    font-size: 14px !important;
+    padding: 8px 10px !important;
+    border-radius: 8px !important;
+    background: none !important;
+    border: none !important;
+    color: #333 !important;
+    transition: 0.2s;
+}
+.bottom-nav button:hover {
+    background: #e0e4e8 !important;
+}
+.bottom-nav .active {
+    background: #d0d5dd !important;
+    font-weight: bold;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # =====================================
 # DATABASE INITIALIZATION
 # =====================================
 try:
     Base.metadata.create_all(bind=engine)
-
     db = SessionLocal()
     try:
         create_admin(db)
     finally:
-        db.close()  # ensure connection is closed even if create_admin fails
-
+        db.close()
     if load_seed_data:
-        load_seed_data()  # may or may not accept a session; keep as is
+        load_seed_data()
 except Exception as e:
     st.error("Database initialization failed")
     st.exception(e)
@@ -179,12 +177,9 @@ except Exception as e:
 # =====================================
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-
-if "username" not in st.session_state:
     st.session_state.username = None
-
-if "role" not in st.session_state:
     st.session_state.role = None
+    st.session_state.page = "Overview"
 
 # =====================================
 # LOGIN FUNCTION
@@ -192,17 +187,12 @@ if "role" not in st.session_state:
 def login(username, password):
     db = SessionLocal()
     try:
-        user = (
-            db.query(User)
-            .filter(User.username == username)
-            .first()
-        )
-        if user:
-            if verify_password(password, user.password_hash):
-                st.session_state.logged_in = True
-                st.session_state.username = user.username
-                st.session_state.role = user.role
-                return True
+        user = db.query(User).filter(User.username == username).first()
+        if user and verify_password(password, user.password_hash):
+            st.session_state.logged_in = True
+            st.session_state.username = user.username
+            st.session_state.role = user.role
+            return True
         return False
     finally:
         db.close()
@@ -211,16 +201,13 @@ def login(username, password):
 # LOGIN SCREEN
 # =====================================
 if not st.session_state.logged_in:
-    st.markdown(
-        """
-        <div style="text-align:center">
-        <h1>🌾 Esan ERP</h1>
-        <h3>Nile Harvest Foods Ltd.</h3>
-        <p>Enterprise Milling & Packaging Management System</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown("""
+    <div style="text-align:center">
+    <h1>🌾 Esan ERP</h1>
+    <h3>Nile Harvest Foods Ltd.</h3>
+    <p>Enterprise Milling & Packaging Management System</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
@@ -236,25 +223,19 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================
-# APPLICATION HEADER
+# APPLICATION HEADER (after login)
 # =====================================
 st.title("🌾 Esan ERP")
 st.caption(f"{COMPANY_NAME} | Version {VERSION}")
 
 # =====================================
-# THEME
-# =====================================
-theme = st.sidebar.selectbox(
-    "Appearance",
-    ["Light", "Dark"]
-)
-esan_theme(theme)
-
-# =====================================
-# USER PANEL
+# SIDEBAR: USER & THEME
 # =====================================
 st.sidebar.success(f"User: {st.session_state.username}")
 st.sidebar.info(f"Role: {st.session_state.role}")
+
+theme = st.sidebar.selectbox("Appearance", ["Light", "Dark"])
+esan_theme(theme)
 
 if st.sidebar.button("Logout"):
     st.session_state.logged_in = False
@@ -263,103 +244,42 @@ if st.sidebar.button("Logout"):
     st.rerun()
 
 # =====================================
-# NAVIGATION
+# ROUTING BASED ON CURRENT PAGE
 # =====================================
-menu = esan_navigation()
-
-# =====================================
-# ERP MODULE ROUTER
-# =====================================
-if menu == "Overview":
-    if dashboard_home:
-        dashboard_home()
-    else:
-        st.info("Dashboard module not available.")
-
-elif menu == "🌾 Procurement":
-    if procurement_dashboard:
-        procurement_dashboard()
-    else:
-        st.warning("Procurement module not available.")
-
-elif menu == "📦 Warehouse":
-    if warehouse_dashboard:
-        warehouse_dashboard()
-    else:
-        st.warning("Warehouse module not available.")
-
-elif menu == "🏭 Milling":
-    if milling_dashboard:
-        milling_dashboard()
-    else:
-        st.warning("Milling module not available.")
-
-elif menu == "📦 Packaging":
-    if packaging_dashboard:
-        packaging_dashboard()
-    else:
-        st.warning("Packaging module not available.")
-
-elif menu == "🚚 Sales & Distribution":
-    st.header("🚚 Sales & Distribution")
-    sales_menu = st.radio(
-        "Sales Module",
-        [
-            "Dashboard",
-            "Customers",
-            "Quotations",
-            "Sales Orders",
-            "Dispatch",
-            "Deliveries",
-            "Invoices",
-            "Payments"
-        ]
-    )
-
-    if sales_menu == "Dashboard":
-        if sales_dashboard:
-            sales_dashboard()
-        else:
-            st.warning("Sales dashboard unavailable.")
-
-    elif sales_menu == "Customers":
-        if customers_page:
-            customers_page()
-        else:
-            st.warning("Customers module unavailable.")
-
-    elif sales_menu == "Quotations":
-        if quotations_page:
-            quotations_page()
-        else:
-            st.warning("Quotation module unavailable.")
-
-    elif sales_menu == "Sales Orders":
-        if sales_orders_page:
-            sales_orders_page()
-        else:
-            st.warning("Sales Orders module unavailable.")
-
-    else:
-        st.info(f"{sales_menu} module will be developed next.")
-
-elif menu == "💰 Finance":
-    if finance_dashboard:
-        finance_dashboard()
-    else:
-        st.warning("Finance module unavailable.")
-
-elif menu == "📊 Reports":
-    if reports_dashboard:
-        reports_dashboard()
-    else:
-        st.warning("Reports module unavailable.")
-
+current_page = st.session_state.page
+func = module_functions.get(current_page)
+if func:
+    func()
 else:
-    st.info("Select a module from the navigation menu.")
+    if current_page == "🚚 Sales":
+        st.header("🚚 Sales & Distribution")
+        st.info("Sales module is under development.")
+    else:
+        st.info(f"{current_page} module not available yet.")
 
 # =====================================
-# FOOTER
+# BOTTOM NAVIGATION BAR
 # =====================================
-st.divider()
-st.caption("© Nile Harvest Foods Ltd. | Esan ERP Enterprise Platform")
+st.markdown('<div class="bottom-nav">', unsafe_allow_html=True)
+
+menu_items = [
+    ("Overview", "🏠"),
+    ("🌾 Procurement", "🌾"),
+    ("📦 Warehouse", "📦"),
+    ("🏭 Milling", "🏭"),
+    ("📦 Packaging", "📦"),
+    ("🚚 Sales", "🚚"),
+    ("💰 Finance", "💰"),
+    ("📊 Reports", "📊"),
+]
+
+cols = st.columns(len(menu_items))
+for i, (label, icon) in enumerate(menu_items):
+    if st.session_state.page == label:
+        cols[i].markdown(f'<button class="active">{icon} {label.split()[-1]}</button>', unsafe_allow_html=True)
+    else:
+        if cols[i].button(f"{icon} {label.split()[-1]}"):
+            st.session_state.page = label
+            st.rerun()
+
+st.markdown('</div>', unsafe_allow_html=True)
