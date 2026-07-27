@@ -370,27 +370,6 @@ menu = esan_navigation()
 
 
 
-# =====================================
-# MODULE ROUTER
-# =====================================
-
-
-if menu == "🏠 Dashboard":
-
-
-    dashboard_home()
-
-
-
-elif menu == "🚚 Sales & Distribution":
-
-
-    st.header(
-        "🚚 Sales & Distribution"
-    )
-
-
-    sales_menu = st.radio(
 
         "Sales Module",
 
@@ -418,20 +397,7 @@ elif menu == "🚚 Sales & Distribution":
 
 
 
-    if sales_menu == "Dashboard":
-
-        sales_dashboard()
-
-
-
-    elif sales_menu == "Customers":
-
-    customers_page()
-
-
-elif sales_menu == 
-"Sales Orders":
-
+    
     sales_orders_page()
 
 
@@ -443,19 +409,66 @@ elif sales_menu ==
 
         )
 
+# =====================================
+# SALES MODULE ROUTER
+# =====================================
 
-
-else:
-
+elif menu == "🚚 Sales & Distribution":
 
     st.header(
-        menu
+        "🚚 Sales & Distribution"
     )
 
 
-    st.info(
-        "Module development in progress."
+    sales_menu = st.radio(
+
+        "Sales Module",
+
+        [
+
+            "Dashboard",
+
+            "Customers",
+
+            "Sales Orders",
+
+            "Quotations",
+
+            "Dispatch",
+
+            "Deliveries",
+
+            "Invoices",
+
+            "Payments"
+
+        ]
+
     )
+
+
+    if sales_menu == "Dashboard":
+
+        sales_dashboard()
+
+
+    elif sales_menu == "Customers":
+
+        customers_page()
+
+
+    elif sales_menu == "Sales Orders":
+
+        sales_orders_page()
+
+
+    else:
+
+        st.info(
+            f"{sales_menu} module is coming next."
+        )
+
+
 
 
 
