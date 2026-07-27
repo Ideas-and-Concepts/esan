@@ -4,21 +4,23 @@ from models import User
 
 def create_admin(db):
 
-    existing = db.query(User).filter(
-        User.username == "admin"
-    ).first()
+    admin = (
+        db.query(User)
+        .filter(User.username == "admin")
+        .first()
+    )
 
+    if admin:
+        return
 
-    if not existing:
+    admin = User(
+        username="admin",
+        full_name="System Administrator",
+        email="admin@nileharvest.com",
+        password_hash=hash_password("admin123"),
+        role="Administrator",
+        active=True,
+    )
 
-        admin = User(
-            username="admin",
-            full_name="System Administrator",
-            password_hash=hash_password(
-                "admin123"
-            ),
-            role="Administrator"
-        )
-
-        db.add(admin)
-        db.commit()
+    db.add(admin)
+    db.commit()
