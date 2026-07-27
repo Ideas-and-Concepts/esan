@@ -11,6 +11,7 @@ from config import COMPANY_NAME, VERSION
 from database import Base, engine, SessionLocal
 from models import User
 from auth import verify_password
+from sqlalchemy import inspect                                      # <-- NEW IMPORT
 
 # =====================================
 # CRITICAL SERVICE / COMPONENT IMPORTS
@@ -90,7 +91,6 @@ try:
 except ImportError:
     pass
 
-# Sales has sub‑modules – we'll keep a simplified entry
 try:
     from modules.sales.dashboard import sales_dashboard
     module_functions["🚚 Sales"] = sales_dashboard
@@ -114,19 +114,17 @@ except ImportError:
 # =====================================
 st.set_page_config(page_title="Esan ERP", page_icon="🌾", layout="wide")
 
-# Clean Streamlit UI
+# Clean Streamlit UI & bottom nav spacing
 st.markdown("""
 <style>
 #MainMenu {display:none;}
 footer {display:none;}
 header {display:none;}
 
-/* Make room for the bottom navigation bar */
 .main > div {
     padding-bottom: 90px;
 }
 
-/* Bottom navigation container */
 .bottom-nav {
     position: fixed;
     bottom: 0;
@@ -160,15 +158,28 @@ header {display:none;}
 """, unsafe_allow_html=True)
 
 # =====================================
-# DATABASE INITIALIZATION
+# DATABASE INITIALIZATION (with schema fix)
 # =====================================
 try:
+    # Create tables that don't exist yet
     Base.metadata.create_all(bind=engine)
+
+    # ---- AUTO‑MIGRATION: add missing columns ----
+    insp = inspect(engine)
+    if 'users' in insp.get_table_names():
+        existing_cols = [col['name'] for col in insp.get_columns('users')]
+        if 'full_name' not in existing_cols:
+            with engine.connect() as conn:
+                conn.exec_driver_sql("ALTER TABLE users ADD COLUMN full_name VARCHAR")
+                conn.commit()
+    # ----------------------------------------------
+
     db = SessionLocal()
     try:
         create_admin(db)
     finally:
         db.close()
+
     if load_seed_data:
         load_seed_data()
 except Exception as e:
@@ -182,7 +193,7 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.username = None
     st.session_state.role = None
-    st.session_state.page = "Overview"  # default page
+    st.session_state.page = "Overview"
 
 # =====================================
 # LOGIN FUNCTION
@@ -232,7 +243,7 @@ st.title("🌾 Esan ERP")
 st.caption(f"{COMPANY_NAME} | Version {VERSION}")
 
 # =====================================
-# SIDEBAR: USER & THEME (still in sidebar, not bottom)
+# SIDEBAR: USER & THEME
 # =====================================
 st.sidebar.success(f"User: {st.session_state.username}")
 st.sidebar.info(f"Role: {st.session_state.role}")
@@ -255,7 +266,6 @@ if func:
     func()
 else:
     if current_page == "🚚 Sales":
-        # Sales might have sub‑modules; we can integrate later
         st.header("🚚 Sales & Distribution")
         st.info("Sales module is under development.")
     else:
@@ -266,7 +276,6 @@ else:
 # =====================================
 st.markdown('<div class="bottom-nav">', unsafe_allow_html=True)
 
-# Define menu items (label, icon)
 menu_items = [
     ("Overview", "🏠"),
     ("🌾 Procurement", "🌾"),
@@ -280,7 +289,6 @@ menu_items = [
 
 cols = st.columns(len(menu_items))
 for i, (label, icon) in enumerate(menu_items):
-    # Highlight active page
     if st.session_state.page == label:
         cols[i].markdown(f'<button class="active">{icon} {label.split()[-1]}</button>', unsafe_allow_html=True)
     else:
