@@ -1,179 +1,80 @@
 """
-Esan ERP
-Sales Orders Module
+Esan ERP Sales Order Management
 Nile Harvest Foods Ltd.
+Version 1.2.0 Alpha
 """
 
+
 import streamlit as st
+from datetime import datetime
 
 from database import SessionLocal
-
-from models import (
-    Customer,
-    SalesOrder
-)
+from models import SalesOrder
 
 
 
 def sales_orders_page():
 
-
     st.header(
-        "📋 Sales Orders"
+        "🧾 Sales Orders"
     )
 
 
     db = SessionLocal()
 
 
+    try:
 
-    # =====================================
-    # CREATE SALES ORDER
-    # =====================================
-
-    st.subheader(
-        "➕ Create New Sales Order"
-    )
-
-
-    customers = (
-
-        db.query(Customer)
-
-        .order_by(
-            Customer.name
-        )
-
-        .all()
-
-    )
-
-
-    if not customers:
-
-        st.warning(
-            "Please add customers first."
-        )
-
-        db.close()
-
-        return
-
-
-
-    customer_list = {
-
-        customer.name: customer.id
-
-        for customer in customers
-
-    }
-
-
-    with st.form(
-        "sales_order_form"
-    ):
-
-
-        customer_name = st.selectbox(
-
-            "Customer",
-
-            list(customer_list.keys())
-
+        st.subheader(
+            "Create Sales Order"
         )
 
 
-        product = st.selectbox(
+        customer = st.text_input(
+            "Customer Name"
+        )
 
-            "Product",
 
-            [
-
-                "Maize Flour 5kg",
-
-                "Maize Flour 10kg",
-
-                "Maize Flour 25kg",
-
-                "Cassava Flour"
-
-            ]
-
+        product = st.text_input(
+            "Product"
         )
 
 
         quantity = st.number_input(
-
-            "Quantity (Bags)",
-
-            min_value=1.0,
-
-            step=1.0
-
+            "Quantity",
+            min_value=1
         )
 
 
-        unit_price = st.number_input(
-
-            "Unit Price (UGX)",
-
-            min_value=0.0,
-
-            step=1000.0
-
+        price = st.number_input(
+            "Unit Price",
+            min_value=0.0
         )
 
 
-        status = st.selectbox(
-
-            "Order Status",
-
-            [
-
-                "Pending",
-
-                "Approved",
-
-                "Processing",
-
-                "Completed",
-
-                "Cancelled"
-
-            ]
-
-        )
+        if st.button(
+            "Create Order"
+        ):
 
 
-        submit = st.form_submit_button(
-
-            "💾 Save Order"
-
-        )
-
-
-        if submit:
-
-
-            total = quantity * unit_price
+            total = quantity * price
 
 
             order = SalesOrder(
 
-                customer_id=
+                customer_name=customer,
 
-                customer_list[customer_name],
-
-                product=product,
+                product_name=product,
 
                 quantity=quantity,
 
-                unit_price=unit_price,
+                unit_price=price,
 
                 total_amount=total,
 
-                status=status
+                status="Pending",
+
+                created_at=datetime.utcnow()
 
             )
 
@@ -184,99 +85,67 @@ def sales_orders_page():
 
 
             st.success(
-
-                "Sales order created successfully."
-
+                "Sales Order created successfully."
             )
 
 
-            st.rerun()
+        st.divider()
 
 
-
-    st.divider()
-
-
-
-    # =====================================
-    # ORDER LIST
-    # =====================================
-
-
-    st.subheader(
-
-        "📦 Existing Orders"
-
-    )
-
-
-    orders = (
-
-        db.query(SalesOrder)
-
-        .order_by(
-
-            SalesOrder.id.desc()
-
+        st.subheader(
+            "Sales Order Records"
         )
 
-        .all()
 
-    )
-
-
-    if orders:
-
-
-        for order in orders:
-
-
-            customer = (
-
-                db.query(Customer)
-
-                .filter(
-
-                    Customer.id == order.customer_id
-
-                )
-
-                .first()
-
+        orders = (
+            db.query(SalesOrder)
+            .order_by(
+                SalesOrder.id.desc()
             )
+            .all()
+        )
 
 
-            with st.expander(
+        if orders:
 
-                f"Order #{order.id} | {customer.name}"
 
-            ):
-
+            for order in orders:
 
                 st.write(
-
                     f"""
-                    **Product:** {order.product}
+                    **Order #{order.id}**
 
-                    **Quantity:** {order.quantity} bags
+                    Customer: {order.customer_name}
 
-                    **Unit Price:** UGX {order.unit_price:,.0f}
+                    Product: {order.product_name}
 
-                    **Total:** UGX {order.total_amount:,.0f}
+                    Quantity: {order.quantity}
 
-                    **Status:** {order.status}
+                    Total: {order.total_amount}
+
+                    Status: {order.status}
+
+                    ---
                     """
-
                 )
 
 
-    else:
+        else:
 
-        st.info(
+            st.info(
+                "No sales orders available."
+            )
 
-            "No sales orders available."
 
+    except Exception as e:
+
+        st.error(
+            "Sales Order module error"
         )
 
+        st.exception(e)
 
-    db.close()
+
+    finally:
+
+        db.close()
