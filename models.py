@@ -37,9 +37,9 @@ class Customer(Base):
     email = Column(String)
     address = Column(String)
     customer_type = Column(String, default="Retail")
-    location = Column(String)
-    country = Column(String)
-    contact_person = Column(String)
+    location = Column(String)          # city/region
+    country = Column(String)           # e.g., "South Sudan"
+    contact_person = Column(String)    # primary contact
     created_at = Column(DateTime, default=datetime.utcnow)
 
     quotations = relationship("Quotation", back_populates="customer")
