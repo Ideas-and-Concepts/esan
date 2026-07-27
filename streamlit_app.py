@@ -30,9 +30,16 @@ from services.user_service import create_admin
 
 
 from components.navigation import esan_navigation
-
-
 from components.themes import esan_theme
+
+from seed.seed_data import load_seed_data
+
+
+from modules.dashboard.home import dashboard_home
+
+from modules.sales.dashboard import sales_dashboard
+from modules.sales.customers import customers_page
+from modules.sales.orders import sales_orders_page
 
 
 # =====================================
