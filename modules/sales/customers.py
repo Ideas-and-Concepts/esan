@@ -1,32 +1,69 @@
 """
 Esan ERP
-Customer Management Module
+Sales & Distribution - Customer Management
+
 Nile Harvest Foods Ltd.
 """
 
+
 import streamlit as st
 
+from sqlalchemy import or_
+
 from database import SessionLocal
+
 from models import Customer
 
 
-def customers_page():
 
-    st.header("👥 Customer Management")
+# =====================================
+# CUSTOMER DASHBOARD
+# =====================================
 
-    db = SessionLocal()
+def customer_summary(db):
 
-
-    # =====================================
-    # ADD CUSTOMER FORM
-    # =====================================
-
-    st.subheader("➕ Register New Customer")
+    total = db.query(
+        Customer
+    ).count()
 
 
-    with st.form("customer_form"):
+    uganda = db.query(
+        Customer
+    ).filter(
+        Customer.country == "Uganda"
+    ).count()
 
-        customer_name = st.text_input(
+
+    south_sudan = db.query(
+        Customer
+    ).filter(
+        Customer.country == "South Sudan"
+    ).count()
+
+
+    return total, uganda, south_sudan
+
+
+
+
+# =====================================
+# ADD CUSTOMER
+# =====================================
+
+def add_customer_form():
+
+
+    st.subheader(
+        "➕ Register New Customer"
+    )
+
+
+    with st.form(
+        "customer_form"
+    ):
+
+
+        name = st.text_input(
             "Customer Name"
         )
 
@@ -36,28 +73,20 @@ def customers_page():
         )
 
 
-        email = st.text_input(
-            "Email Address"
-        )
-
-
-        location = st.text_input(
-            "Location / Address"
-        )
-
-
         country = st.selectbox(
 
             "Country",
 
             [
                 "Uganda",
-                "South Sudan",
-                "Kenya",
-                "Tanzania",
-                "Other"
+                "South Sudan"
             ]
 
+        )
+
+
+        location = st.text_input(
+            "Location"
         )
 
 
@@ -66,113 +95,127 @@ def customers_page():
             "Customer Type",
 
             [
-                "Retail",
-                "Wholesale",
+
                 "Distributor",
+
+                "Wholesale",
+
+                "Retail",
+
                 "Export Customer"
+
             ]
 
         )
 
 
-        credit_limit = st.number_input(
-
-            "Credit Limit",
-
-            min_value=0.0,
-
-            step=100000.0
-
-        )
-
-
         submitted = st.form_submit_button(
-            "💾 Save Customer"
+
+            "Save Customer"
+
         )
+
 
 
         if submitted:
 
 
-            if customer_name:
+            if not name:
 
 
-                new_customer = Customer(
-
-                    name=customer_name,
-
-                    phone=phone,
-
-                    location=location,
-
-                    country=country
-
+                st.error(
+                    "Customer name is required"
                 )
 
 
-                db.add(new_customer)
-
-                db.commit()
-
-
-                st.success(
-                    "Customer registered successfully."
-                )
-
-
-                st.rerun()
-
-
-            else:
-
-                st.warning(
-                    "Customer name is required."
-                )
+                return
 
 
 
-    st.divider()
+            db = SessionLocal()
+
+
+            customer = Customer(
+
+                name=name,
+
+                phone=phone,
+
+                country=country,
+
+                location=location,
+
+                customer_type=customer_type
+
+            )
+
+
+            db.add(customer)
+
+            db.commit()
+
+            db.close()
 
 
 
-    # =====================================
-    # CUSTOMER DATABASE
-    # =====================================
+            st.success(
+                "Customer registered successfully"
+            )
+
+
+            st.rerun()
+
+
+
+
+# =====================================
+# CUSTOMER DATABASE
+# =====================================
+
+def customer_database():
+
 
     st.subheader(
         "📋 Customer Database"
     )
 
 
+    db = SessionLocal()
+
+
+
     search = st.text_input(
+
         "🔍 Search Customer"
-    )
-
-
-    customers = (
-
-        db.query(Customer)
-
-        .order_by(
-            Customer.id.desc()
-        )
-
-        .all()
 
     )
+
+
+
+    query = db.query(Customer)
+
 
 
     if search:
 
-        customers = [
 
-            customer for customer in customers
+        query = query.filter(
 
-            if search.lower()
+            or_(
 
-            in customer.name.lower()
+                Customer.name.contains(search),
 
-        ]
+                Customer.location.contains(search),
+
+                Customer.country.contains(search)
+
+            )
+
+        )
+
+
+
+    customers = query.all()
 
 
 
@@ -184,68 +227,145 @@ def customers_page():
 
             with st.expander(
 
-                f"👤 {customer.name}"
+                f"{customer.name} | {customer.country}"
 
             ):
 
 
                 st.write(
-
-                    f"""
-                    **Phone:** {customer.phone}
-
-                    **Location:** {customer.location}
-
-                    **Country:** {customer.country}
-
-                    **Customer ID:** {customer.id}
-                    """
-
+                    f"📍 Location: {customer.location}"
                 )
 
 
-                col1, col2 = st.columns(2)
+                st.write(
+                    f"☎ Phone: {customer.phone}"
+                )
 
 
-                with col1:
+                st.write(
+                    f"Category: {customer.customer_type}"
+                )
 
-                    st.button(
 
-                        "✏ Edit",
 
-                        key=f"edit_{customer.id}"
+                if st.button(
 
+                    "Delete Customer",
+
+                    key=f"delete_{customer.id}"
+
+                ):
+
+
+                    db.delete(customer)
+
+                    db.commit()
+
+
+                    st.success(
+                        "Customer deleted"
                     )
 
 
-                with col2:
+                    st.rerun()
 
-                    if st.button(
-
-                        "🗑 Delete",
-
-                        key=f"delete_{customer.id}"
-
-                    ):
-
-                        db.delete(customer)
-
-                        db.commit()
-
-
-                        st.success(
-                            "Customer deleted."
-                        )
-
-                        st.rerun()
 
 
     else:
 
 
         st.info(
-            "No customers found."
+            "No customers found"
         )
 
 
+
     db.close()
+
+
+
+
+# =====================================
+# MAIN CUSTOMER PAGE
+# =====================================
+
+def customers_page():
+
+
+    st.header(
+        "👥 Customer Management"
+    )
+
+
+
+    db = SessionLocal()
+
+
+
+    total, uganda, south_sudan = customer_summary(db)
+
+
+
+    db.close()
+
+
+
+    c1,c2,c3 = st.columns(3)
+
+
+
+    c1.metric(
+
+        "Total Customers",
+
+        total
+
+    )
+
+
+    c2.metric(
+
+        "Uganda Customers",
+
+        uganda
+
+    )
+
+
+    c3.metric(
+
+        "South Sudan Customers",
+
+        south_sudan
+
+    )
+
+
+
+    st.divider()
+
+
+
+    tab1, tab2 = st.tabs(
+
+        [
+
+            "➕ Add Customer",
+
+            "📋 Customer Database"
+
+        ]
+
+    )
+
+
+
+    with tab1:
+
+        add_customer_form()
+
+
+
+    with tab2:
+
+        customer_database()
