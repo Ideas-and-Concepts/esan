@@ -37,7 +37,7 @@ try:
     from components.navigation import esan_navigation
 except ImportError:
     def esan_navigation():
-        """Fallback navigation using a sidebar selectbox."""
+        """Fallback sidebar navigation."""
         menu_options = [
             "Overview", "🌾 Procurement", "📦 Warehouse", "🏭 Milling",
             "📦 Packaging", "🚚 Sales", "💰 Finance", "📊 Reports"
@@ -127,43 +127,31 @@ st.set_page_config(
     page_title="Esan ERP",
     page_icon="🌾",
     layout="wide",
-    initial_sidebar_state="expanded"   # sidebar always open after login
+    initial_sidebar_state="expanded"
 )
 
 # =====================================
-# CLEAN UI – ONLY HIDE HEADER / FOOTER / MENU (NOT THE SIDEBAR)
+# CLEAN UI – hide only header/footer/menu
 # =====================================
 st.markdown("""
 <style>
-    /* Remove Streamlit's default top bar and footer */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-
-    /* Optional: light gray sidebar background */
-    section[data-testid="stSidebar"] {
-        background-color: #f8f9fa;
-    }
-
-    /* Reduce padding in main area */
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 1rem;
-    }
+    .block-container { padding-top: 2rem; padding-bottom: 1rem; }
 </style>
 """, unsafe_allow_html=True)
 
 # =====================================
-# FORCE DATABASE REBUILD IF SCHEMA CHANGED
+# DATABASE REBUILD IF SCHEMA CHANGED
 # =====================================
 def rebuild_database():
-    """Delete old database file and recreate from models."""
     try:
         if "sqlite:///" in DATABASE_URL:
             db_path = DATABASE_URL.replace("sqlite:///", "")
             if os.path.exists(db_path):
                 os.remove(db_path)
-                st.warning("🔄 Database schema updated. Rebuilding with fresh tables...")
+                st.warning("🔄 Database schema updated. Rebuilding...")
     except Exception:
         pass
     Base.metadata.drop_all(bind=engine)
@@ -199,7 +187,6 @@ try:
 
     if load_seed_data:
         load_seed_data()
-
 except Exception as e:
     st.error("Database initialization failed")
     st.exception(e)
@@ -212,9 +199,6 @@ if "logged_in" not in st.session_state:
     st.session_state.username = None
     st.session_state.role = None
 
-# =====================================
-# LOGIN FUNCTION
-# =====================================
 def login(username, password):
     db = SessionLocal()
     try:
@@ -229,7 +213,7 @@ def login(username, password):
         db.close()
 
 # =====================================
-# LOGIN SCREEN (NO SIDEBAR UNTIL LOGGED IN)
+# LOGIN SCREEN (no sidebar before login)
 # =====================================
 if not st.session_state.logged_in:
     st.markdown("""
@@ -254,13 +238,13 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================
-# APPLICATION HEADER (after login)
+# MAIN APP (after login)
 # =====================================
 st.title("🌾 Esan ERP")
 st.caption(f"{COMPANY_NAME} | Version {VERSION}")
 
 # =====================================
-# SIDEBAR – FULL PANEL WITH NAVIGATION
+# SIDEBAR – USER, THEME, LOGOUT, NAVIGATION
 # =====================================
 with st.sidebar:
     st.markdown("## 👤 User Panel")
@@ -278,8 +262,7 @@ with st.sidebar:
 
     st.divider()
     st.markdown("## 📋 Navigation")
-    # The custom navigation component (or fallback selectbox) is rendered here
-    menu = esan_navigation()
+    menu = esan_navigation()   # renders navigation inside sidebar
 
 # =====================================
 # ERP MODULE ROUTER
@@ -335,6 +318,5 @@ elif menu == "📊 Reports":
 else:
     st.info("Select a module from the sidebar.")
 
-# Footer (main area)
 st.divider()
 st.caption("© Nile Harvest Foods Ltd. | Esan ERP Enterprise Platform")
