@@ -8,8 +8,8 @@ Version 1.2.0 Alpha
 
 
 import streamlit as st
-import os                                     # ← added for database rebuild
-from sqlalchemy import inspect                # ← added for schema check
+import os
+from sqlalchemy import inspect
 
 
 # =====================================
@@ -26,7 +26,7 @@ from database import (
     Base,
     engine,
     SessionLocal,
-    DATABASE_URL                             # ← added for rebuild
+    DATABASE_URL
 )
 
 
@@ -120,6 +120,16 @@ except Exception:
 
 
 
+try:
+
+    from modules.sales.delivery import delivery_page
+
+except Exception:
+
+    delivery_page = None
+
+
+
 
 # PROCUREMENT
 
@@ -182,6 +192,26 @@ try:
 except Exception:
 
     finance_dashboard = None
+
+
+
+try:
+
+    from modules.finance.invoices import invoices_page
+
+except Exception:
+
+    invoices_page = None
+
+
+
+try:
+
+    from modules.finance.payments import payments_page
+
+except Exception:
+
+    payments_page = None
 
 
 
@@ -251,59 +281,22 @@ unsafe_allow_html=True
 
 # =====================================
 # DATABASE INITIALIZATION (with auto-repair)
+# =====================================
 
 def rebuild_database():
-    """
-    Delete old database file and recreate tables from models.
-    Used when database schema changes.
-    """
-
+    """Delete old database file and recreate tables from models."""
     try:
-
         if "sqlite:///" in DATABASE_URL:
-
-            db_path = DATABASE_URL.replace(
-                "sqlite:///",
-                ""
-            )
-
+            db_path = DATABASE_URL.replace("sqlite:///", "")
             if os.path.exists(db_path):
-
                 os.remove(db_path)
-
-                st.warning(
-                    "🔄 Database schema updated. Rebuilding fresh database..."
-                )
-
-
-    except Exception as e:
-
-        st.warning(
-            f"Database file cleanup skipped: {e}"
-        )
-
-
-    # Recreate database tables safely
-    try:
-
-        Base.metadata.drop_all(
-            bind=engine
-        )
-
-
     except Exception:
-
         pass
-
-
-
-    Base.metadata.create_all(
-        bind=engine
-    )
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
 
 try:
 
-    # Check for missing columns before seeding
     needs_rebuild = False
     inspector = inspect(engine)
     existing_tables = inspector.get_table_names()
@@ -318,18 +311,30 @@ try:
                     break
 
     if needs_rebuild:
+        st.warning("🔄 Database schema updated. Rebuilding with fresh tables...")
         rebuild_database()
     else:
         Base.metadata.create_all(bind=engine)
 
+
     db = SessionLocal()
+
+
     create_admin(db)
+
+
     db.close()
 
+
+
     if load_seed_data:
+
         load_seed_data()
 
+
+
 except Exception as e:
+
 
     st.error(
         "Database initialization failed"
@@ -755,6 +760,54 @@ elif menu == "🚚 Sales & Distribution":
 
             st.warning(
                 "Sales Orders module unavailable."
+            )
+
+
+
+
+    elif sales_menu == "Deliveries":
+
+
+        if delivery_page:
+
+            delivery_page()
+
+        else:
+
+            st.warning(
+                "Delivery module unavailable."
+            )
+
+
+
+
+    elif sales_menu == "Invoices":
+
+
+        if invoices_page:
+
+            invoices_page()
+
+        else:
+
+            st.warning(
+                "Invoices module unavailable."
+            )
+
+
+
+
+    elif sales_menu == "Payments":
+
+
+        if payments_page:
+
+            payments_page()
+
+        else:
+
+            st.warning(
+                "Payments module unavailable."
             )
 
 
