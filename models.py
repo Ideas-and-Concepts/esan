@@ -16,15 +16,52 @@ from database import Base
 # USERS & AUTHENTICATION
 # ==================================================
 class User(Base):
+
     __tablename__ = "users"
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, nullable=False)
-    password_hash = Column(String, nullable=False)
-    full_name = Column(String)
-    role = Column(String, default="user")
-    email = Column(String)
-    active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    username = Column(
+        String(100),
+        unique=True,
+        nullable=False
+    )
+
+    full_name = Column(
+        String(200),
+        nullable=False,
+        default=""
+    )
+
+    password_hash = Column(
+        String(255),
+        nullable=False
+    )
+
+    role = Column(
+        String(50),
+        default="User"
+    )
+
+    email = Column(
+        String(200),
+        unique=True,
+        nullable=True
+    )
+
+    active = Column(
+        Boolean,
+        default=True
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
 
 # ==================================================
 # SALES & CRM
