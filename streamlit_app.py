@@ -447,13 +447,11 @@ menu = esan_navigation()
 # =====================================
 
 
-if menu == "🏠 Dashboard":
-
-    dashboard_home()
-
-
+if menu == "Overview":
 
 elif menu == "🌾 Procurement":
+
+    procurement_dashboard()
 
 
     if procurement_dashboard:
