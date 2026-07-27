@@ -95,8 +95,6 @@ unsafe_allow_html=True
 
 )
 
-
-
 # =====================================
 # DATABASE INITIALIZATION
 # =====================================
@@ -115,6 +113,10 @@ try:
     db.close()
 
 
+    # Load demo/company seed data
+    load_seed_data()
+
+
 except Exception as e:
 
     st.error(
@@ -122,8 +124,6 @@ except Exception as e:
     )
 
     st.exception(e)
-
-
 
 # =====================================
 # SESSION STATE
