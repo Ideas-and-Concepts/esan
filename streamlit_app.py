@@ -446,13 +446,13 @@ menu = esan_navigation()
 # ERP ROUTER
 # =====================================
 
-
 if menu == "Overview":
 
+    dashboard_home()
+
+
+
 elif menu == "🌾 Procurement":
-
-    procurement_dashboard()
-
 
     if procurement_dashboard:
 
@@ -468,7 +468,6 @@ elif menu == "🌾 Procurement":
 
 elif menu == "📦 Warehouse":
 
-
     if warehouse_dashboard:
 
         warehouse_dashboard()
@@ -482,7 +481,6 @@ elif menu == "📦 Warehouse":
 
 
 elif menu == "🏭 Milling":
-
 
     if milling_dashboard:
 
@@ -498,7 +496,6 @@ elif menu == "🏭 Milling":
 
 elif menu == "📦 Packaging":
 
-
     if packaging_dashboard:
 
         packaging_dashboard()
@@ -513,7 +510,6 @@ elif menu == "📦 Packaging":
 
 elif menu == "🚚 Sales & Distribution":
 
-
     st.header(
         "🚚 Sales & Distribution"
     )
@@ -524,23 +520,14 @@ elif menu == "🚚 Sales & Distribution":
         "Sales Module",
 
         [
-
             "Dashboard",
-
             "Customers",
-
             "Sales Orders",
-
             "Quotations",
-
             "Dispatch",
-
             "Deliveries",
-
             "Invoices",
-
             "Payments"
-
         ]
 
     )
@@ -551,17 +538,19 @@ elif menu == "🚚 Sales & Distribution":
         sales_dashboard()
 
 
-
     elif sales_menu == "Customers":
 
         customers_page()
-
 
 
     elif sales_menu == "Sales Orders":
 
         sales_orders_page()
 
+
+    elif sales_menu == "Quotations":
+
+        quotations_page()
 
 
     else:
@@ -573,7 +562,6 @@ elif menu == "🚚 Sales & Distribution":
 
 
 elif menu == "💰 Finance":
-
 
     if finance_dashboard:
 
@@ -588,7 +576,6 @@ elif menu == "💰 Finance":
 
 
 elif menu == "📊 Reports":
-
 
     if reports_dashboard:
 
@@ -607,10 +594,6 @@ else:
     st.info(
         "Select a module from the navigation menu."
     )
-
-elif sales_menu == "Quotations":
-
-    quotations_page()
 
 
 
