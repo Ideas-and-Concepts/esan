@@ -1,6 +1,8 @@
 """
 Esan ERP Database Models
 Nile Harvest Foods Ltd.
+Enterprise Milling & Packaging ERP
+Version 1.2.0
 """
 
 from datetime import datetime
@@ -11,19 +13,20 @@ from sqlalchemy import (
     String,
     Float,
     DateTime,
-    Boolean
+    Boolean,
+    ForeignKey,
+    Text
 )
+
+from sqlalchemy.orm import relationship
 
 from database import Base
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
-from datetime import datetime
 
 
-
-# =====================================
-# USER MODEL
-# =====================================
+# ==================================================
+# USERS & AUTHENTICATION
+# ==================================================
 
 class User(Base):
 
@@ -32,7 +35,8 @@ class User(Base):
 
     id = Column(
         Integer,
-        primary_key=True
+        primary_key=True,
+        index=True
     )
 
 
@@ -55,10 +59,302 @@ class User(Base):
     )
 
 
+    email = Column(
+        String
+    )
 
-# =====================================
-# SUPPLIERS
-# =====================================
+
+    active = Column(
+        Boolean,
+        default=True
+    )
+
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+
+
+
+# ==================================================
+# SALES & CRM
+# ==================================================
+
+class Customer(Base):
+
+    __tablename__ = "customers"
+
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+
+    name = Column(
+        String,
+        nullable=False
+    )
+
+
+    phone = Column(
+        String
+    )
+
+
+    email = Column(
+        String
+    )
+
+
+    address = Column(
+        String
+    )
+
+
+    customer_type = Column(
+        String,
+        default="Retail"
+    )
+
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+
+    quotations = relationship(
+        "Quotation",
+        back_populates="customer"
+    )
+
+
+    orders = relationship(
+        "SalesOrder",
+        back_populates="customer"
+    )
+
+
+
+
+# ==================================================
+# QUOTATIONS
+# ==================================================
+
+class Quotation(Base):
+
+    __tablename__ = "quotations"
+
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+
+    quotation_number = Column(
+        String,
+        unique=True
+    )
+
+
+    customer_id = Column(
+        Integer,
+        ForeignKey(
+            "customers.id"
+        )
+    )
+
+
+    status = Column(
+        String,
+        default="Draft"
+    )
+
+
+    total_amount = Column(
+        Float,
+        default=0
+    )
+
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+
+    customer = relationship(
+        "Customer",
+        back_populates="quotations"
+    )
+
+
+    items = relationship(
+        "QuotationItem",
+        back_populates="quotation"
+    )
+
+
+
+
+class QuotationItem(Base):
+
+    __tablename__ = "quotation_items"
+
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+
+    quotation_id = Column(
+        Integer,
+        ForeignKey(
+            "quotations.id"
+        )
+    )
+
+
+    product_name = Column(
+        String
+    )
+
+
+    quantity = Column(
+        Float
+    )
+
+
+    unit_price = Column(
+        Float
+    )
+
+
+    total = Column(
+        Float
+    )
+
+
+    quotation = relationship(
+        "Quotation",
+        back_populates="items"
+    )
+
+
+
+# ==================================================
+# SALES ORDERS
+# ==================================================
+
+class SalesOrder(Base):
+
+    __tablename__ = "sales_orders"
+
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+
+    order_number = Column(
+        String,
+        unique=True
+    )
+
+
+    customer_id = Column(
+        Integer,
+        ForeignKey(
+            "customers.id"
+        )
+    )
+
+
+    status = Column(
+        String,
+        default="Pending"
+    )
+
+
+    total_amount = Column(
+        Float,
+        default=0
+    )
+
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+
+    customer = relationship(
+        "Customer",
+        back_populates="orders"
+    )
+
+
+    items = relationship(
+        "SalesOrderItem",
+        back_populates="order"
+    )
+
+
+
+class SalesOrderItem(Base):
+
+    __tablename__ = "sales_order_items"
+
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+
+    order_id = Column(
+        Integer,
+        ForeignKey(
+            "sales_orders.id"
+        )
+    )
+
+
+    product_name = Column(
+        String
+    )
+
+
+    quantity = Column(
+        Float
+    )
+
+
+    unit_price = Column(
+        Float
+    )
+
+
+    total = Column(
+        Float
+    )
+
+
+    order = relationship(
+        "SalesOrder",
+        back_populates="items"
+    )
+
+# ==================================================
+# PROCUREMENT
+# ==================================================
 
 class Supplier(Base):
 
@@ -82,26 +378,36 @@ class Supplier(Base):
     )
 
 
-    location = Column(
+    email = Column(
         String
     )
 
 
-    country = Column(
+    address = Column(
         String
     )
 
 
-    active = Column(
-        Boolean,
-        default=True
+    supplier_type = Column(
+        String,
+        default="Agricultural Supplier"
+    )
+
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
     )
 
 
 
-# =====================================
-# PROCUREMENT
-# =====================================
+    purchase_orders = relationship(
+        "PurchaseOrder",
+        back_populates="supplier"
+    )
+
+
+
 
 class PurchaseOrder(Base):
 
@@ -114,51 +420,55 @@ class PurchaseOrder(Base):
     )
 
 
-    supplier = Column(
-        String
+    po_number = Column(
+        String,
+        unique=True
     )
 
 
-    material = Column(
-        String
-    )
-
-
-    quantity = Column(
-        Float
-    )
-
-
-    unit_cost = Column(
-        Float
-    )
-
-
-    total_cost = Column(
-        Float
+    supplier_id = Column(
+        Integer,
+        ForeignKey(
+            "suppliers.id"
+        )
     )
 
 
     status = Column(
         String,
-        default="Pending"
+        default="Draft"
+    )
+
+
+    total_amount = Column(
+        Float,
+        default=0
     )
 
 
     created_at = Column(
         DateTime,
-        default=datetime.now
+        default=datetime.utcnow
+    )
+
+
+    supplier = relationship(
+        "Supplier",
+        back_populates="purchase_orders"
+    )
+
+
+    items = relationship(
+        "PurchaseOrderItem",
+        back_populates="purchase_order"
     )
 
 
 
-# =====================================
-# INVENTORY
-# =====================================
 
-class Inventory(Base):
+class PurchaseOrderItem(Base):
 
-    __tablename__ = "inventory"
+    __tablename__ = "purchase_order_items"
 
 
     id = Column(
@@ -167,12 +477,15 @@ class Inventory(Base):
     )
 
 
-    item_name = Column(
-        String
+    purchase_order_id = Column(
+        Integer,
+        ForeignKey(
+            "purchase_orders.id"
+        )
     )
 
 
-    category = Column(
+    product_name = Column(
         String
     )
 
@@ -182,8 +495,42 @@ class Inventory(Base):
     )
 
 
-    unit = Column(
-        String
+    unit_price = Column(
+        Float
+    )
+
+
+    total = Column(
+        Float
+    )
+
+
+    purchase_order = relationship(
+        "PurchaseOrder",
+        back_populates="items"
+    )
+
+
+
+
+# ==================================================
+# INVENTORY / WAREHOUSE
+# ==================================================
+
+class Warehouse(Base):
+
+    __tablename__ = "warehouses"
+
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+
+    name = Column(
+        String,
+        nullable=False
     )
 
 
@@ -192,20 +539,21 @@ class Inventory(Base):
     )
 
 
-    updated_at = Column(
+    capacity = Column(
+        Float
+    )
+
+
+    created_at = Column(
         DateTime,
-        default=datetime.now
+        default=datetime.utcnow
     )
 
 
 
-# =====================================
-# MILLING PRODUCTION
-# =====================================
+class Product(Base):
 
-class ProductionBatch(Base):
-
-    __tablename__ = "production_batches"
+    __tablename__ = "products"
 
 
     id = Column(
@@ -214,8 +562,108 @@ class ProductionBatch(Base):
     )
 
 
-    product = Column(
+    name = Column(
+        String,
+        nullable=False
+    )
+
+
+    category = Column(
         String
+    )
+
+
+    unit = Column(
+        String,
+        default="Kg"
+    )
+
+
+    quantity = Column(
+        Float,
+        default=0
+    )
+
+
+    cost_price = Column(
+        Float,
+        default=0
+    )
+
+
+    selling_price = Column(
+        Float,
+        default=0
+    )
+
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+
+
+
+class StockMovement(Base):
+
+    __tablename__ = "stock_movements"
+
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+
+    product_id = Column(
+        Integer,
+        ForeignKey(
+            "products.id"
+        )
+    )
+
+
+    movement_type = Column(
+        String
+    )
+
+
+    quantity = Column(
+        Float
+    )
+
+
+    reference = Column(
+        String
+    )
+
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+
+
+# ==================================================
+# PRODUCTION: MILLING
+# ==================================================
+
+class MillingBatch(Base):
+
+    __tablename__ = "milling_batches"
+
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+
+    batch_number = Column(
+        String,
+        unique=True
     )
 
 
@@ -234,109 +682,85 @@ class ProductionBatch(Base):
     )
 
 
-    waste_quantity = Column(
+    wastage = Column(
         Float
     )
 
 
-    production_date = Column(
-        DateTime,
-        default=datetime.now
+    status = Column(
+        String,
+        default="Processing"
     )
 
 
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
 
-# =====================================
-# PACKAGING
-# =====================================
 
-class PackagingRecord(Base):
+# ==================================================
+# PRODUCTION: PACKAGING
+# ==================================================
 
-    __tablename__ = "packaging_records"
+class PackagingBatch(Base):
+
+    __tablename__ = "packaging_batches"
 
 
     id = Column(
         Integer,
         primary_key=True
-    )
-
-
-    product = Column(
-        String
-    )
-
-
-    quantity = Column(
-        Float
-    )
-
-
-    packaging_size = Column(
-        String
     )
 
 
     batch_number = Column(
-        String
-    )
-
-
-    date = Column(
-        DateTime,
-        default=datetime.now
-    )
-
-
-
-# =====================================
-# CUSTOMERS
-# =====================================
-
-class Customer(Base):
-
-    __tablename__ = "customers"
-
-
-    id = Column(
-        Integer,
-        primary_key=True
-    )
-
-
-    name = Column(
         String,
-        nullable=False
+        unique=True
     )
 
 
-    phone = Column(
+    product_name = Column(
         String
     )
 
 
-    location = Column(
+    input_quantity = Column(
+        Float
+    )
+
+
+    packed_quantity = Column(
+        Float
+    )
+
+
+    package_size = Column(
         String
     )
 
 
-    country = Column(
-        String
+    status = Column(
+        String,
+        default="Processing"
     )
 
 
-    customer_type = Column(
-        String
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
     )
 
 
 
-# =====================================
-# SALES ORDERS
-# =====================================
 
-class SalesOrder(Base):
+# ==================================================
+# SALES DELIVERY
+# ==================================================
 
-    __tablename__ = "sales_orders"
+class Delivery(Base):
+
+    __tablename__ = "deliveries"
 
 
     id = Column(
@@ -345,23 +769,32 @@ class SalesOrder(Base):
     )
 
 
-    customer = Column(
+    delivery_number = Column(
+        String,
+        unique=True
+    )
+
+
+    order_id = Column(
+        Integer,
+        ForeignKey(
+            "sales_orders.id"
+        )
+    )
+
+
+    destination = Column(
         String
     )
 
 
-    product = Column(
+    driver = Column(
         String
     )
 
 
-    quantity = Column(
-        Float
-    )
-
-
-    amount = Column(
-        Float
+    vehicle = Column(
+        String
     )
 
 
@@ -371,16 +804,79 @@ class SalesOrder(Base):
     )
 
 
-    order_date = Column(
+    delivered_date = Column(
+        DateTime
+    )
+
+
+    created_at = Column(
         DateTime,
-        default=datetime.now
+        default=datetime.utcnow
     )
 
 
 
-# =====================================
+
+# ==================================================
+# INVOICING
+# ==================================================
+
+class Invoice(Base):
+
+    __tablename__ = "invoices"
+
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+
+    invoice_number = Column(
+        String,
+        unique=True
+    )
+
+
+    customer_id = Column(
+        Integer,
+        ForeignKey(
+            "customers.id"
+        )
+    )
+
+
+    order_id = Column(
+        Integer,
+        ForeignKey(
+            "sales_orders.id"
+        )
+    )
+
+
+    amount = Column(
+        Float,
+        default=0
+    )
+
+
+    status = Column(
+        String,
+        default="Unpaid"
+    )
+
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+
+
+
+# ==================================================
 # PAYMENTS
-# =====================================
+# ==================================================
 
 class Payment(Base):
 
@@ -393,13 +889,71 @@ class Payment(Base):
     )
 
 
-    customer = Column(
+    invoice_id = Column(
+        Integer,
+        ForeignKey(
+            "invoices.id"
+        )
+    )
+
+
+    amount = Column(
+        Float,
+        default=0
+    )
+
+
+    payment_method = Column(
         String
     )
 
 
-    invoice_number = Column(
+    reference = Column(
         String
+    )
+
+
+    status = Column(
+        String,
+        default="Completed"
+    )
+
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+
+
+
+# ==================================================
+# FINANCE TRANSACTIONS
+# ==================================================
+
+class FinanceTransaction(Base):
+
+    __tablename__ = "finance_transactions"
+
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+
+    transaction_type = Column(
+        String
+    )
+
+
+    category = Column(
+        String
+    )
+
+
+    description = Column(
+        Text
     )
 
 
@@ -408,24 +962,26 @@ class Payment(Base):
     )
 
 
-    status = Column(
+    reference = Column(
         String
     )
 
 
-    payment_date = Column(
+    created_at = Column(
         DateTime,
-        default=datetime.now
+        default=datetime.utcnow
     )
 
 
-# =====================================
-# CUSTOMERS
-# =====================================
 
-class Customer(Base):
 
-    __tablename__ = "customers"
+# ==================================================
+# SYSTEM SETTINGS
+# ==================================================
+
+class SystemSetting(Base):
+
+    __tablename__ = "system_settings"
 
 
     id = Column(
@@ -434,134 +990,18 @@ class Customer(Base):
     )
 
 
-    name = Column(
-        String
-    )
-
-
-    phone = Column(
-        String
-    )
-
-
-    location = Column(
-        String
-    )
-
-
-    country = Column(
-        String
-    )
-
-
-    customer_type = Column(
-        String
-    )
-
-# =====================================
-# QUOTATIONS 
-# =====================================
-
-class Quotation(Base):
-
-    __tablename__ = "quotations"
-
-
-    id = Column(
-        Integer,
-        primary_key=True
-    )
-
-
-    quotation_number = Column(
+    key = Column(
         String,
         unique=True
     )
 
 
-    customer = Column(
+    value = Column(
         String
-    )
-
-
-    product = Column(
-        String
-    )
-
-
-    quantity = Column(
-        Float
-    )
-
-
-    unit_price = Column(
-        Float
-    )
-
-
-    total_amount = Column(
-        Float
-    )
-
-
-    status = Column(
-        String,
-        default="Draft"
     )
 
 
     created_at = Column(
         DateTime,
-        default=datetime.now
-    )
-
-
-# =====================================
-# SalesOrders
-# =====================================
-
-class SalesOrder(Base):
-
-    __tablename__ = "sales_orders"
-
-
-    id = Column(
-        Integer,
-        primary_key=True
-    )
-
-
-    customer_name = Column(
-        String
-    )
-
-
-    product_name = Column(
-        String
-    )
-
-
-    quantity = Column(
-        Integer
-    )
-
-
-    unit_price = Column(
-        Float
-    )
-
-
-    total_amount = Column(
-        Float
-    )
-
-
-    status = Column(
-        String,
-        default="Pending"
-    )
-
-
-    created_at = Column(
-        DateTime
+        default=datetime.utcnow
     )
