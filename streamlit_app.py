@@ -11,6 +11,8 @@ import streamlit as st
 
 from modules.sales.dashboard import sales_dashboard
 
+from modules.sales.customers import customers_page
+
 # =====================================
 # PAGE CONFIGURATION
 # =====================================
