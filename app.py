@@ -7,11 +7,12 @@ Version 1.2.0 Alpha
 """
 
 import streamlit as st
+import os
 from config import COMPANY_NAME, VERSION
-from database import Base, engine, SessionLocal
+from database import Base, engine, SessionLocal, DATABASE_URL
 from models import User
 from auth import verify_password
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect
 
 # =====================================
 # CRITICAL SERVICE / COMPONENT IMPORTS
@@ -129,41 +130,58 @@ header {display:none;}
 """, unsafe_allow_html=True)
 
 # =====================================
-# DATABASE SCHEMA CHECK & RESET
+# FORCE DATABASE REBUILD IF SCHEMA CHANGED
 # =====================================
-def check_schema_integrity():
-    """Check if the existing database matches the models. If not, drop and recreate."""
-    inspector = inspect(engine)
-    tables = inspector.get_table_names()
-    if not tables:
-        return True   # empty db – create_all will handle it
-
-    # Get model table definitions
-    for table_name, table in Base.metadata.tables.items():
-        if table_name in tables:
-            existing_cols = {col['name'] for col in inspector.get_columns(table_name)}
-            model_cols = {c.name for c in table.columns}
-            if model_cols - existing_cols:   # missing columns
-                return False
-    return True
+def rebuild_database():
+    """Delete old database file and recreate from models."""
+    try:
+        # Extract the file path from DATABASE_URL (sqlite:///esan_erp.db -> esan_erp.db)
+        if "sqlite:///" in DATABASE_URL:
+            db_path = DATABASE_URL.replace("sqlite:///", "")
+            if os.path.exists(db_path):
+                os.remove(db_path)
+                st.warning("🔄 Database schema updated. Rebuilding with fresh tables...")
+    except Exception:
+        pass  # If we can't delete the file, drop all tables via SQLAlchemy instead
+    
+    # Drop all existing tables
+    Base.metadata.drop_all(bind=engine)
+    # Create all tables from current model definitions
+    Base.metadata.create_all(bind=engine)
 
 # =====================================
 # DATABASE INITIALIZATION
 # =====================================
 try:
-    if not check_schema_integrity():
-        st.warning("⚠️ Schema mismatch detected. Resetting database to match new models. All data will be lost.")
-        Base.metadata.drop_all(bind=engine)
-        st.success("Database reset. Creating fresh tables...")
+    # Check if database needs rebuilding
+    needs_rebuild = False
+    inspector = inspect(engine)
+    existing_tables = inspector.get_table_names()
+    
+    if existing_tables:
+        # Check if all required columns exist
+        for table_name, table in Base.metadata.tables.items():
+            if table_name in existing_tables:
+                existing_cols = {col['name'] for col in inspector.get_columns(table_name)}
+                model_cols = {c.name for c in table.columns}
+                if model_cols - existing_cols:
+                    needs_rebuild = True
+                    break
+    
+    if needs_rebuild:
+        rebuild_database()
+    else:
+        # Just create any missing tables
+        Base.metadata.create_all(bind=engine)
 
-    Base.metadata.create_all(bind=engine)
-
+    # Create admin user
     db = SessionLocal()
     try:
         create_admin(db)
     finally:
         db.close()
 
+    # Load seed data
     if load_seed_data:
         load_seed_data()
 
@@ -242,8 +260,10 @@ if st.sidebar.button("Logout"):
     st.session_state.role = None
     st.rerun()
 
-# Sidebar navigation (replaces bottom bar)
-menu = esan_navigation()  # returns a string like "Overview", "🌾 Procurement", etc.
+# Sidebar navigation
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📋 Navigation")
+menu = esan_navigation()
 
 # =====================================
 # ERP MODULE ROUTER
@@ -280,7 +300,6 @@ elif menu == "📦 Packaging":
 
 elif menu == "🚚 Sales & Distribution":
     st.header("🚚 Sales & Distribution")
-    # Sales sub‑menu can be implemented here
     if module_functions["🚚 Sales"]:
         module_functions["🚚 Sales"]()
     else:
