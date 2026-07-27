@@ -1,0 +1,1 @@
+record_payment(invoice_id, amount)
