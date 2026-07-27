@@ -454,3 +454,60 @@ class Customer(Base):
     customer_type = Column(
         String
     )
+
+# =====================================
+# QUOTATIONS 
+# =====================================
+
+class Quotation(Base):
+
+    __tablename__ = "quotations"
+
+
+    id = Column(
+        Integer,
+        primary_key=True
+    )
+
+
+    quotation_number = Column(
+        String,
+        unique=True
+    )
+
+
+    customer = Column(
+        String
+    )
+
+
+    product = Column(
+        String
+    )
+
+
+    quantity = Column(
+        Float
+    )
+
+
+    unit_price = Column(
+        Float
+    )
+
+
+    total_amount = Column(
+        Float
+    )
+
+
+    status = Column(
+        String,
+        default="Draft"
+    )
+
+
+    created_at = Column(
+        DateTime,
+        default=datetime.now
+    )
