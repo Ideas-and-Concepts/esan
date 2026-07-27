@@ -20,6 +20,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
+    full_name = Column(String)                     # Added to match service call
     role = Column(String, default="user")
     email = Column(String)
     active = Column(Boolean, default=True)
@@ -255,7 +256,7 @@ class SystemSetting(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 # ==================================================
-# STOCK RESERVATION (with relationships)
+# STOCK RESERVATION
 # ==================================================
 class StockReservation(Base):
     __tablename__ = "stock_reservations"
@@ -266,6 +267,5 @@ class StockReservation(Base):
     status = Column(String, default="Reserved")
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # Relationships (newly added)
     sales_order = relationship("SalesOrder")
     product = relationship("Product")
