@@ -251,20 +251,55 @@ unsafe_allow_html=True
 
 # =====================================
 # DATABASE INITIALIZATION (with auto-repair)
-# =====================================
 
 def rebuild_database():
-    """Delete old database file and recreate tables from models."""
+    """
+    Delete old database file and recreate tables from models.
+    Used when database schema changes.
+    """
+
     try:
+
         if "sqlite:///" in DATABASE_URL:
-            db_path = DATABASE_URL.replace("sqlite:///", "")
+
+            db_path = DATABASE_URL.replace(
+                "sqlite:///",
+                ""
+            )
+
             if os.path.exists(db_path):
+
                 os.remove(db_path)
-                st.warning("🔄 Database schema updated. Rebuilding with fresh tables...")
+
+                st.warning(
+                    "🔄 Database schema updated. Rebuilding fresh database..."
+                )
+
+
+    except Exception as e:
+
+        st.warning(
+            f"Database file cleanup skipped: {e}"
+        )
+
+
+    # Recreate database tables safely
+    try:
+
+        Base.metadata.drop_all(
+            bind=engine
+        )
+
+
     except Exception:
+
         pass
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
+
+
+
+    Base.metadata.create_all(
+        bind=engine
+    )
 
 try:
 
