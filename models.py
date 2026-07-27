@@ -47,6 +47,12 @@ class User(Base):
     )
 
 
+    full_name = Column(
+        String,
+        nullable=False
+    )
+
+
     password_hash = Column(
         String,
         nullable=False
@@ -55,7 +61,7 @@ class User(Base):
 
     role = Column(
         String,
-        default="user"
+        default="User"
     )
 
 
@@ -74,7 +80,6 @@ class User(Base):
         DateTime,
         default=datetime.utcnow
     )
-
 
 
 
