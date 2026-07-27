@@ -462,6 +462,23 @@ else:
         "Module development in progress."
     )
 
+if menu == "🌾 Procurement":
+    procurement_dashboard()
+
+elif menu == "📦 Warehouse":
+    warehouse_dashboard()
+
+elif menu == "🏭 Milling":
+    milling_dashboard()
+
+elif menu == "📦 Packaging":
+    packaging_dashboard()
+
+elif menu == "💰 Finance":
+    finance_dashboard()
+
+elif menu == "📊 Reports":
+    reports_dashboard()
 
 
 # =====================================
