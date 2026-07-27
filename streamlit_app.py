@@ -453,16 +453,20 @@ if menu == "Dashboard":
 else:
 
 
+    elif menu == "Sales":
+
+    sales_dashboard()
+
+
+else:
+
     st.header(
         f"📁 {menu}"
     )
 
-
     st.info(
         f"{menu} module will be developed in the next phase."
     )
-
-
 
 # =====================================
 # FOOTER
