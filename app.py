@@ -9,8 +9,7 @@ Version 1.2.0 Alpha
 import streamlit as st
 from config import COMPANY_NAME, VERSION
 from database import Base, engine, SessionLocal
-from models import User  # keep for login
-import models           # import the whole module to access all classes
+from models import User
 from auth import verify_password
 from sqlalchemy import inspect, text
 
@@ -21,7 +20,6 @@ try:
     from services.user_service import create_admin
 except ImportError:
     def create_admin(db):
-        """Fallback: create default admin if missing."""
         admin = db.query(User).filter(User.username == "admin").first()
         if not admin:
             from auth import hash_password
@@ -33,6 +31,12 @@ except ImportError:
             )
             db.add(admin)
             db.commit()
+
+try:
+    from components.navigation import esan_navigation
+except ImportError:
+    def esan_navigation():
+        return "Overview"
 
 try:
     from components.themes import esan_theme
@@ -49,7 +53,7 @@ except ImportError:
     load_seed_data = None
 
 # =====================================
-# MODULE IMPORTS (with fallbacks) – unchanged
+# MODULE IMPORTS (fallbacks)
 # =====================================
 module_functions = {
     "Overview": None,
@@ -61,63 +65,98 @@ module_functions = {
     "💰 Finance": None,
     "📊 Reports": None,
 }
-# (same import blocks as before – omitted for brevity, they remain identical)
+
+try:
+    from modules.dashboard.home import dashboard_home
+    module_functions["Overview"] = dashboard_home
+except ImportError:
+    pass
+
+try:
+    from modules.procurement.dashboard import procurement_dashboard
+    module_functions["🌾 Procurement"] = procurement_dashboard
+except ImportError:
+    pass
+
+try:
+    from modules.warehouse.dashboard import warehouse_dashboard
+    module_functions["📦 Warehouse"] = warehouse_dashboard
+except ImportError:
+    pass
+
+try:
+    from modules.milling.dashboard import milling_dashboard
+    module_functions["🏭 Milling"] = milling_dashboard
+except ImportError:
+    pass
+
+try:
+    from modules.packaging.dashboard import packaging_dashboard
+    module_functions["📦 Packaging"] = packaging_dashboard
+except ImportError:
+    pass
+
+try:
+    from modules.sales.dashboard import sales_dashboard
+    module_functions["🚚 Sales"] = sales_dashboard
+except ImportError:
+    pass
+
+try:
+    from modules.finance.dashboard import finance_dashboard
+    module_functions["💰 Finance"] = finance_dashboard
+except ImportError:
+    pass
+
+try:
+    from modules.reports.dashboard import reports_dashboard
+    module_functions["📊 Reports"] = reports_dashboard
+except ImportError:
+    pass
 
 # =====================================
 # PAGE CONFIGURATION
 # =====================================
 st.set_page_config(page_title="Esan ERP", page_icon="🌾", layout="wide")
 
-# Clean Streamlit UI & bottom nav spacing – unchanged
+# Clean Streamlit UI
+st.markdown("""
+<style>
+#MainMenu {display:none;}
+footer {display:none;}
+header {display:none;}
+</style>
+""", unsafe_allow_html=True)
 
 # =====================================
-# DATABASE MIGRATION HELPER
+# DATABASE SCHEMA CHECK & RESET
 # =====================================
-def auto_migrate():
-    """Add missing columns to existing tables based on current model definitions."""
+def check_schema_integrity():
+    """Check if the existing database matches the models. If not, drop and recreate."""
     inspector = inspect(engine)
-    # Get all model classes from the 'models' module
-    model_classes = [
-        obj for name, obj in vars(models).items()
-        if isinstance(obj, type) and hasattr(obj, '__tablename__')
-    ]
-    with engine.connect() as conn:
-        for model in model_classes:
-            table_name = model.__tablename__
-            if table_name not in inspector.get_table_names():
-                continue  # table doesn't exist yet, create_all will make it
-            existing_cols = [col['name'] for col in inspector.get_columns(table_name)]
-            # Columns defined in the model (ignore relationships, primary keys handled by create_all)
-            for col in model.__table__.columns:
-                if col.name not in existing_cols:
-                    # Build a simple ALTER TABLE statement (SQLite compatible)
-                    col_type = str(col.type).upper()
-                    if isinstance(col.type, String):
-                        col_type = "VARCHAR"  # SQLite doesn't care, but use standard
-                    elif isinstance(col.type, Integer):
-                        col_type = "INTEGER"
-                    elif isinstance(col.type, Float):
-                        col_type = "FLOAT"
-                    elif isinstance(col.type, Boolean):
-                        col_type = "BOOLEAN"
-                    elif isinstance(col.type, DateTime):
-                        col_type = "DATETIME"
-                    elif isinstance(col.type, Text):
-                        col_type = "TEXT"
-                    else:
-                        col_type = "TEXT"  # fallback
-                    nullable = "" if col.nullable else " NOT NULL DEFAULT ''"
-                    conn.exec_driver_sql(
-                        f"ALTER TABLE {table_name} ADD COLUMN {col.name} {col_type}{nullable}"
-                    )
-        conn.commit()
+    tables = inspector.get_table_names()
+    if not tables:
+        return True   # empty db – create_all will handle it
+
+    # Get model table definitions
+    for table_name, table in Base.metadata.tables.items():
+        if table_name in tables:
+            existing_cols = {col['name'] for col in inspector.get_columns(table_name)}
+            model_cols = {c.name for c in table.columns}
+            if model_cols - existing_cols:   # missing columns
+                return False
+    return True
 
 # =====================================
 # DATABASE INITIALIZATION
 # =====================================
 try:
-    Base.metadata.create_all(bind=engine)    # create missing tables
-    auto_migrate()                           # add any missing columns
+    if not check_schema_integrity():
+        st.warning("⚠️ Schema mismatch detected. Resetting database to match new models. All data will be lost.")
+        Base.metadata.drop_all(bind=engine)
+        st.success("Database reset. Creating fresh tables...")
+
+    Base.metadata.create_all(bind=engine)
 
     db = SessionLocal()
     try:
@@ -127,8 +166,141 @@ try:
 
     if load_seed_data:
         load_seed_data()
+
 except Exception as e:
     st.error("Database initialization failed")
     st.exception(e)
 
-# ... rest of app.py unchanged (session state, login, UI, bottom nav) ...
+# =====================================
+# SESSION STATE
+# =====================================
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.username = None
+    st.session_state.role = None
+    st.session_state.page = "Overview"
+
+# =====================================
+# LOGIN FUNCTION
+# =====================================
+def login(username, password):
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.username == username).first()
+        if user and verify_password(password, user.password_hash):
+            st.session_state.logged_in = True
+            st.session_state.username = user.username
+            st.session_state.role = user.role
+            return True
+        return False
+    finally:
+        db.close()
+
+# =====================================
+# LOGIN SCREEN
+# =====================================
+if not st.session_state.logged_in:
+    st.markdown("""
+    <div style="text-align:center">
+    <h1>🌾 Esan ERP</h1>
+    <h3>Nile Harvest Foods Ltd.</h3>
+    <p>Enterprise Milling & Packaging Management System</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        if login(username, password):
+            st.success("Login successful")
+            st.rerun()
+        else:
+            st.error("Invalid username or password")
+
+    st.info("Default administrator: admin / admin123")
+    st.stop()
+
+# =====================================
+# APPLICATION HEADER
+# =====================================
+st.title("🌾 Esan ERP")
+st.caption(f"{COMPANY_NAME} | Version {VERSION}")
+
+# =====================================
+# SIDEBAR: USER, THEME, NAVIGATION
+# =====================================
+st.sidebar.success(f"User: {st.session_state.username}")
+st.sidebar.info(f"Role: {st.session_state.role}")
+
+theme = st.sidebar.selectbox("Appearance", ["Light", "Dark"])
+esan_theme(theme)
+
+if st.sidebar.button("Logout"):
+    st.session_state.logged_in = False
+    st.session_state.username = None
+    st.session_state.role = None
+    st.rerun()
+
+# Sidebar navigation (replaces bottom bar)
+menu = esan_navigation()  # returns a string like "Overview", "🌾 Procurement", etc.
+
+# =====================================
+# ERP MODULE ROUTER
+# =====================================
+if menu == "Overview":
+    if module_functions["Overview"]:
+        module_functions["Overview"]()
+    else:
+        st.info("Dashboard module not available.")
+
+elif menu == "🌾 Procurement":
+    if module_functions["🌾 Procurement"]:
+        module_functions["🌾 Procurement"]()
+    else:
+        st.warning("Procurement module not available.")
+
+elif menu == "📦 Warehouse":
+    if module_functions["📦 Warehouse"]:
+        module_functions["📦 Warehouse"]()
+    else:
+        st.warning("Warehouse module not available.")
+
+elif menu == "🏭 Milling":
+    if module_functions["🏭 Milling"]:
+        module_functions["🏭 Milling"]()
+    else:
+        st.warning("Milling module not available.")
+
+elif menu == "📦 Packaging":
+    if module_functions["📦 Packaging"]:
+        module_functions["📦 Packaging"]()
+    else:
+        st.warning("Packaging module not available.")
+
+elif menu == "🚚 Sales & Distribution":
+    st.header("🚚 Sales & Distribution")
+    # Sales sub‑menu can be implemented here
+    if module_functions["🚚 Sales"]:
+        module_functions["🚚 Sales"]()
+    else:
+        st.info("Sales module under development.")
+
+elif menu == "💰 Finance":
+    if module_functions["💰 Finance"]:
+        module_functions["💰 Finance"]()
+    else:
+        st.warning("Finance module not available.")
+
+elif menu == "📊 Reports":
+    if module_functions["📊 Reports"]:
+        module_functions["📊 Reports"]()
+    else:
+        st.warning("Reports module not available.")
+
+else:
+    st.info("Select a module from the sidebar.")
+
+# Footer
+st.divider()
+st.caption("© Nile Harvest Foods Ltd. | Esan ERP Enterprise Platform")
