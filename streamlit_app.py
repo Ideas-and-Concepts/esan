@@ -8,7 +8,6 @@ import streamlit as st
 
 
 from config import (
-    APP_NAME,
     COMPANY_NAME,
     VERSION
 )
@@ -36,15 +35,20 @@ from components.navigation import esan_navigation
 from components.themes import esan_theme
 
 
-# Dashboard
+# =====================================
+# MODULE IMPORTS
+# =====================================
+
 from modules.dashboard.home import dashboard_home
 
 
-# Sales
 from modules.sales.dashboard import sales_dashboard
+
 from modules.sales.customers import customers_page
 
 from modules.sales.orders import sales_orders_page
+
+
 
 # =====================================
 # PAGE CONFIGURATION
@@ -63,7 +67,7 @@ st.set_page_config(
 
 
 # =====================================
-# REMOVE STREAMLIT BRANDING
+# HIDE STREAMLIT DEFAULT UI
 # =====================================
 
 st.markdown(
@@ -72,28 +76,18 @@ st.markdown(
 <style>
 
 #MainMenu {
-
-visibility:hidden;
-
+display:none;
 }
-
 
 footer {
-
-visibility:hidden;
-
+display:none;
 }
-
 
 header {
-
-visibility:hidden;
-
+display:none;
 }
 
-
 </style>
-
 """,
 
 unsafe_allow_html=True
@@ -103,7 +97,7 @@ unsafe_allow_html=True
 
 
 # =====================================
-# DATABASE STARTUP
+# DATABASE INITIALIZATION
 # =====================================
 
 try:
@@ -123,7 +117,7 @@ try:
 except Exception as e:
 
     st.error(
-        "Database startup failed"
+        "Database initialization failed"
     )
 
     st.exception(e)
@@ -151,9 +145,8 @@ if "role" not in st.session_state:
 
 
 # =====================================
-# LOGIN
+# LOGIN FUNCTION
 # =====================================
-
 
 def login(username, password):
 
@@ -161,53 +154,55 @@ def login(username, password):
     db = SessionLocal()
 
 
-    user = (
+    try:
 
-        db.query(User)
+        user = (
 
-        .filter(
-            User.username == username
+            db.query(User)
+
+            .filter(
+                User.username == username
+            )
+
+            .first()
+
         )
 
-        .first()
 
-    )
-
-
-    db.close()
+        if user:
 
 
-    if user:
+            if verify_password(
+
+                password,
+
+                user.password_hash
+
+            ):
 
 
-        if verify_password(
+                st.session_state.logged_in = True
 
-            password,
+                st.session_state.username = user.username
 
-            user.password_hash
-
-        ):
+                st.session_state.role = user.role
 
 
-            st.session_state.logged_in = True
-
-            st.session_state.username = user.username
-
-            st.session_state.role = user.role
+                return True
 
 
-            return True
+        return False
 
 
-    return False
+    finally:
 
+        db.close()
 
 
 
 # =====================================
-# LOGIN SCREEN
+# LOGIN PAGE
 # =====================================
-
 
 if not st.session_state.logged_in:
 
@@ -215,17 +210,17 @@ if not st.session_state.logged_in:
     st.markdown(
 
     """
-    <h1 style="text-align:center;">
-    🌾 Esan ERP
-    </h1>
+    <div style="text-align:center">
 
-    <h3 style="text-align:center;">
-    Nile Harvest Foods Ltd.
-    </h3>
+    <h1>🌾 Esan ERP</h1>
 
-    <p style="text-align:center;">
+    <h3>Nile Harvest Foods Ltd.</h3>
+
+    <p>
     Enterprise Milling & Packaging Management System
     </p>
+
+    </div>
 
     """,
 
@@ -254,13 +249,16 @@ if not st.session_state.logged_in:
 
 
         if login(
+
             username,
+
             password
+
         ):
 
 
             st.success(
-                "Welcome to Esan ERP"
+                "Login successful"
             )
 
             st.rerun()
@@ -268,14 +266,13 @@ if not st.session_state.logged_in:
 
         else:
 
-
             st.error(
-                "Invalid login details"
+                "Invalid username or password"
             )
 
 
     st.info(
-        "Default admin: admin / admin123"
+        "Default administrator: admin / admin123"
     )
 
 
@@ -284,9 +281,8 @@ if not st.session_state.logged_in:
 
 
 # =====================================
-# APPLICATION HEADER
+# MAIN APPLICATION HEADER
 # =====================================
-
 
 st.title(
     "🌾 Esan ERP"
@@ -302,13 +298,12 @@ f"{COMPANY_NAME} | Version {VERSION}"
 
 
 # =====================================
-# THEME
+# THEME CONTROL
 # =====================================
-
 
 theme = st.sidebar.selectbox(
 
-    "Theme",
+    "Appearance",
 
     [
 
@@ -326,9 +321,8 @@ esan_theme(theme)
 
 
 # =====================================
-# USER PANEL
+# USER INFORMATION
 # =====================================
-
 
 st.sidebar.success(
 
@@ -365,55 +359,24 @@ if st.sidebar.button(
 # MAIN NAVIGATION
 # =====================================
 
-
 menu = esan_navigation()
 
 
 
-
-        "Sales Module",
-
-        [
-
-            "Dashboard",
-
-            "Customers",
-
-            "Quotations",
-
-            "Sales Orders",
-
-            "Dispatch",
-
-            "Deliveries",
-
-            "Invoices",
-
-            "Payments"
-
-        ]
-
-    )
-
-
-
-    
-    sales_orders_page()
-
-
-    else:
-
-        st.info(
-
-        f"{sales_menu} module is coming next."
-
-        )
-
 # =====================================
-# SALES MODULE ROUTER
+# MODULE ROUTER
 # =====================================
+
+
+if menu == "🏠 Dashboard":
+
+
+    dashboard_home()
+
+
 
 elif menu == "🚚 Sales & Distribution":
+
 
     st.header(
         "🚚 Sales & Distribution"
@@ -449,33 +412,53 @@ elif menu == "🚚 Sales & Distribution":
 
     if sales_menu == "Dashboard":
 
+
         sales_dashboard()
+
 
 
     elif sales_menu == "Customers":
 
+
         customers_page()
+
 
 
     elif sales_menu == "Sales Orders":
 
+
         sales_orders_page()
+
 
 
     else:
 
+
         st.info(
-            f"{sales_menu} module is coming next."
+
+            f"{sales_menu} module will be developed next."
+
         )
 
 
+
+else:
+
+
+    st.header(
+        menu
+    )
+
+
+    st.info(
+        "Module development in progress."
+    )
 
 
 
 # =====================================
 # FOOTER
 # =====================================
-
 
 st.divider()
 
