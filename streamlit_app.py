@@ -127,27 +127,22 @@ st.set_page_config(
     page_title="Esan ERP",
     page_icon="🌾",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded"   # sidebar always open after login
 )
 
 # =====================================
-# CLEAN UI – HIDE ALL STREAMLIT BRANDING
+# CLEAN UI – ONLY HIDE HEADER / FOOTER / MENU (NOT THE SIDEBAR)
 # =====================================
 st.markdown("""
 <style>
+    /* Remove Streamlit's default top bar and footer */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
 
-    /* Hide the sidebar expand/collapse arrow */
-    [data-testid="stSidebar"] > div:first-child {
-        display: none;
-    }
-
-    /* Sidebar background */
+    /* Optional: light gray sidebar background */
     section[data-testid="stSidebar"] {
         background-color: #f8f9fa;
-        padding-top: 1rem;
     }
 
     /* Reduce padding in main area */
@@ -234,7 +229,7 @@ def login(username, password):
         db.close()
 
 # =====================================
-# LOGIN SCREEN (shown before sidebar)
+# LOGIN SCREEN (NO SIDEBAR UNTIL LOGGED IN)
 # =====================================
 if not st.session_state.logged_in:
     st.markdown("""
@@ -259,13 +254,13 @@ if not st.session_state.logged_in:
     st.stop()
 
 # =====================================
-# APP HEADER (after login)
+# APPLICATION HEADER (after login)
 # =====================================
 st.title("🌾 Esan ERP")
 st.caption(f"{COMPANY_NAME} | Version {VERSION}")
 
 # =====================================
-# SIDEBAR – USER, THEME, LOGOUT, NAVIGATION
+# SIDEBAR – FULL PANEL WITH NAVIGATION
 # =====================================
 with st.sidebar:
     st.markdown("## 👤 User Panel")
@@ -283,7 +278,8 @@ with st.sidebar:
 
     st.divider()
     st.markdown("## 📋 Navigation")
-    menu = esan_navigation()   # Custom navigation component (or fallback selectbox)
+    # The custom navigation component (or fallback selectbox) is rendered here
+    menu = esan_navigation()
 
 # =====================================
 # ERP MODULE ROUTER
