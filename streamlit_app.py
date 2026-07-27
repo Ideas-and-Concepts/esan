@@ -1,10 +1,14 @@
 """
 Esan ERP Controller
 Nile Harvest Foods Ltd.
+Enterprise Milling & Packaging Management System
+
 Version 1.2.0 Alpha
 """
 
+
 import streamlit as st
+
 
 
 # =====================================
@@ -35,12 +39,14 @@ from services.user_service import create_admin
 
 from components.navigation import esan_navigation
 
+
 from components.themes import esan_theme
 
-from modules.sales.quotations import quotations_page
+
+
 
 # =====================================
-# SEED DATA
+# OPTIONAL SEED DATA
 # =====================================
 
 try:
@@ -53,67 +59,141 @@ except Exception:
 
 
 
+
 # =====================================
 # MODULE IMPORTS
 # =====================================
 
 
-from modules.dashboard.home import dashboard_home
+try:
 
+    from modules.dashboard.home import dashboard_home
 
+except Exception:
 
-# Sales
-
-from modules.sales.dashboard import sales_dashboard
-
-from modules.sales.customers import customers_page
-
-from modules.sales.orders import sales_orders_page
+    dashboard_home = None
 
 
 
 
-# Optional modules
+# SALES
 
 try:
-    from modules.procurement.dashboard import procurement_dashboard
+
+    from modules.sales.dashboard import sales_dashboard
+
 except Exception:
+
+    sales_dashboard = None
+
+
+
+try:
+
+    from modules.sales.customers import customers_page
+
+except Exception:
+
+    customers_page = None
+
+
+
+try:
+
+    from modules.sales.orders import sales_orders_page
+
+except Exception:
+
+    sales_orders_page = None
+
+
+
+try:
+
+    from modules.sales.quotations import quotations_page
+
+except Exception:
+
+    quotations_page = None
+
+
+
+
+# PROCUREMENT
+
+try:
+
+    from modules.procurement.dashboard import procurement_dashboard
+
+except Exception:
+
     procurement_dashboard = None
 
 
 
+
+# WAREHOUSE
+
 try:
+
     from modules.warehouse.dashboard import warehouse_dashboard
+
 except Exception:
+
     warehouse_dashboard = None
 
 
 
+
+# MILLING
+
 try:
+
     from modules.milling.dashboard import milling_dashboard
+
 except Exception:
+
     milling_dashboard = None
 
 
 
+
+# PACKAGING
+
 try:
+
     from modules.packaging.dashboard import packaging_dashboard
+
 except Exception:
+
     packaging_dashboard = None
 
 
 
+
+# FINANCE
+
 try:
+
     from modules.finance.dashboard import finance_dashboard
+
 except Exception:
+
     finance_dashboard = None
 
 
 
+
+# REPORTS
+
 try:
+
     from modules.reports.dashboard import reports_dashboard
+
 except Exception:
+
     reports_dashboard = None
+
 
 
 
@@ -133,8 +213,9 @@ st.set_page_config(
 
 
 
+
 # =====================================
-# HIDE STREAMLIT UI
+# STREAMLIT CLEAN UI
 # =====================================
 
 st.markdown(
@@ -146,16 +227,17 @@ st.markdown(
 display:none;
 }
 
+
 footer {
 display:none;
 }
+
 
 header {
 display:none;
 }
 
 </style>
-
 """,
 
 unsafe_allow_html=True
@@ -164,11 +246,13 @@ unsafe_allow_html=True
 
 
 
+
 # =====================================
-# DATABASE STARTUP
+# DATABASE INITIALIZATION
 # =====================================
 
 try:
+
 
     Base.metadata.create_all(
         bind=engine
@@ -177,7 +261,9 @@ try:
 
     db = SessionLocal()
 
+
     create_admin(db)
+
 
     db.close()
 
@@ -191,12 +277,12 @@ try:
 
 except Exception as e:
 
+
     st.error(
         "Database initialization failed"
     )
 
     st.exception(e)
-
 
 
 
@@ -227,13 +313,14 @@ if "role" not in st.session_state:
 # LOGIN FUNCTION
 # =====================================
 
-def login(username, password):
+def login(username,password):
 
 
     db = SessionLocal()
 
 
     try:
+
 
         user = (
 
@@ -246,6 +333,7 @@ def login(username, password):
             .first()
 
         )
+
 
 
         if user:
@@ -270,7 +358,9 @@ def login(username, password):
                 return True
 
 
+
         return False
+
 
 
     finally:
@@ -279,9 +369,8 @@ def login(username, password):
 
 
 
-
 # =====================================
-# LOGIN PAGE
+# LOGIN SCREEN
 # =====================================
 
 if not st.session_state.logged_in:
@@ -301,13 +390,11 @@ if not st.session_state.logged_in:
     </p>
 
     </div>
-
     """,
 
     unsafe_allow_html=True
 
     )
-
 
 
     username = st.text_input(
@@ -316,11 +403,8 @@ if not st.session_state.logged_in:
 
 
     password = st.text_input(
-
         "Password",
-
         type="password"
-
     )
 
 
@@ -330,7 +414,10 @@ if not st.session_state.logged_in:
     ):
 
 
-        if login(username,password):
+        if login(
+            username,
+            password
+        ):
 
             st.success(
                 "Login successful"
@@ -346,7 +433,6 @@ if not st.session_state.logged_in:
             )
 
 
-
     st.info(
         "Default administrator: admin / admin123"
     )
@@ -358,7 +444,7 @@ if not st.session_state.logged_in:
 
 
 # =====================================
-# HEADER
+# APPLICATION HEADER
 # =====================================
 
 st.title(
@@ -367,10 +453,9 @@ st.title(
 
 
 st.caption(
-
-f"{COMPANY_NAME} | Version {VERSION}"
-
+    f"{COMPANY_NAME} | Version {VERSION}"
 )
+
 
 
 
@@ -383,11 +468,8 @@ theme = st.sidebar.selectbox(
     "Appearance",
 
     [
-
         "Light",
-
         "Dark"
-
     ]
 
 )
@@ -404,14 +486,14 @@ esan_theme(theme)
 
 st.sidebar.success(
 
-f"User: {st.session_state.username}"
+    f"User: {st.session_state.username}"
 
 )
 
 
 st.sidebar.info(
 
-f"Role: {st.session_state.role}"
+    f"Role: {st.session_state.role}"
 
 )
 
@@ -421,12 +503,12 @@ if st.sidebar.button(
     "Logout"
 ):
 
+
     st.session_state.logged_in = False
 
     st.session_state.username = None
 
     st.session_state.role = None
-
 
     st.rerun()
 
@@ -443,16 +525,28 @@ menu = esan_navigation()
 
 
 # =====================================
-# ERP ROUTER
+# ERP MODULE ROUTER
 # =====================================
+
 
 if menu == "Overview":
 
-    dashboard_home()
+
+    if dashboard_home:
+
+        dashboard_home()
+
+    else:
+
+        st.info(
+            "Dashboard module not available."
+        )
+
 
 
 
 elif menu == "🌾 Procurement":
+
 
     if procurement_dashboard:
 
@@ -461,12 +555,14 @@ elif menu == "🌾 Procurement":
     else:
 
         st.warning(
-            "Procurement module not available yet."
+            "Procurement module not available."
         )
 
 
 
+
 elif menu == "📦 Warehouse":
+
 
     if warehouse_dashboard:
 
@@ -475,12 +571,14 @@ elif menu == "📦 Warehouse":
     else:
 
         st.warning(
-            "Warehouse module not available yet."
+            "Warehouse module not available."
         )
 
 
 
+
 elif menu == "🏭 Milling":
+
 
     if milling_dashboard:
 
@@ -489,12 +587,14 @@ elif menu == "🏭 Milling":
     else:
 
         st.warning(
-            "Milling module not available yet."
+            "Milling module not available."
         )
 
 
 
+
 elif menu == "📦 Packaging":
+
 
     if packaging_dashboard:
 
@@ -503,12 +603,14 @@ elif menu == "📦 Packaging":
     else:
 
         st.warning(
-            "Packaging module not available yet."
+            "Packaging module not available."
         )
 
 
 
+
 elif menu == "🚚 Sales & Distribution":
+
 
     st.header(
         "🚚 Sales & Distribution"
@@ -520,48 +622,108 @@ elif menu == "🚚 Sales & Distribution":
         "Sales Module",
 
         [
+
             "Dashboard",
+
             "Customers",
-            "Sales Orders",
+
             "Quotations",
+
+            "Sales Orders",
+
             "Dispatch",
+
             "Deliveries",
+
             "Invoices",
+
             "Payments"
+
         ]
 
     )
 
 
+
     if sales_menu == "Dashboard":
 
-        sales_dashboard()
+
+        if sales_dashboard:
+
+            sales_dashboard()
+
+        else:
+
+            st.warning(
+                "Sales dashboard unavailable."
+            )
+
+
 
 
     elif sales_menu == "Customers":
 
-        customers_page()
+
+        if customers_page:
+
+            customers_page()
+
+        else:
+
+            st.warning(
+                "Customers module unavailable."
+            )
 
 
-    elif sales_menu == "Sales Orders":
-
-        sales_orders_page()
 
 
     elif sales_menu == "Quotations":
 
-        quotations_page()
+
+        if quotations_page:
+
+            quotations_page()
+
+        else:
+
+            st.warning(
+                "Quotation module unavailable."
+            )
+
+
+
+
+    elif sales_menu == "Sales Orders":
+
+
+        if sales_orders_page:
+
+            sales_orders_page()
+
+        else:
+
+            st.warning(
+                "Sales Orders module unavailable."
+            )
+
+
 
 
     else:
 
+
         st.info(
+
             f"{sales_menu} module will be developed next."
+
         )
 
 
 
+
+
 elif menu == "💰 Finance":
+
 
     if finance_dashboard:
 
@@ -570,12 +732,14 @@ elif menu == "💰 Finance":
     else:
 
         st.warning(
-            "Finance module not available yet."
+            "Finance module unavailable."
         )
 
 
 
+
 elif menu == "📊 Reports":
+
 
     if reports_dashboard:
 
@@ -584,16 +748,19 @@ elif menu == "📊 Reports":
     else:
 
         st.warning(
-            "Reports module not available yet."
+            "Reports module unavailable."
         )
+
 
 
 
 else:
 
+
     st.info(
         "Select a module from the navigation menu."
     )
+
 
 
 
@@ -609,3 +776,4 @@ st.caption(
 "© Nile Harvest Foods Ltd. | Esan ERP Enterprise Platform"
 
 )
+
