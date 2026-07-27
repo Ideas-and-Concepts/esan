@@ -1,3 +1,9 @@
+"""
+Esan ERP
+Customer Management Module
+Nile Harvest Foods Ltd.
+"""
+
 import streamlit as st
 
 from database import SessionLocal
@@ -6,23 +12,21 @@ from models import Customer
 
 def customers_page():
 
-    st.header(
-        "👥 Customer Management"
-    )
-
+    st.header("👥 Customer Management")
 
     db = SessionLocal()
 
 
-    # -----------------------------
-    # Add Customer
-    # -----------------------------
+    # =====================================
+    # ADD CUSTOMER FORM
+    # =====================================
 
-    with st.expander(
-        "➕ Add New Customer"
-    ):
+    st.subheader("➕ Register New Customer")
 
-        name = st.text_input(
+
+    with st.form("customer_form"):
+
+        customer_name = st.text_input(
             "Customer Name"
         )
 
@@ -32,68 +36,144 @@ def customers_page():
         )
 
 
+        email = st.text_input(
+            "Email Address"
+        )
+
+
         location = st.text_input(
-            "Location"
+            "Location / Address"
         )
 
 
         country = st.selectbox(
+
             "Country",
+
             [
                 "Uganda",
-                "South Sudan"
+                "South Sudan",
+                "Kenya",
+                "Tanzania",
+                "Other"
             ]
+
         )
 
 
-        if st.button(
-            "Save Customer"
-        ):
+        customer_type = st.selectbox(
+
+            "Customer Type",
+
+            [
+                "Retail",
+                "Wholesale",
+                "Distributor",
+                "Export Customer"
+            ]
+
+        )
 
 
-            customer = Customer(
+        credit_limit = st.number_input(
 
-                name=name,
+            "Credit Limit",
 
-                phone=phone,
+            min_value=0.0,
 
-                location=location,
+            step=100000.0
 
-                country=country
-
-            )
+        )
 
 
-            db.add(customer)
+        submitted = st.form_submit_button(
+            "💾 Save Customer"
+        )
 
-            db.commit()
+
+        if submitted:
 
 
-            st.success(
-                "Customer saved successfully"
-            )
+            if customer_name:
+
+
+                new_customer = Customer(
+
+                    name=customer_name,
+
+                    phone=phone,
+
+                    location=location,
+
+                    country=country
+
+                )
+
+
+                db.add(new_customer)
+
+                db.commit()
+
+
+                st.success(
+                    "Customer registered successfully."
+                )
+
+
+                st.rerun()
+
+
+            else:
+
+                st.warning(
+                    "Customer name is required."
+                )
 
 
 
     st.divider()
 
 
-    # -----------------------------
-    # Customer List
-    # -----------------------------
+
+    # =====================================
+    # CUSTOMER DATABASE
+    # =====================================
 
     st.subheader(
-        "📋 Customer List"
+        "📋 Customer Database"
+    )
+
+
+    search = st.text_input(
+        "🔍 Search Customer"
     )
 
 
     customers = (
+
         db.query(Customer)
+
         .order_by(
             Customer.id.desc()
         )
+
         .all()
+
     )
+
+
+    if search:
+
+        customers = [
+
+            customer for customer in customers
+
+            if search.lower()
+
+            in customer.name.lower()
+
+        ]
+
 
 
     if customers:
@@ -102,27 +182,69 @@ def customers_page():
         for customer in customers:
 
 
-            with st.container():
+            with st.expander(
+
+                f"👤 {customer.name}"
+
+            ):
+
 
                 st.write(
+
                     f"""
-                    👤 **{customer.name}**
+                    **Phone:** {customer.phone}
 
-                    📞 {customer.phone}
+                    **Location:** {customer.location}
 
-                    📍 {customer.location}
+                    **Country:** {customer.country}
 
-                    🌍 {customer.country}
+                    **Customer ID:** {customer.id}
                     """
+
                 )
 
-                st.divider()
+
+                col1, col2 = st.columns(2)
+
+
+                with col1:
+
+                    st.button(
+
+                        "✏ Edit",
+
+                        key=f"edit_{customer.id}"
+
+                    )
+
+
+                with col2:
+
+                    if st.button(
+
+                        "🗑 Delete",
+
+                        key=f"delete_{customer.id}"
+
+                    ):
+
+                        db.delete(customer)
+
+                        db.commit()
+
+
+                        st.success(
+                            "Customer deleted."
+                        )
+
+                        st.rerun()
 
 
     else:
 
+
         st.info(
-            "No customers registered yet."
+            "No customers found."
         )
 
 
