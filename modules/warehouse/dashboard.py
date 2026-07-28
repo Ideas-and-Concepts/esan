@@ -7,7 +7,7 @@ Esan ERP - Warehouse Management
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-from sqlalchemy import func                     # ← needed for sum()
+from sqlalchemy import func
 from database import SessionLocal
 from models import Warehouse, Product, StockMovement
 
@@ -19,12 +19,9 @@ def warehouse_dashboard():
     db = get_db()
     try:
         col1, col2, col3, col4 = st.columns(4)
-
         total_products = db.query(Product).count()
         total_warehouses = db.query(Warehouse).count()
-        # Use func.sum, NOT db.func.sum
         total_stock = db.query(func.sum(Product.quantity)).scalar() or 0
-
         recent_movements = db.query(StockMovement).filter(
             StockMovement.created_at >= datetime.utcnow() - timedelta(days=7)
         ).count()
@@ -39,14 +36,7 @@ def warehouse_dashboard():
             st.metric("Movements (7d)", recent_movements)
 
         st.markdown("---")
-
-        tab1, tab2, tab3, tab4 = st.tabs([
-            "Inventory Overview",
-            "Stock Movements",
-            "Warehouses",
-            "Low Stock Alert"
-        ])
-
+        tab1, tab2, tab3, tab4 = st.tabs(["Inventory", "Movements", "Warehouses", "Low Stock"])
         with tab1:
             inventory_overview(db)
         with tab2:
