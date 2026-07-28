@@ -1,0 +1,381 @@
+"""
+Esan ERP Inventory Service
+
+Nile Harvest Foods Ltd.
+Enterprise Milling & Packaging Management System
+
+Handles:
+- Stock availability
+- Stock reservation
+- Stock movements
+- Inventory updates
+
+Version 1.0
+"""
+
+from datetime import datetime
+
+from models import (
+    Product,
+    StockMovement,
+    StockReservation
+)
+
+
+# ==================================================
+# CHECK AVAILABLE STOCK
+# ==================================================
+
+def get_available_stock(db, product_id):
+    """
+    Returns available stock excluding reserved quantities.
+    """
+
+    product = (
+        db.query(Product)
+        .filter(Product.id == product_id)
+        .first()
+    )
+
+    if not product:
+        return 0
+
+
+    reserved = (
+        db.query(StockReservation)
+        .filter(
+            StockReservation.product_id == product_id,
+            StockReservation.status == "Reserved"
+        )
+        .all()
+    )
+
+
+    reserved_quantity = sum(
+        item.quantity for item in reserved
+    )
+
+
+    return product.quantity - reserved_quantity
+
+
+
+# ==================================================
+# CHECK STOCK AVAILABILITY
+# ==================================================
+
+def check_stock_available(db, product_id, quantity):
+    """
+    Checks whether enough stock exists.
+    """
+
+    available = get_available_stock(
+        db,
+        product_id
+    )
+
+
+    return available >= quantity
+
+
+
+# ==================================================
+# RESERVE STOCK
+# ==================================================
+
+def reserve_stock(
+    db,
+    sales_order_id,
+    product_id,
+    quantity
+):
+
+    """
+    Reserve stock for approved Sales Order.
+    """
+
+
+    if not check_stock_available(
+        db,
+        product_id,
+        quantity
+    ):
+
+        raise Exception(
+            "Insufficient stock available"
+        )
+
+
+
+    reservation = StockReservation(
+
+        sales_order_id=sales_order_id,
+
+        product_id=product_id,
+
+        quantity=quantity,
+
+        status="Reserved",
+
+        created_at=datetime.utcnow()
+
+    )
+
+
+    db.add(reservation)
+
+    db.commit()
+
+    db.refresh(reservation)
+
+
+    return reservation
+
+
+
+# ==================================================
+# RELEASE RESERVED STOCK
+# ==================================================
+
+def release_stock_reservation(
+    db,
+    sales_order_id
+):
+
+    """
+    Release reserved stock when order is cancelled.
+    """
+
+
+    reservations = (
+        db.query(StockReservation)
+        .filter(
+            StockReservation.sales_order_id == sales_order_id,
+            StockReservation.status == "Reserved"
+        )
+        .all()
+    )
+
+
+    for reservation in reservations:
+
+        reservation.status = "Released"
+
+
+    db.commit()
+
+
+    return True
+
+
+
+# ==================================================
+# DEDUCT STOCK AFTER DELIVERY
+# ==================================================
+
+def deduct_stock(
+    db,
+    product_id,
+    quantity,
+    reference
+):
+
+    """
+    Deduct finished goods after dispatch.
+    """
+
+
+    product = (
+        db.query(Product)
+        .filter(Product.id == product_id)
+        .first()
+    )
+
+
+    if not product:
+
+        raise Exception(
+            "Product not found"
+        )
+
+
+    if product.quantity < quantity:
+
+        raise Exception(
+            "Insufficient stock"
+        )
+
+
+    product.quantity -= quantity
+
+
+
+    movement = StockMovement(
+
+        product_id=product_id,
+
+        movement_type="OUT",
+
+        quantity=quantity,
+
+        reference=reference,
+
+        created_at=datetime.utcnow()
+
+    )
+
+
+    db.add(movement)
+
+
+    db.commit()
+
+
+    return product
+
+
+
+# ==================================================
+# ADD STOCK
+# ==================================================
+
+def add_stock(
+    db,
+    product_id,
+    quantity,
+    reference
+):
+
+    """
+    Add stock after procurement or production.
+    """
+
+
+    product = (
+        db.query(Product)
+        .filter(Product.id == product_id)
+        .first()
+    )
+
+
+    if not product:
+
+        raise Exception(
+            "Product not found"
+        )
+
+
+
+    product.quantity += quantity
+
+
+
+    movement = StockMovement(
+
+        product_id=product_id,
+
+        movement_type="IN",
+
+        quantity=quantity,
+
+        reference=reference,
+
+        created_at=datetime.utcnow()
+
+    )
+
+
+    db.add(movement)
+
+    db.commit()
+
+
+    return product
+
+
+
+# ==================================================
+# CANCEL RESERVATION AFTER DELIVERY
+# ==================================================
+
+def complete_reservation(
+    db,
+    sales_order_id
+):
+
+    """
+    Mark reserved stock as consumed.
+    """
+
+
+    reservations = (
+        db.query(StockReservation)
+        .filter(
+            StockReservation.sales_order_id == sales_order_id,
+            StockReservation.status == "Reserved"
+        )
+        .all()
+    )
+
+
+    for reservation in reservations:
+
+        reservation.status = "Completed"
+
+
+    db.commit()
+
+
+    return True
+
+
+
+# ==================================================
+# INVENTORY VALUE
+# ==================================================
+
+def calculate_inventory_value(db):
+
+    """
+    Calculates total inventory value.
+    """
+
+    products = db.query(Product).all()
+
+
+    total = 0
+
+
+    for product in products:
+
+        total += (
+            product.quantity *
+            product.cost_price
+        )
+
+
+    return total
+
+
+
+# ==================================================
+# LOW STOCK REPORT
+# ==================================================
+
+def get_low_stock_products(
+    db,
+    minimum_level=100
+):
+
+    """
+    Returns products below reorder level.
+    """
+
+
+    return (
+        db.query(Product)
+        .filter(
+            Product.quantity <= minimum_level
+        )
+        .all()
+    )
