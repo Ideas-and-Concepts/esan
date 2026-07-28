@@ -275,3 +275,61 @@ class StockReservation(Base):
 
     sales_order = relationship("SalesOrder")
     product = relationship("Product")
+
+
+# ==================================================
+# HR - EMPLOYEES
+# ==================================================
+class Employee(Base):
+    __tablename__ = "employees"
+    id = Column(Integer, primary_key=True)
+    employee_code = Column(String, unique=True)
+    full_name = Column(String, nullable=False)
+    department = Column(String)
+    position = Column(String)
+    phone = Column(String)
+    email = Column(String)
+    hire_date = Column(DateTime)
+    salary = Column(Float, default=0)
+    status = Column(String, default="Active")  # Active, Inactive, Terminated
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# ==================================================
+# LOGISTICS - VEHICLES & MAINTENANCE
+# ==================================================
+class Vehicle(Base):
+    __tablename__ = "vehicles"
+    id = Column(Integer, primary_key=True)
+    vehicle_number = Column(String, unique=True)
+    vehicle_type = Column(String)  # Truck, Van, Bike
+    make = Column(String)
+    model = Column(String)
+    capacity = Column(Float)      # Tons
+    status = Column(String, default="Available")  # Available, In Transit, Maintenance
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class MaintenanceRecord(Base):
+    __tablename__ = "maintenance_records"
+    id = Column(Integer, primary_key=True)
+    vehicle_id = Column(Integer, ForeignKey("vehicles.id"))
+    description = Column(Text)
+    cost = Column(Float, default=0)
+    maintenance_date = Column(DateTime)
+    next_due_date = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    vehicle = relationship("Vehicle")
+
+# ==================================================
+# EQUIPMENT (for maintenance module)
+# ==================================================
+class Equipment(Base):
+    __tablename__ = "equipment"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    equipment_type = Column(String)  # Milling Machine, Packaging Line, etc.
+    serial_number = Column(String)
+    purchase_date = Column(DateTime)
+    last_maintenance = Column(DateTime)
+    next_maintenance = Column(DateTime)
+    status = Column(String, default="Operational")
+    created_at = Column(DateTime, default=datetime.utcnow)
