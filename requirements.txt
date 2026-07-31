@@ -4,4 +4,4 @@ pandas
 plotly
 passlib
 bcrypt
-python-dotenv
+psycopg2-binary
