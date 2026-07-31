@@ -1,76 +1,44 @@
 """
-Esan ERP Theme Manager
+Theme Component
+Esan ERP - Light/Dark toggle
 """
 
 import streamlit as st
 
-
-def esan_theme(mode):
-
-
-    if mode == "Dark":
-
-        st.markdown(
-            """
-            <style>
-
-            .stApp {
-
-                background-color:#111827;
-
-                color:white;
-
-            }
-
-
-            div[data-testid="stMetric"] {
-
-                background:#1F2937;
-
-                padding:20px;
-
-                border-radius:15px;
-
-            }
-
-
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-
-
+def esan_theme(theme):
+    if theme == "Dark":
+        st.markdown("""
+        <style>
+        /* Dark theme overrides */
+        .stApp {
+            background-color: #0e1117;
+            color: #fafafa;
+        }
+        .stSidebar {
+            background-color: #262730;
+        }
+        .st-bq {
+            background-color: #262730;
+        }
+        .stMetric {
+            background-color: #1a1c23;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        </style>
+        """, unsafe_allow_html=True)
     else:
-
-
-        st.markdown(
-
-            """
-            <style>
-
-            .stApp {
-
-                background:#F5F7FA;
-
-            }
-
-
-            div[data-testid="stMetric"] {
-
-                background:white;
-
-                padding:20px;
-
-                border-radius:15px;
-
-                box-shadow:0 2px 8px #ddd;
-
-            }
-
-
-            </style>
-            """,
-
-            unsafe_allow_html=True
-
-        )
+        # Light theme (default)
+        st.markdown("""
+        <style>
+        .stApp {
+            background-color: #ffffff;
+            color: #31333f;
+        }
+        .stMetric {
+            background-color: #f0f2f6;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        </style>
+        """, unsafe_allow_html=True)
