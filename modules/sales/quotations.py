@@ -1,243 +1,74 @@
 """
-Esan ERP
-Sales & Distribution - Quotations
-
-Nile Harvest Foods Ltd.
+Quotations Module – uses sales_service
 """
 
 import streamlit as st
-from datetime import datetime
-
-from database import SessionLocal
-from models import Quotation, Customer
-
-
-
-def quotation_form():
-
-    st.subheader(
-        "➕ Create New Quotation"
-    )
-
-
-    db = SessionLocal()
-
-
-    customers = db.query(
-        Customer
-    ).all()
-
-
-    customer_list = [
-        c.name for c in customers
-    ]
-
-
-    if not customer_list:
-
-        st.warning(
-            "Please register customers first."
-        )
-
-        db.close()
-
-        return
-
-
-
-    with st.form(
-        "quotation_form"
-    ):
-
-
-        customer = st.selectbox(
-
-            "Customer",
-
-            customer_list
-
-        )
-
-
-        product = st.selectbox(
-
-            "Product",
-
-            [
-
-                "Maize Flour 5kg",
-
-                "Maize Flour 25kg",
-
-                "Cassava Flour 25kg",
-
-                "Animal Feed"
-
-            ]
-
-        )
-
-
-        quantity = st.number_input(
-
-            "Quantity",
-
-            min_value=1.0
-
-        )
-
-
-        unit_price = st.number_input(
-
-            "Unit Price (UGX)",
-
-            min_value=0.0
-
-        )
-
-
-        submit = st.form_submit_button(
-
-            "Save Quotation"
-
-        )
-
-
-
-        if submit:
-
-
-            total = quantity * unit_price
-
-
-            quotation = Quotation(
-
-                quotation_number=
-
-                f"QT-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-
-
-                customer=customer,
-
-
-                product=product,
-
-
-                quantity=quantity,
-
-
-                unit_price=unit_price,
-
-
-                total_amount=total,
-
-
-                status="Draft"
-
-            )
-
-
-            db.add(
-                quotation
-            )
-
-
-            db.commit()
-
-
-            st.success(
-                "Quotation created successfully"
-            )
-
-
-            st.rerun()
-
-
-
-    db.close()
-
-
-
-def quotation_database():
-
-
-    st.subheader(
-        "📋 Quotation Database"
-    )
-
-
-    db = SessionLocal()
-
-
-    quotations = db.query(
-        Quotation
-    ).order_by(
-        Quotation.id.desc()
-    ).all()
-
-
-
-    for q in quotations:
-
-
-        with st.expander(
-
-            f"{q.quotation_number} - {q.customer}"
-
-        ):
-
-
-            st.write(
-                f"Product: {q.product}"
-            )
-
-
-            st.write(
-                f"Quantity: {q.quantity}"
-            )
-
-
-            st.write(
-                f"Total: UGX {q.total_amount:,.0f}"
-            )
-
-
-            st.write(
-                f"Status: {q.status}"
-            )
-
-
-    db.close()
-
-
+import pandas as pd
+from services.sales_service import (
+    get_all_customers,
+    create_quotation,
+    get_all_quotations
+)
 
 def quotations_page():
-
-
-    st.header(
-        "📄 Sales Quotations"
-    )
-
-
-    tab1, tab2 = st.tabs(
-
-        [
-
-            "Create Quotation",
-
-            "Quotation Database"
-
-        ]
-
-    )
-
-
+    st.title("📄 Sales Quotations")
+    tab1, tab2 = st.tabs(["Create Quotation", "View Quotations"])
     with tab1:
-
-        quotation_form()
-
-
-
+        create_quotation_view()
     with tab2:
+        view_quotations()
 
-        quotation_database()
+def create_quotation_view():
+    customers = get_all_customers()
+    if not customers:
+        st.warning("No customers.")
+        return
+    cust_options = {c.name: c.id for c in customers}
+    selected = st.selectbox("Customer", list(cust_options.keys()))
+
+    st.markdown("### Quotation Items")
+    if 'quotation_items' not in st.session_state:
+        st.session_state.quotation_items = []
+    with st.form("add_quote_item", clear_on_submit=True):
+        col1, col2, col3 = st.columns(3)
+        product = col1.text_input("Product")
+        qty = col2.number_input("Quantity", min_value=0.0)
+        price = col3.number_input("Unit Price", min_value=0.0)
+        if st.form_submit_button("Add"):
+            if product and qty>0 and price>0:
+                st.session_state.quotation_items.append({'product_name': product, 'quantity': qty, 'unit_price': price})
+
+    if st.session_state.quotation_items:
+        df = pd.DataFrame(st.session_state.quotation_items)
+        st.dataframe(df, use_container_width=True)
+        total = sum(it['quantity']*it['unit_price'] for it in st.session_state.quotation_items)
+        st.markdown(f"**Total:** ${total:,.2f}")
+        if st.button("Clear"):
+            st.session_state.quotation_items = []
+            st.rerun()
+
+    if st.button("Create Quotation", type="primary"):
+        if not st.session_state.quotation_items:
+            st.error("No items.")
+            return
+        try:
+            q = create_quotation(cust_options[selected], st.session_state.quotation_items)
+            st.success(f"Quotation {q.quotation_number} created!")
+            st.session_state.quotation_items = []
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+def view_quotations():
+    quotes = get_all_quotations()
+    if quotes:
+        data = [{
+            'Number': q.quotation_number,
+            'Customer ID': q.customer_id,
+            'Status': q.status,
+            'Total': f"${q.total_amount:,.2f}",
+            'Date': q.created_at.strftime('%Y-%m-%d')
+        } for q in quotes]
+        st.dataframe(pd.DataFrame(data), use_container_width=True)
+    else:
+        st.info("No quotations.")
