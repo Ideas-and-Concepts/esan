@@ -1,8 +1,8 @@
 """
 Esan ERP API – FastAPI Backend for Vercel
 ==========================================
-- Floating sidebar (fixed) for navigation
-- Full ERP interface at /
+- Collapsible floating sidebar
+- Full module set (matches streamlit_app.py)
 - Login with admin / admin123
 - API endpoints under /api/
 - Health check at /health
@@ -20,12 +20,9 @@ from sqlalchemy.orm import Session
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("esan_api")
 
-# Make repository root importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# ------------------------------------------------------------------
-# Database / models / auth – graceful fallback
-# ------------------------------------------------------------------
+# ---------- Database / models / auth ----------
 try:
     from database import SessionLocal, engine, Base
     from models import (
@@ -39,19 +36,13 @@ except Exception as e:
     logger.error(f"Database import failed: {e}")
     DB_AVAILABLE = False
 
-# ------------------------------------------------------------------
-# FastAPI app
-# ------------------------------------------------------------------
+# ---------- FastAPI app ----------
 app = FastAPI(title="Esan ERP API", version="1.4.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# ------------------------------------------------------------------
-# Startup: create tables + admin (safe)
-# ------------------------------------------------------------------
 @app.on_event("startup")
 def startup():
     if not DB_AVAILABLE:
-        logger.warning("Database not available – skipping setup.")
         return
     try:
         Base.metadata.create_all(bind=engine)
@@ -60,10 +51,8 @@ def startup():
             admin = db.query(User).filter(User.username == "admin").first()
             if not admin:
                 admin = User(
-                    username="admin",
-                    password_hash=hash_password("admin123"),
-                    role="Administrator",
-                    full_name="System Administrator",
+                    username="admin", password_hash=hash_password("admin123"),
+                    role="Administrator", full_name="System Administrator",
                     email="admin@nileharvest.com"
                 )
                 db.add(admin)
@@ -73,9 +62,6 @@ def startup():
     except Exception as e:
         logger.error(f"Startup error: {e}")
 
-# ------------------------------------------------------------------
-# Dependency
-# ------------------------------------------------------------------
 def get_db():
     if not DB_AVAILABLE:
         raise HTTPException(status_code=503, detail="Database unavailable")
@@ -85,9 +71,6 @@ def get_db():
     finally:
         db.close()
 
-# ------------------------------------------------------------------
-# Authentication
-# ------------------------------------------------------------------
 security = HTTPBasic()
 
 @app.post("/api/login")
@@ -95,33 +78,21 @@ def login(credentials: HTTPBasicCredentials = Depends(security), db: Session = D
     user = db.query(User).filter(User.username == credentials.username).first()
     if not user or not verify_password(credentials.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    return {
-        "username": user.username,
-        "full_name": user.full_name or user.username,
-        "role": user.role
-    }
+    return {"username": user.username, "full_name": user.full_name or user.username, "role": user.role}
 
-# ------------------------------------------------------------------
-# API data endpoints
-# ------------------------------------------------------------------
+# ---------- API data endpoints ----------
 @app.get("/api/customers")
 def list_customers(db: Session = Depends(get_db)):
     customers = db.query(Customer).all()
-    return [
-        {"id": c.id, "name": c.name, "email": c.email, "phone": c.phone,
-         "customer_type": c.customer_type, "location": c.location, "country": c.country}
-        for c in customers
-    ]
+    return [{"id": c.id, "name": c.name, "email": c.email, "phone": c.phone,
+             "customer_type": c.customer_type, "location": c.location, "country": c.country} for c in customers]
 
 @app.get("/api/orders")
 def list_orders(db: Session = Depends(get_db)):
     orders = db.query(SalesOrder).all()
-    return [
-        {"id": o.id, "order_number": o.order_number, "customer_id": o.customer_id,
-         "status": o.status, "total_amount": o.total_amount,
-         "created_at": o.created_at.isoformat() if o.created_at else None}
-        for o in orders
-    ]
+    return [{"id": o.id, "order_number": o.order_number, "customer_id": o.customer_id,
+             "status": o.status, "total_amount": o.total_amount,
+             "created_at": o.created_at.isoformat() if o.created_at else None} for o in orders]
 
 @app.get("/api/invoices")
 def list_invoices(db: Session = Depends(get_db)):
@@ -142,22 +113,15 @@ def list_invoices(db: Session = Depends(get_db)):
 @app.get("/api/payments")
 def list_payments(db: Session = Depends(get_db)):
     payments = db.query(Payment).all()
-    return [
-        {"id": p.id, "invoice_id": p.invoice_id, "amount": p.amount,
-         "payment_method": p.payment_method, "reference": p.reference,
-         "status": p.status,
-         "created_at": p.created_at.isoformat() if p.created_at else None}
-        for p in payments
-    ]
+    return [{"id": p.id, "invoice_id": p.invoice_id, "amount": p.amount,
+             "payment_method": p.payment_method, "reference": p.reference,
+             "status": p.status} for p in payments]
 
 @app.get("/api/products")
 def list_products(db: Session = Depends(get_db)):
     products = db.query(Product).all()
-    return [
-        {"id": p.id, "name": p.name, "category": p.category, "unit": p.unit,
-         "quantity": p.quantity, "cost_price": p.cost_price, "selling_price": p.selling_price}
-        for p in products
-    ]
+    return [{"id": p.id, "name": p.name, "category": p.category, "unit": p.unit,
+             "quantity": p.quantity, "cost_price": p.cost_price, "selling_price": p.selling_price} for p in products]
 
 @app.get("/api/suppliers")
 def list_suppliers(db: Session = Depends(get_db)):
@@ -167,20 +131,14 @@ def list_suppliers(db: Session = Depends(get_db)):
 @app.get("/api/quotations")
 def list_quotations(db: Session = Depends(get_db)):
     quotations = db.query(Quotation).all()
-    return [
-        {"id": q.id, "quotation_number": q.quotation_number, "customer_id": q.customer_id,
-         "status": q.status, "total_amount": q.total_amount}
-        for q in quotations
-    ]
+    return [{"id": q.id, "quotation_number": q.quotation_number, "customer_id": q.customer_id,
+             "status": q.status, "total_amount": q.total_amount} for q in quotations]
 
 @app.get("/api/deliveries")
 def list_deliveries(db: Session = Depends(get_db)):
     deliveries = db.query(Delivery).all()
-    return [
-        {"id": d.id, "delivery_number": d.delivery_number, "order_id": d.order_id,
-         "destination": d.destination, "driver": d.driver, "status": d.status}
-        for d in deliveries
-    ]
+    return [{"id": d.id, "delivery_number": d.delivery_number, "order_id": d.order_id,
+             "destination": d.destination, "driver": d.driver, "status": d.status} for d in deliveries]
 
 @app.get("/api/dashboard/summary")
 def dashboard_summary(db: Session = Depends(get_db)):
@@ -195,9 +153,7 @@ def dashboard_summary(db: Session = Depends(get_db)):
         "packaging_batches": db.query(PackagingBatch).count(),
     }
 
-# ------------------------------------------------------------------
-# Full ERP frontend with floating sidebar
-# ------------------------------------------------------------------
+# ---------- Frontend with collapsible sidebar ----------
 @app.get("/", response_class=HTMLResponse)
 def erp_frontend():
     return """
@@ -218,18 +174,32 @@ def erp_frontend():
             .login-card button { width:100%; padding:10px; background:#2e7d32; color:white; border:none; border-radius:5px; font-weight:600; cursor:pointer; }
             .login-card button:hover { background:#1b5e20; }
             .error { color:#d32f2f; font-size:0.9rem; margin-top:10px; }
-            /* ----- floating sidebar layout ----- */
+            /* Layout */
             .app-container { display: flex; height: 100vh; }
             .sidebar { width: 280px; background: #f8f9fa; border-right: 1px solid #ddd;
                        position: fixed; top: 0; left: 0; height: 100vh; overflow-y: auto;
-                       padding: 1rem; display: flex; flex-direction: column; z-index: 10; }
-            .main-content { margin-left: 280px; flex: 1; padding: 2rem; overflow-y: auto; }
-            .sidebar h2 { text-align:center; color:#2d3748; margin-bottom:1rem; }
-            .sidebar .nav-group { margin-bottom:1.5rem; }
-            .sidebar .nav-group-title { font-weight:600; color:#555; margin-bottom:0.3rem; text-transform:uppercase; font-size:0.8rem; }
-            .sidebar .nav-btn { display:block; width:100%; padding:10px 12px; margin-bottom:4px; text-align:left; background:white; border:1px solid #e0e0e0; border-radius:6px; cursor:pointer; color:#333; font-size:0.95rem; transition: background 0.2s; }
-            .sidebar .nav-btn:hover { background:#e2e8f0; }
-            .sidebar .nav-btn.active { background:#c6f6d5; border-color:#38a169; font-weight:600; }
+                       padding: 1rem; display: flex; flex-direction: column; z-index: 10;
+                       transition: transform 0.3s ease; }
+            .sidebar.collapsed { transform: translateX(-100%); }
+            .main-content { margin-left: 280px; flex: 1; padding: 2rem; overflow-y: auto; transition: margin-left 0.3s ease; }
+            .main-content.expanded { margin-left: 0; }
+            /* Toggle button */
+            .sidebar-toggle { position: fixed; top: 1rem; left: 1rem; z-index: 20; background: white; border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; cursor: pointer; display: none; }
+            @media (max-width: 768px) {
+                .sidebar { transform: translateX(-100%); }
+                .sidebar.open { transform: translateX(0); }
+                .main-content { margin-left: 0; }
+                .sidebar-toggle { display: block; }
+            }
+            /* Sidebar elements */
+            .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+            .sidebar-header h2 { color:#2d3748; }
+            .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #888; }
+            .nav-group { margin-bottom:1.5rem; }
+            .nav-group-title { font-weight:600; color:#555; margin-bottom:0.3rem; text-transform:uppercase; font-size:0.8rem; }
+            .nav-btn { display:block; width:100%; padding:10px 12px; margin-bottom:4px; text-align:left; background:white; border:1px solid #e0e0e0; border-radius:6px; cursor:pointer; color:#333; font-size:0.95rem; transition: background 0.2s; }
+            .nav-btn:hover { background:#e2e8f0; }
+            .nav-btn.active { background:#c6f6d5; border-color:#38a169; font-weight:600; }
             .user-panel { margin-top:auto; padding-top:1rem; border-top:1px solid #ddd; }
             .logout-btn { background:#e53e3e !important; color:white !important; margin-top:0.5rem; width:100%; border:none; padding:10px; border-radius:6px; cursor:pointer; }
             /* Main area */
@@ -243,10 +213,8 @@ def erp_frontend():
             th { background:#f5f5f5; padding:10px; text-align:left; border-bottom:2px solid #ddd; }
             td { padding:10px; border-bottom:1px solid #eee; }
             .footer { margin-top:2rem; color:#999; font-size:0.85rem; }
-            @media (max-width:768px) {
-                .sidebar { width: 220px; }
-                .main-content { margin-left: 220px; }
-            }
+            /* Admin menu (hidden by default) */
+            #admin-menu { display: none; }
         </style>
     </head>
     <body>
@@ -263,10 +231,16 @@ def erp_frontend():
             </div>
         </div>
 
-        <!-- Main App (sidebar + content) -->
+        <!-- Main App -->
         <div id="app" style="display:none">
-            <div class="sidebar">
-                <h2>🌾 Esan ERP</h2>
+            <!-- Sidebar Toggle Button (mobile / collapsed) -->
+            <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
+
+            <div class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <h2>🌾 Esan ERP</h2>
+                    <button class="close-btn" onclick="toggleSidebar()">✕</button>
+                </div>
                 <div class="nav-group">
                     <div class="nav-group-title">MAIN</div>
                     <button class="nav-btn" data-module="overview">🏠 Overview</button>
@@ -287,8 +261,19 @@ def erp_frontend():
                     <button class="nav-btn" data-module="finance">💰 Finance</button>
                 </div>
                 <div class="nav-group">
+                    <div class="nav-group-title">LOGISTICS & HR</div>
+                    <button class="nav-btn" data-module="logistics">🚚 Logistics</button>
+                    <button class="nav-btn" data-module="hr">👥 HR & Employees</button>
+                    <button class="nav-btn" data-module="maintenance">🔧 Maintenance</button>
+                </div>
+                <div class="nav-group">
                     <div class="nav-group-title">REPORTING</div>
                     <button class="nav-btn" data-module="reports">📊 Reports</button>
+                </div>
+                <div class="nav-group" id="admin-menu">
+                    <div class="nav-group-title">ADMINISTRATION</div>
+                    <button class="nav-btn" data-module="user_management">🔐 User Management</button>
+                    <button class="nav-btn" data-module="change_password">🔑 Change Password</button>
                 </div>
                 <div class="user-panel" id="sidebar-user">
                     <strong id="sidebar-username"></strong>
@@ -296,7 +281,8 @@ def erp_frontend():
                     <button class="logout-btn" onclick="logout()">🚪 Logout</button>
                 </div>
             </div>
-            <div class="main-content">
+
+            <div class="main-content" id="main-content">
                 <h1>🌾 Esan ERP</h1>
                 <p class="subtitle">Nile Harvest Foods Ltd. | Version 1.4.0 Alpha</p>
                 <div id="module-content"></div>
@@ -307,6 +293,7 @@ def erp_frontend():
         <script>
             const API_BASE = window.location.origin;
             let currentModule = 'overview';
+            let userRole = '';
 
             // ---------- Authentication ----------
             async function login() {
@@ -321,10 +308,15 @@ def erp_frontend():
                     if (response.ok) {
                         const user = await response.json();
                         sessionStorage.setItem('user', JSON.stringify(user));
+                        userRole = user.role;
                         document.getElementById('login-overlay').classList.add('hidden');
                         document.getElementById('app').style.display = 'flex';
                         document.getElementById('sidebar-username').innerText = user.full_name || user.username;
                         document.getElementById('sidebar-role').innerText = user.role;
+                        // Show admin menu if role is Administrator
+                        if (user.role === 'Administrator') {
+                            document.getElementById('admin-menu').style.display = 'block';
+                        }
                         navigate('overview');
                     } else {
                         errorDiv.innerText = 'Invalid username or password';
@@ -340,6 +332,21 @@ def erp_frontend():
                 document.getElementById('app').style.display = 'none';
                 document.getElementById('username').value = '';
                 document.getElementById('password').value = '';
+                document.getElementById('admin-menu').style.display = 'none';
+                // Close sidebar on mobile
+                document.getElementById('sidebar').classList.remove('open');
+            }
+
+            // ---------- Sidebar toggle ----------
+            function toggleSidebar() {
+                const sidebar = document.getElementById('sidebar');
+                const mainContent = document.getElementById('main-content');
+                if (window.innerWidth <= 768) {
+                    sidebar.classList.toggle('open');
+                } else {
+                    sidebar.classList.toggle('collapsed');
+                    mainContent.classList.toggle('expanded');
+                }
             }
 
             // ---------- Navigation ----------
@@ -354,10 +361,19 @@ def erp_frontend():
                     case 'packaging': content.innerHTML = '<h3>Packaging</h3><p>Coming soon.</p>'; break;
                     case 'sales': content.innerHTML = '<h3>Sales & Distribution</h3><div id="sales-content">Choose a sub-module: <button onclick="loadCustomers()">Customers</button> <button onclick="loadOrders()">Orders</button> <button onclick="loadQuotations()">Quotations</button> <button onclick="loadInvoices()">Invoices</button> <button onclick="loadPayments()">Payments</button></div>'; break;
                     case 'finance': content.innerHTML = '<h3>Finance</h3><p>Coming soon.</p>'; break;
+                    case 'logistics': content.innerHTML = '<h3>Logistics</h3><p>Coming soon.</p>'; break;
+                    case 'hr': content.innerHTML = '<h3>HR & Employees</h3><p>Coming soon.</p>'; break;
+                    case 'maintenance': content.innerHTML = '<h3>Maintenance</h3><p>Coming soon.</p>'; break;
                     case 'reports': content.innerHTML = '<h3>Reports</h3><p>Coming soon.</p>'; break;
+                    case 'user_management': content.innerHTML = '<h3>User Management</h3><p>Only accessible by admin.</p>'; break;
+                    case 'change_password': content.innerHTML = '<h3>Change Password</h3><p>Form will be available soon.</p>'; break;
                     default: content.innerHTML = '<p>Module not found.</p>';
                 }
                 updateActiveButton(module);
+                // On mobile, close sidebar after navigation
+                if (window.innerWidth <= 768) {
+                    document.getElementById('sidebar').classList.remove('open');
+                }
             }
 
             function updateActiveButton(module) {
@@ -459,10 +475,14 @@ def erp_frontend():
                 const user = sessionStorage.getItem('user');
                 if (user) {
                     const parsed = JSON.parse(user);
+                    userRole = parsed.role;
                     document.getElementById('login-overlay').classList.add('hidden');
                     document.getElementById('app').style.display = 'flex';
                     document.getElementById('sidebar-username').innerText = parsed.full_name || parsed.username;
                     document.getElementById('sidebar-role').innerText = parsed.role;
+                    if (parsed.role === 'Administrator') {
+                        document.getElementById('admin-menu').style.display = 'block';
+                    }
                     navigate('overview');
                 }
             };
@@ -471,9 +491,6 @@ def erp_frontend():
     </html>
     """
 
-# ------------------------------------------------------------------
-# Health check
-# ------------------------------------------------------------------
 @app.get("/health")
 def health():
     return {"message": "Esan ERP API is running"}
