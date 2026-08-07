@@ -314,3 +314,594 @@ change_password_page = safe_import(
     "change_password_page"
 )
 
+# ==================================================
+# DATABASE INITIALIZATION
+# ==================================================
+
+def initialize_database():
+
+    try:
+
+        inspector = inspect(engine)
+
+        existing_tables = (
+            inspector.get_table_names()
+        )
+
+
+        missing_tables = []
+
+        for table_name in Base.metadata.tables:
+
+            if table_name not in existing_tables:
+
+                missing_tables.append(
+                    table_name
+                )
+
+
+        if missing_tables:
+
+            st.warning(
+                "🔄 Creating missing ERP database tables..."
+            )
+
+            Base.metadata.create_all(
+                bind=engine
+            )
+
+
+        else:
+
+            Base.metadata.create_all(
+                bind=engine
+            )
+
+
+        db = SessionLocal()
+
+        try:
+
+            create_admin(db)
+
+        finally:
+
+            db.close()
+
+
+        if load_seed_data:
+
+            try:
+
+                load_seed_data()
+
+            except Exception as e:
+
+                logging.warning(
+                    f"Seed loading failed: {e}"
+                )
+
+
+    except Exception as e:
+
+        logging.error(
+            f"Database initialization error: {e}"
+        )
+
+        st.error(
+            "Database initialization failed"
+        )
+
+
+
+initialize_database()
+
+
+
+# ==================================================
+# SESSION MANAGEMENT
+# ==================================================
+
+if "logged_in" not in st.session_state:
+
+    st.session_state.logged_in = False
+
+    st.session_state.username = None
+
+    st.session_state.role = None
+
+
+
+def login(username, password):
+
+    db = SessionLocal()
+
+    try:
+
+        user = (
+            db.query(User)
+            .filter(
+                User.username == username
+            )
+            .first()
+        )
+
+
+        if user and verify_password(
+            password,
+            user.password_hash
+        ):
+
+            st.session_state.logged_in = True
+
+            st.session_state.username = (
+                user.username
+            )
+
+            st.session_state.role = (
+                user.role
+            )
+
+            return True
+
+
+        return False
+
+
+    finally:
+
+        db.close()
+
+
+
+# ==================================================
+# LOGIN SCREEN
+# ==================================================
+
+if not st.session_state.logged_in:
+
+
+    st.markdown(
+        """
+        <div style="text-align:center">
+
+        <h1>🌾 Esan ERP</h1>
+
+        <h3>Nile Harvest Foods Ltd.</h3>
+
+        <p>
+        Enterprise Milling & Packaging Management System
+        </p>
+
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+    col1, col2, col3 = st.columns(
+        [1,2,1]
+    )
+
+
+    with col2:
+
+        username = st.text_input(
+            "Username"
+        )
+
+
+        password = st.text_input(
+            "Password",
+            type="password"
+        )
+
+
+        if st.button(
+            "Login",
+            use_container_width=True
+        ):
+
+
+            if login(
+                username,
+                password
+            ):
+
+                st.success(
+                    "Login successful"
+                )
+
+                st.rerun()
+
+
+            else:
+
+                st.error(
+                    "Invalid username or password"
+                )
+
+
+        st.info(
+            "Default administrator: admin / admin123"
+        )
+
+
+    st.stop()
+
+
+
+# ==================================================
+# MAIN APPLICATION
+# ==================================================
+
+st.title(
+    "🌾 Esan ERP"
+)
+
+st.caption(
+    f"{COMPANY_NAME} | Version {VERSION}"
+)
+
+
+
+# ==================================================
+# SIDEBAR
+# ==================================================
+
+with st.sidebar:
+
+
+    st.markdown(
+        "## 👤 User Panel"
+    )
+
+
+    st.success(
+        f"User: {st.session_state.username}"
+    )
+
+
+    st.info(
+        f"Role: {st.session_state.role}"
+    )
+
+
+    if st.button(
+        "🚪 Logout"
+    ):
+
+        st.session_state.logged_in = False
+
+        st.session_state.username = None
+
+        st.session_state.role = None
+
+        st.rerun()
+
+
+
+    st.divider()
+
+
+    st.markdown(
+        "## 📋 Navigation"
+    )
+
+
+    menu_items = [
+
+        "Overview",
+
+        "🌾 Procurement",
+
+        "📦 Warehouse",
+
+        "🏭 Milling",
+
+        "📦 Packaging",
+
+        "🚚 Sales & Distribution",
+
+        "💰 Finance",
+
+        "🚚 Logistics",
+
+        "👥 HR & Employees",
+
+        "🔧 Maintenance",
+
+        "📊 Reports",
+
+        "🤖 AI Assistant"
+
+    ]
+
+
+    if st.session_state.role == "Administrator":
+
+        menu_items.append(
+            "🔐 Administration"
+        )
+
+
+    menu = st.selectbox(
+        "",
+        menu_items
+    )
+
+
+
+# ==================================================
+# ROUTER
+# ==================================================
+
+if menu == "Overview":
+
+    if dashboard_home:
+
+        dashboard_home()
+
+    else:
+
+        st.info(
+            "Overview dashboard not available"
+        )
+
+
+
+elif menu == "🌾 Procurement":
+
+    if procurement_dashboard:
+
+        procurement_dashboard()
+
+    else:
+
+        st.warning(
+            "Procurement module unavailable"
+        )
+
+
+
+elif menu == "📦 Warehouse":
+
+    if warehouse_dashboard:
+
+        warehouse_dashboard()
+
+    else:
+
+        st.warning(
+            "Warehouse module unavailable"
+        )
+
+
+
+elif menu == "🏭 Milling":
+
+    if milling_dashboard:
+
+        milling_dashboard()
+
+    else:
+
+        st.warning(
+            "Milling module unavailable"
+        )
+
+
+
+elif menu == "📦 Packaging":
+
+    if packaging_dashboard:
+
+        packaging_dashboard()
+
+    else:
+
+        st.warning(
+            "Packaging module unavailable"
+        )
+
+
+
+elif menu == "🚚 Sales & Distribution":
+
+    st.header(
+        "🚚 Sales & Distribution"
+    )
+
+
+    sales_menu = st.radio(
+        "Sales Module",
+        [
+            "Dashboard",
+            "Customers",
+            "Quotations",
+            "Sales Orders",
+            "Dispatch",
+            "Deliveries",
+            "Invoices",
+            "Payments"
+        ]
+    )
+
+
+    sales_pages = {
+
+        "Dashboard": sales_dashboard,
+
+        "Customers": customers_page,
+
+        "Quotations": quotations_page,
+
+        "Sales Orders": sales_orders_page,
+
+        "Dispatch": dispatch_page,
+
+        "Deliveries": delivery_page,
+
+        "Invoices": invoices_page,
+
+        "Payments": payments_page
+
+    }
+
+
+    page = sales_pages.get(
+        sales_menu
+    )
+
+
+    if page:
+
+        page()
+
+    else:
+
+        st.warning(
+            "Sales module unavailable"
+        )
+
+
+
+elif menu == "💰 Finance":
+
+    if finance_dashboard:
+
+        finance_dashboard()
+
+    else:
+
+        st.warning(
+            "Finance module unavailable"
+        )
+
+
+
+elif menu == "📊 Reports":
+
+    if reports_dashboard:
+
+        reports_dashboard()
+
+    else:
+
+        st.warning(
+            "Reports module unavailable"
+        )
+
+
+
+elif menu == "🚚 Logistics":
+
+    if logistics_dashboard:
+
+        logistics_dashboard()
+
+    else:
+
+        st.info(
+            "Logistics module will be added"
+        )
+
+
+
+elif menu == "👥 HR & Employees":
+
+    if hr_dashboard:
+
+        hr_dashboard()
+
+    else:
+
+        st.info(
+            "HR module will be added"
+        )
+
+
+
+elif menu == "🔧 Maintenance":
+
+    if maintenance_dashboard:
+
+        maintenance_dashboard()
+
+    else:
+
+        st.info(
+            "Maintenance module will be added"
+        )
+
+
+
+elif menu == "🤖 AI Assistant":
+
+    if ai_assistant_page:
+
+        ai_assistant_page()
+
+    else:
+
+        st.info(
+            "AI Assistant module will be added"
+        )
+
+
+
+elif menu == "🔐 Administration":
+
+
+    if st.session_state.role != "Administrator":
+
+        st.error(
+            "Access denied"
+        )
+
+
+    else:
+
+
+        st.header(
+            "🔐 Administration"
+        )
+
+
+        admin_menu = st.radio(
+
+            "Administration",
+
+            [
+                "User Management",
+                "Change Password"
+            ]
+
+        )
+
+
+        if admin_menu == "User Management":
+
+            if user_management_page:
+
+                user_management_page()
+
+
+
+        elif admin_menu == "Change Password":
+
+            if change_password_page:
+
+                change_password_page()
+
+
+
+# ==================================================
+# FOOTER
+# ==================================================
+
+st.divider()
+
+st.caption(
+    "© Nile Harvest Foods Ltd. | Esan ERP Enterprise Platform"
+)
