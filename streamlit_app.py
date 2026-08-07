@@ -12,16 +12,10 @@ from sqlalchemy import inspect
 from modules.procurement.dashboard import procurement_dashboard
 from modules.milling.dashboard import milling_dashboard
 from modules.packaging.dashboard import packaging_dashboard
-from modules.warehouse.dashboard 
-import warehouse_dashboard 
-from
-modules.finance.dashboard
-import finance_dashboard
-from 
-modules.sales.dashboard
-import sales_dashboard
-from modules.reports.dashboard
-import reports_dashboard
+from modules.warehouse.dashboard import warehouse_dashboard 
+from modules.finance.dashboard import finance_dashboard
+from  modules.sales.dashboard import sales_dashboard
+from modules.reports.dashboard import reports_dashboard
 
 
 from config import COMPANY_NAME, VERSION
