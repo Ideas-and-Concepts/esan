@@ -9,6 +9,7 @@ import sys
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -16,7 +17,8 @@ from typing import List
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import SessionLocal, engine, Base
-from models import Customer, Invoice, Payment, SalesOrder, Product
+from models import Customer, Invoice, Payment, SalesOrder, Product, User
+from auth import verify_password, hash_password   # <-- added hash_password
 
 # ------------------------------------------------------------------
 # App setup
@@ -30,6 +32,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ------------------------------------------------------------------
+# Startup: create tables + default admin
+# ------------------------------------------------------------------
+@app.on_event("startup")
+def on_startup():
+    Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        admin = db.query(User).filter(User.username == "admin").first()
+        if not admin:
+            admin = User(
+                username="admin",
+                password_hash=hash_password("admin123"),
+                role="Administrator",
+                full_name="System Administrator",
+                email="admin@nileharvest.com"
+            )
+            db.add(admin)
+            db.commit()
+    finally:
+        db.close()
 
 # ------------------------------------------------------------------
 # Dependency
@@ -53,6 +77,22 @@ def handle_db_error(func):
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
     return wrapper
+
+# ------------------------------------------------------------------
+# Authentication endpoint
+# ------------------------------------------------------------------
+security = HTTPBasic()
+
+@app.post("/api/login")
+def login(credentials: HTTPBasicCredentials = Depends(security), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == credentials.username).first()
+    if not user or not verify_password(credentials.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {
+        "username": user.username,
+        "full_name": user.full_name or user.username,
+        "role": user.role
+    }
 
 # ------------------------------------------------------------------
 # API Endpoints (kept separate under /api/)
@@ -82,52 +122,69 @@ def list_products(db: Session = Depends(get_db)):
     return [{"id": p.id, "name": p.name, "quantity": p.quantity} for p in products]
 
 # ------------------------------------------------------------------
-# Static HTML that mimics the Streamlit UI
+# Root – full ERP frontend with login
 # ------------------------------------------------------------------
-STREAMLIT_APP_URL = "https://YOUR-STREAMLIT-APP.streamlit.app"  # <-- change this
-
 @app.get("/", response_class=HTMLResponse)
 def root():
-    return f"""
+    return """
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Esan ERP</title>
+        <title>Esan ERP – Nile Harvest Foods Ltd.</title>
         <style>
-            * {{ margin:0; padding:0; box-sizing:border-box; }}
-            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }}
-            .app {{ display: flex; height: 100vh; }}
-            .sidebar {{ width: 280px; background: #f8f9fa; padding: 1.5rem; display: flex; flex-direction: column; }}
-            .sidebar h2 {{ margin-bottom: 1rem; color: #2d3748; }}
-            .user-panel {{ margin-bottom: 2rem; }}
-            .user-panel .success {{ color: #2f855a; }}
-            .user-panel .info {{ color: #2b6cb0; }}
-            .logout {{ margin: 1rem 0; }}
-            .logout button {{ padding: 8px 16px; background: #e53e3e; color: white; border: none; border-radius: 6px; cursor: pointer; }}
-            .nav {{ flex: 1; }}
-            .nav select {{ width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e0; }}
-            .main {{ flex: 1; padding: 2rem; }}
-            .main h1 {{ font-size: 2rem; color: #2d3748; }}
-            .footer {{ margin-top: 2rem; color: #a0aec0; font-size: 0.9rem; }}
-            @media (max-width: 768px) {{ .sidebar {{ display: none; }} }}
+            * { margin:0; padding:0; box-sizing:border-box; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+            #login-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.98); display:flex; justify-content:center; align-items:center; z-index:999; flex-direction:column; }
+            #login-overlay.hidden { display: none; }
+            .login-card { background:white; padding:2rem; border-radius:10px; box-shadow:0 10px 25px rgba(0,0,0,0.1); width:320px; text-align:center; }
+            .login-card h1 { font-size:2rem; margin-bottom:0.5rem; }
+            .login-card input { width:100%; padding:10px; margin:8px 0; border:1px solid #ddd; border-radius:5px; }
+            .login-card button { width:100%; padding:10px; background:#2e7d32; color:white; border:none; border-radius:5px; font-weight:600; cursor:pointer; }
+            .login-card button:hover { background:#1b5e20; }
+            .error { color:#d32f2f; font-size:0.9rem; margin-top:10px; }
+            #app { display: flex; height: 100vh; }
+            .sidebar { width:280px; background:#f8f9fa; padding:1.5rem; display:flex; flex-direction:column; }
+            .sidebar h2 { margin-bottom:1rem; color:#2d3748; }
+            .user-panel { margin-bottom:2rem; }
+            .user-panel .success { color:#2f855a; }
+            .user-panel .info { color:#2b6cb0; }
+            .logout-btn { padding:8px 16px; background:#e53e3e; color:white; border:none; border-radius:6px; cursor:pointer; margin-bottom:1.5rem; }
+            .nav { flex:1; }
+            .nav select { width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; }
+            .main { flex:1; padding:2rem; }
+            .main h1 { font-size:2rem; color:#2d3748; }
+            .footer { margin-top:2rem; color:#a0aec0; font-size:0.9rem; }
+            @media (max-width:768px) { .sidebar { display:none; } }
         </style>
     </head>
     <body>
-        <div class="app">
+        <!-- Login Screen -->
+        <div id="login-overlay">
+            <div class="login-card">
+                <h1>🌾 Esan ERP</h1>
+                <p style="margin-bottom:1rem; color:gray;">Nile Harvest Foods Ltd.</p>
+                <input type="text" id="username" placeholder="Username" autocomplete="off">
+                <input type="password" id="password" placeholder="Password">
+                <button onclick="login()">Login</button>
+                <div class="error" id="login-error"></div>
+                <p style="font-size:0.8rem; margin-top:1rem; color:gray;">Default: admin / admin123</p>
+            </div>
+        </div>
+
+        <!-- Main App (hidden until login) -->
+        <div id="app" style="display:none">
             <div class="sidebar">
                 <h2>🌾 Esan ERP</h2>
                 <div class="user-panel">
-                    <p class="success">✅ User: admin</p>
-                    <p class="info">ℹ️ Role: Administrator</p>
+                    <p class="success" id="sidebar-username">✅ User: admin</p>
+                    <p class="info" id="sidebar-role">ℹ️ Role: Administrator</p>
                 </div>
-                <div class="logout">
-                    <button onclick="window.location.href='{STREAMLIT_APP_URL}'">🚀 Launch Full App</button>
-                </div>
+                <button class="logout-btn" onclick="logout()">🚪 Logout</button>
                 <div class="nav">
                     <label>📋 Navigation</label>
-                    <select onchange="if(this.value) alert('Open the full app at {STREAMLIT_APP_URL}')">
+                    <select onchange="if(this.value) alert('Module navigation is coming soon.')">
                         <option>Overview</option>
                         <option>🌾 Procurement</option>
                         <option>📦 Warehouse</option>
@@ -142,10 +199,62 @@ def root():
             <div class="main">
                 <h1>🌾 Esan ERP</h1>
                 <p>Nile Harvest Foods Ltd. | Version 1.3.0 Alpha</p>
-                <p>This is a static preview. <a href="{STREAMLIT_APP_URL}">Open the full interactive ERP →</a></p>
+                <p>Welcome to the Esan ERP web interface. Use the sidebar to navigate.</p>
                 <div class="footer">© Nile Harvest Foods Ltd. | Esan ERP Enterprise Platform</div>
             </div>
         </div>
+
+        <script>
+            const API_BASE = window.location.origin;
+
+            async function login() {
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+                const errorDiv = document.getElementById('login-error');
+
+                try {
+                    const response = await fetch(API_BASE + '/api/login', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Basic ' + btoa(username + ':' + password)
+                        }
+                    });
+
+                    if (response.ok) {
+                        const user = await response.json();
+                        sessionStorage.setItem('user', JSON.stringify(user));
+                        document.getElementById('login-overlay').classList.add('hidden');
+                        document.getElementById('app').style.display = 'flex';
+                        document.getElementById('sidebar-username').innerText = '✅ User: ' + user.username;
+                        document.getElementById('sidebar-role').innerText = 'ℹ️ Role: ' + user.role;
+                    } else {
+                        errorDiv.innerText = 'Invalid username or password';
+                    }
+                } catch (e) {
+                    errorDiv.innerText = 'Connection error. Check your network.';
+                }
+            }
+
+            function logout() {
+                sessionStorage.removeItem('user');
+                document.getElementById('login-overlay').classList.remove('hidden');
+                document.getElementById('app').style.display = 'none';
+                document.getElementById('username').value = '';
+                document.getElementById('password').value = '';
+            }
+
+            // Auto-login if session exists
+            window.onload = () => {
+                const user = sessionStorage.getItem('user');
+                if (user) {
+                    const parsed = JSON.parse(user);
+                    document.getElementById('login-overlay').classList.add('hidden');
+                    document.getElementById('app').style.display = 'flex';
+                    document.getElementById('sidebar-username').innerText = '✅ User: ' + parsed.username;
+                    document.getElementById('sidebar-role').innerText = 'ℹ️ Role: ' + parsed.role;
+                }
+            };
+        </script>
     </body>
     </html>
     """
