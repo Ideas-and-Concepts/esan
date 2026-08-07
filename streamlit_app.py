@@ -544,6 +544,90 @@ st.caption(
 )
 
 
+
+# ==================================================
+# SIDEBAR
+# ==================================================
+
+with st.sidebar:
+
+
+    st.markdown(
+        "## 👤 User Panel"
+    )
+
+
+    st.success(
+        f"User: {st.session_state.username}"
+    )
+
+
+    st.info(
+        f"Role: {st.session_state.role}"
+    )
+
+
+    if st.button(
+        "🚪 Logout"
+    ):
+
+        st.session_state.logged_in = False
+
+        st.session_state.username = None
+
+        st.session_state.role = None
+
+        st.rerun()
+
+
+    st.divider()
+
+
+    st.markdown(
+        "## 📋 Navigation"
+    )
+
+
+    menu_items = [
+
+        "Overview",
+
+        "🌾 Procurement",
+
+        "📦 Warehouse",
+
+        "🏭 Milling",
+
+        "📦 Packaging",
+
+        "🚚 Sales & Distribution",
+
+        "💰 Finance",
+
+        "🚚 Logistics",
+
+        "👥 HR & Employees",
+
+        "🔧 Maintenance",
+
+        "📊 Reports",
+
+        "🤖 AI Assistant"
+
+    ]
+
+
+    if st.session_state.role == "Administrator":
+
+        menu_items.append(
+            "🔐 Administration"
+        )
+
+
+    menu = st.session_state.current_page
+
+
+
 # ==================================================
 # SIDEBAR NAVIGATION PANEL
 # ==================================================
@@ -567,6 +651,146 @@ with st.sidebar:
     if "current_page" not in st.session_state:
 
         st.session_state.current_page = "Overview"
+
+
+
+    # -------------------------
+    # Navigation Helper
+    # -------------------------
+
+    def nav_button(label):
+
+        if st.button(
+            label,
+            use_container_width=True
+        ):
+
+            st.session_state.current_page = label
+
+
+
+    # -------------------------
+    # MAIN MENU
+    # -------------------------
+
+    nav_button(
+        "🏠 Overview"
+    )
+
+
+    st.markdown(
+        "**OPERATIONS**"
+    )
+
+
+    nav_button(
+        "🌾 Procurement"
+    )
+
+
+    nav_button(
+        "📦 Warehouse"
+    )
+
+
+    nav_button(
+        "🏭 Milling"
+    )
+
+
+    nav_button(
+        "📦 Packaging"
+    )
+
+
+
+    st.markdown(
+        "**COMMERCIAL**"
+    )
+
+
+    nav_button(
+        "🚚 Sales & Distribution"
+    )
+
+
+
+    st.markdown(
+        "**FINANCE**"
+    )
+
+
+    nav_button(
+        "💰 Finance"
+    )
+
+
+
+    st.markdown(
+        "**REPORTING**"
+    )
+
+
+    nav_button(
+        "📊 Reports"
+    )
+
+
+
+    # -------------------------
+    # ADMINISTRATION
+    # -------------------------
+
+    if st.session_state.role == "Administrator":
+
+        st.markdown(
+            "**ADMINISTRATION**"
+        )
+
+
+        nav_button(
+            "🔐 Administration"
+        )
+
+
+
+    st.divider()
+
+
+    # -------------------------
+    # USER PANEL
+    # -------------------------
+
+    st.markdown(
+        "### 👤 User Panel"
+    )
+
+
+    st.write(
+        f"User: **{st.session_state.username}**"
+    )
+
+
+    st.write(
+        f"Role: **{st.session_state.role}**"
+    )
+
+
+    if st.button(
+        "🚪 Logout",
+        use_container_width=True
+    ):
+
+        st.session_state.logged_in = False
+
+        st.session_state.username = None
+
+        st.session_state.role = None
+
+        st.session_state.current_page = "Overview"
+
+        st.rerun()
+
 
 
 
