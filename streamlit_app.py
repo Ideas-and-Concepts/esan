@@ -9,6 +9,17 @@ import streamlit as st
 import os
 from sqlalchemy import inspect
 
+from modules.procurement.dashboard import procurement_dashboard
+from modules.milling.dashboard import milling_dashboard
+from modules.packaging.dashboard import packaging_dashboard
+from modules.warehouse.dashboard 
+import warehouse_dashboard 
+from
+modules.finance.dashboard
+import finance_dashboard
+from 
+
+
 from config import COMPANY_NAME, VERSION
 from database import Base, engine, SessionLocal, DATABASE_URL
 from models import User
