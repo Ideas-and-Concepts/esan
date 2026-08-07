@@ -1,24 +1,25 @@
 """
 Database Configuration
-- Uses DATABASE_URL from Streamlit secrets if valid.
-- Falls back to SQLite for local dev or invalid placeholders.
+Works on Streamlit Cloud (with secrets) and Vercel (with env vars).
 """
 
-import streamlit as st
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# Get the secret (or None)
-raw_url = st.secrets.get("DATABASE_URL", "")
+# Try to import streamlit (only available on Streamlit Cloud)
+try:
+    import streamlit as st
+    IN_STREAMLIT = True
+except ImportError:
+    IN_STREAMLIT = False
 
-# Detect obvious placeholder strings
-INVALID_PLACEHOLDERS = ["your_real_user", "your_real_password", "ep-xxxx", "username:password"]
-
-if raw_url and not any(p in raw_url for p in INVALID_PLACEHOLDERS):
-    DATABASE_URL = raw_url
-else:
-    # Fallback to SQLite (local / no valid secret)
+# Get DATABASE_URL – priority: env var, then Streamlit secrets, then SQLite fallback
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL and IN_STREAMLIT:
+    DATABASE_URL = st.secrets.get("DATABASE_URL")
+if not DATABASE_URL:
     DATABASE_URL = "sqlite:///esan_erp.db"
 
 # Create engine accordingly
