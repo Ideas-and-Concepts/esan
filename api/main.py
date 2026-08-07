@@ -1,6 +1,11 @@
 """
 Esan ERP API – FastAPI Backend for Vercel
-Starts reliably, creates tables/admin, serves login + UI.
+==========================================
+Mirrors the structure of streamlit_app.py:
+- safe module imports
+- admin creation on startup
+- serves a Streamlit‑like frontend at /
+- provides API endpoints for all modules
 """
 
 import os
@@ -11,17 +16,56 @@ from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.orm import Session
 
-# Make the repo root importable (so we can import models, database, auth)
+# Make the repository root importable (same as streamlit_app.py)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import SessionLocal, engine, Base
-from models import Customer, Invoice, Payment, SalesOrder, Product, User
-from auth import verify_password, hash_password   # ensure auth.py has these
+from models import (
+    Customer, Invoice, Payment, SalesOrder, Product, User,
+    Quotation, Supplier, PurchaseOrder, MillingBatch, PackagingBatch,
+    Delivery, FinanceTransaction
+)
+from auth import verify_password, hash_password
 
 # ------------------------------------------------------------------
-# App setup
+# SAFE IMPORT SYSTEM (just like streamlit_app.py)
 # ------------------------------------------------------------------
-app = FastAPI(title="Esan ERP API", version="1.0")
+module_errors = []
+
+def safe_import(module_path, function_name):
+    """Simulate the safe import from streamlit_app.py – not strictly needed for API, but kept for consistency."""
+    try:
+        module = __import__(module_path, fromlist=[function_name])
+        if hasattr(module, function_name):
+            return getattr(module, function_name)
+        module_errors.append(f"{module_path}: missing {function_name}")
+    except Exception as e:
+        module_errors.append(f"{module_path}: {e}")
+    return None
+
+# Register all modules (the same list as in streamlit_app.py)
+dashboard_home = safe_import("modules.dashboard.home", "dashboard_home")
+procurement_dashboard = safe_import("modules.procurement.dashboard", "procurement_dashboard")
+warehouse_dashboard = safe_import("modules.warehouse.dashboard", "warehouse_dashboard")
+milling_dashboard = safe_import("modules.milling.dashboard", "milling_dashboard")
+packaging_dashboard = safe_import("modules.packaging.dashboard", "packaging_dashboard")
+sales_dashboard = safe_import("modules.sales.dashboard", "sales_dashboard")
+customers_page = safe_import("modules.sales.customers", "customers_page")
+quotations_page = safe_import("modules.sales.quotations", "quotations_page")
+sales_orders_page = safe_import("modules.sales.orders", "sales_orders_page")
+dispatch_page = safe_import("modules.sales.dispatch", "dispatch_page")
+delivery_page = safe_import("modules.sales.delivery", "delivery_page")
+invoices_page = safe_import("modules.finance.invoices", "invoices_page")
+payments_page = safe_import("modules.finance.payments", "payments_page")
+finance_dashboard = safe_import("modules.finance.dashboard", "finance_dashboard")
+reports_dashboard = safe_import("modules.reports.dashboard", "reports_dashboard")
+user_management_page = safe_import("modules.administration.user_management", "user_management_page")
+change_password_page = safe_import("modules.administration.change_password", "change_password_page")
+
+# ------------------------------------------------------------------
+# FastAPI app
+# ------------------------------------------------------------------
+app = FastAPI(title="Esan ERP API", version="1.4.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,14 +76,12 @@ app.add_middleware(
 )
 
 # ------------------------------------------------------------------
-# Startup: create tables and default admin (runs once per cold start)
+# Startup: create tables and default admin (exactly like streamlit_app.py)
 # ------------------------------------------------------------------
 @app.on_event("startup")
 def on_startup():
     # Create tables if they don't exist
     Base.metadata.create_all(bind=engine)
-
-    # Insert admin if missing
     db = SessionLocal()
     try:
         admin = db.query(User).filter(User.username == "admin").first()
@@ -67,7 +109,7 @@ def get_db():
         db.close()
 
 # ------------------------------------------------------------------
-# Error handler (prevents 500 from leaking traceback)
+# Error handler
 # ------------------------------------------------------------------
 def handle_db_error(func):
     from functools import wraps
@@ -80,12 +122,12 @@ def handle_db_error(func):
     return wrapper
 
 # ------------------------------------------------------------------
-# Authentication
+# Authentication (mirrors the login function in streamlit_app.py)
 # ------------------------------------------------------------------
 security = HTTPBasic()
 
 @app.post("/api/login")
-def login(credentials: HTTPBasicCredentials = Depends(security), db: Session = Depends(get_db)):
+def api_login(credentials: HTTPBasicCredentials = Depends(security), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == credentials.username).first()
     if not user or not verify_password(credentials.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -96,34 +138,86 @@ def login(credentials: HTTPBasicCredentials = Depends(security), db: Session = D
     }
 
 # ------------------------------------------------------------------
-# API endpoints (simplified – you can add more)
+# Dashboard endpoint (mirrors the Overview module)
+# ------------------------------------------------------------------
+@app.get("/api/dashboard/summary")
+@handle_db_error
+def dashboard_summary(db: Session = Depends(get_db)):
+    return {
+        "customers": db.query(Customer).count(),
+        "orders": db.query(SalesOrder).count(),
+        "products": db.query(Product).count(),
+        "invoices": db.query(Invoice).count(),
+        "quotations": db.query(Quotation).count(),
+        "suppliers": db.query(Supplier).count(),
+        "milling_batches": db.query(MillingBatch).count(),
+        "packaging_batches": db.query(PackagingBatch).count(),
+    }
+
+# ------------------------------------------------------------------
+# Module data endpoints (each mirrors a page in streamlit_app.py)
 # ------------------------------------------------------------------
 @app.get("/api/customers")
 @handle_db_error
 def list_customers(db: Session = Depends(get_db)):
     customers = db.query(Customer).all()
-    return [{"id": c.id, "name": c.name, "email": c.email} for c in customers]
-
-@app.get("/api/invoices")
-@handle_db_error
-def list_invoices(db: Session = Depends(get_db)):
-    invoices = db.query(Invoice).all()
-    return [{"id": i.id, "invoice_number": i.invoice_number, "amount": i.amount} for i in invoices]
+    return [{"id": c.id, "name": c.name, "email": c.email, "phone": c.phone, "customer_type": c.customer_type, "location": c.location, "country": c.country} for c in customers]
 
 @app.get("/api/orders")
 @handle_db_error
 def list_orders(db: Session = Depends(get_db)):
     orders = db.query(SalesOrder).all()
-    return [{"id": o.id, "order_number": o.order_number, "status": o.status} for o in orders]
+    return [{"id": o.id, "order_number": o.order_number, "customer_id": o.customer_id, "status": o.status, "total_amount": o.total_amount, "created_at": o.created_at.isoformat() if o.created_at else None} for o in orders]
+
+@app.get("/api/invoices")
+@handle_db_error
+def list_invoices(db: Session = Depends(get_db)):
+    invoices = db.query(Invoice).all()
+    result = []
+    for inv in invoices:
+        payments = db.query(Payment).filter(Payment.invoice_id == inv.id).all()
+        total_paid = sum(p.amount for p in payments)
+        result.append({
+            "id": inv.id, "invoice_number": inv.invoice_number,
+            "customer_id": inv.customer_id, "amount": inv.amount,
+            "paid": total_paid, "balance": inv.amount - total_paid,
+            "status": inv.status,
+            "created_at": inv.created_at.isoformat() if inv.created_at else None
+        })
+    return result
+
+@app.get("/api/payments")
+@handle_db_error
+def list_payments(db: Session = Depends(get_db)):
+    payments = db.query(Payment).all()
+    return [{"id": p.id, "invoice_id": p.invoice_id, "amount": p.amount, "payment_method": p.payment_method, "reference": p.reference, "status": p.status} for p in payments]
 
 @app.get("/api/products")
 @handle_db_error
 def list_products(db: Session = Depends(get_db)):
     products = db.query(Product).all()
-    return [{"id": p.id, "name": p.name, "quantity": p.quantity} for p in products]
+    return [{"id": p.id, "name": p.name, "category": p.category, "unit": p.unit, "quantity": p.quantity, "cost_price": p.cost_price, "selling_price": p.selling_price} for p in products]
+
+@app.get("/api/suppliers")
+@handle_db_error
+def list_suppliers(db: Session = Depends(get_db)):
+    suppliers = db.query(Supplier).all()
+    return [{"id": s.id, "name": s.name, "email": s.email, "phone": s.phone} for s in suppliers]
+
+@app.get("/api/quotations")
+@handle_db_error
+def list_quotations(db: Session = Depends(get_db)):
+    quotations = db.query(Quotation).all()
+    return [{"id": q.id, "quotation_number": q.quotation_number, "customer_id": q.customer_id, "status": q.status, "total_amount": q.total_amount} for q in quotations]
+
+@app.get("/api/deliveries")
+@handle_db_error
+def list_deliveries(db: Session = Depends(get_db)):
+    deliveries = db.query(Delivery).all()
+    return [{"id": d.id, "delivery_number": d.delivery_number, "order_id": d.order_id, "status": d.status} for d in deliveries]
 
 # ------------------------------------------------------------------
-# Frontend – full HTML with login and sidebar (Streamlit‑like UI)
+# Main frontend – full Streamlit‑like UI
 # ------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def root():
@@ -136,7 +230,7 @@ def root():
         <title>Esan ERP – Nile Harvest Foods Ltd.</title>
         <style>
             * { margin:0; padding:0; box-sizing:border-box; }
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; }
             #login-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.98); display:flex; justify-content:center; align-items:center; z-index:999; flex-direction:column; }
             #login-overlay.hidden { display: none; }
             .login-card { background:white; padding:2rem; border-radius:10px; box-shadow:0 10px 25px rgba(0,0,0,0.1); width:320px; text-align:center; }
@@ -146,16 +240,25 @@ def root():
             .login-card button:hover { background:#1b5e20; }
             .error { color:#d32f2f; font-size:0.9rem; margin-top:10px; }
             #app { display: flex; height: 100vh; }
-            .sidebar { width:280px; background:#f8f9fa; padding:1.5rem; display:flex; flex-direction:column; }
-            .sidebar h2 { margin-bottom:1rem; color:#2d3748; }
-            .user-panel { margin-bottom:2rem; }
-            .user-panel .success { color:#2f855a; }
-            .user-panel .info { color:#2b6cb0; }
-            .logout-btn { padding:8px 16px; background:#e53e3e; color:white; border:none; border-radius:6px; cursor:pointer; margin-bottom:1.5rem; }
-            .nav select { width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; }
-            .main { flex:1; padding:2rem; }
+            .sidebar { width:280px; background:#f8f9fa; padding:1rem; display:flex; flex-direction:column; border-right:1px solid #ddd; }
+            .sidebar h2 { text-align:center; color:#2d3748; margin-bottom:1rem; }
+            .sidebar .nav-group { margin-bottom:1.5rem; }
+            .sidebar .nav-group-title { font-weight:600; color:#555; margin-bottom:0.3rem; text-transform:uppercase; font-size:0.8rem; }
+            .sidebar button { display:block; width:100%; padding:8px 12px; margin-bottom:4px; text-align:left; background:none; border:none; border-radius:6px; cursor:pointer; color:#333; font-size:0.95rem; }
+            .sidebar button:hover { background:#e2e8f0; }
+            .user-panel { margin-top:auto; padding-top:1rem; border-top:1px solid #ddd; }
+            .logout-btn { background:#e53e3e !important; color:white !important; margin-top:0.5rem; }
+            .main { flex:1; padding:2rem; overflow-y:auto; }
             .main h1 { font-size:2rem; color:#2d3748; }
-            .footer { margin-top:2rem; color:#a0aec0; font-size:0.9rem; }
+            .main .subtitle { color:#666; margin-bottom:2rem; }
+            .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap:1rem; margin-bottom:2rem; }
+            .kpi { background:white; border-radius:10px; padding:1.2rem; box-shadow:0 2px 10px rgba(0,0,0,0.05); text-align:center; }
+            .kpi .number { font-size:1.8rem; font-weight:600; color:#2e7d32; }
+            .kpi .label { font-size:0.9rem; color:#888; }
+            table { width:100%; border-collapse:collapse; margin-top:1rem; background:white; border-radius:8px; overflow:hidden; }
+            th { background:#f5f5f5; padding:10px; text-align:left; border-bottom:2px solid #ddd; }
+            td { padding:10px; border-bottom:1px solid #eee; }
+            .footer { margin-top:2rem; color:#999; font-size:0.85rem; }
             @media (max-width:768px) { .sidebar { display:none; } }
         </style>
     </head>
@@ -173,33 +276,43 @@ def root():
             </div>
         </div>
 
-        <!-- Main App (hidden until login) -->
+        <!-- Main App -->
         <div id="app" style="display:none">
             <div class="sidebar">
                 <h2>🌾 Esan ERP</h2>
-                <div class="user-panel">
-                    <p class="success" id="sidebar-username">✅ User: admin</p>
-                    <p class="info" id="sidebar-role">ℹ️ Role: Administrator</p>
+                <div class="nav-group">
+                    <div class="nav-group-title">MAIN</div>
+                    <button onclick="navigate('overview')">🏠 Overview</button>
                 </div>
-                <button class="logout-btn" onclick="logout()">🚪 Logout</button>
-                <div class="nav">
-                    <label>📋 Navigation</label>
-                    <select onchange="if(this.value) alert('Module navigation coming soon.')">
-                        <option>Overview</option>
-                        <option>🌾 Procurement</option>
-                        <option>📦 Warehouse</option>
-                        <option>🏭 Milling</option>
-                        <option>📦 Packaging</option>
-                        <option>🚚 Sales & Distribution</option>
-                        <option>💰 Finance</option>
-                        <option>📊 Reports</option>
-                    </select>
+                <div class="nav-group">
+                    <div class="nav-group-title">OPERATIONS</div>
+                    <button onclick="navigate('procurement')">🌾 Procurement</button>
+                    <button onclick="navigate('warehouse')">📦 Warehouse</button>
+                    <button onclick="navigate('milling')">🏭 Milling</button>
+                    <button onclick="navigate('packaging')">📦 Packaging</button>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-group-title">COMMERCIAL</div>
+                    <button onclick="navigate('sales')">🚚 Sales & Distribution</button>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-group-title">FINANCE</div>
+                    <button onclick="navigate('finance')">💰 Finance</button>
+                </div>
+                <div class="nav-group">
+                    <div class="nav-group-title">REPORTING</div>
+                    <button onclick="navigate('reports')">📊 Reports</button>
+                </div>
+                <div class="user-panel" id="sidebar-user">
+                    <strong id="sidebar-username"></strong>
+                    <div id="sidebar-role"></div>
+                    <button class="logout-btn" onclick="logout()">🚪 Logout</button>
                 </div>
             </div>
             <div class="main">
                 <h1>🌾 Esan ERP</h1>
-                <p>Nile Harvest Foods Ltd. | Version 1.3.0 Alpha</p>
-                <p>Welcome to Esan ERP. Use the sidebar to explore modules.</p>
+                <p class="subtitle">Nile Harvest Foods Ltd. | Version 1.4.0 Alpha</p>
+                <div id="module-content"></div>
                 <div class="footer">© Nile Harvest Foods Ltd. | Esan ERP Enterprise Platform</div>
             </div>
         </div>
@@ -211,27 +324,24 @@ def root():
                 const username = document.getElementById('username').value;
                 const password = document.getElementById('password').value;
                 const errorDiv = document.getElementById('login-error');
-
                 try {
                     const response = await fetch(API_BASE + '/api/login', {
                         method: 'POST',
-                        headers: {
-                            'Authorization': 'Basic ' + btoa(username + ':' + password)
-                        }
+                        headers: { 'Authorization': 'Basic ' + btoa(username + ':' + password) }
                     });
-
                     if (response.ok) {
                         const user = await response.json();
                         sessionStorage.setItem('user', JSON.stringify(user));
                         document.getElementById('login-overlay').classList.add('hidden');
                         document.getElementById('app').style.display = 'flex';
-                        document.getElementById('sidebar-username').innerText = '✅ User: ' + user.username;
-                        document.getElementById('sidebar-role').innerText = 'ℹ️ Role: ' + user.role;
+                        document.getElementById('sidebar-username').innerText = user.full_name || user.username;
+                        document.getElementById('sidebar-role').innerText = user.role;
+                        navigate('overview');
                     } else {
                         errorDiv.innerText = 'Invalid username or password';
                     }
                 } catch (e) {
-                    errorDiv.innerText = 'Connection error. Check your network.';
+                    errorDiv.innerText = 'Connection error.';
                 }
             }
 
@@ -243,6 +353,114 @@ def root():
                 document.getElementById('password').value = '';
             }
 
+            async function navigate(module) {
+                const content = document.getElementById('module-content');
+                switch(module) {
+                    case 'overview': content.innerHTML = await loadOverview(); break;
+                    case 'procurement': content.innerHTML = '<h3>Procurement</h3><div id="procurement-content">Loading...</div>'; loadSuppliers(); break;
+                    case 'warehouse': content.innerHTML = '<h3>Warehouse</h3><div id="warehouse-content">Loading...</div>'; loadProducts(); break;
+                    case 'milling': content.innerHTML = '<h3>Milling</h3><div id="milling-content">Loading...</div>'; loadMilling(); break;
+                    case 'packaging': content.innerHTML = '<h3>Packaging</h3><div id="packaging-content">Loading...</div>'; loadPackaging(); break;
+                    case 'sales': content.innerHTML = '<h3>Sales & Distribution</h3><div id="sales-content">Choose a sub-module: <button onclick="loadCustomers()">Customers</button> <button onclick="loadOrders()">Orders</button> <button onclick="loadQuotations()">Quotations</button> <button onclick="loadInvoices()">Invoices</button> <button onclick="loadPayments()">Payments</button></div>'; break;
+                    case 'finance': content.innerHTML = '<h3>Finance</h3><div id="finance-content">Loading...</div>'; loadFinanceSummary(); break;
+                    case 'reports': content.innerHTML = '<h3>Reports</h3><p>Coming soon.</p>'; break;
+                    default: content.innerHTML = '<p>Module not found.</p>';
+                }
+            }
+
+            async function loadOverview() {
+                const resp = await fetch(API_BASE + '/api/dashboard/summary');
+                const data = await resp.json();
+                return `
+                    <div class="kpi-grid">
+                        <div class="kpi"><div class="number">${data.customers}</div><div class="label">Customers</div></div>
+                        <div class="kpi"><div class="number">${data.orders}</div><div class="label">Orders</div></div>
+                        <div class="kpi"><div class="number">${data.products}</div><div class="label">Products</div></div>
+                        <div class="kpi"><div class="number">${data.invoices}</div><div class="label">Invoices</div></div>
+                    </div>`;
+            }
+
+            async function loadCustomers() {
+                const resp = await fetch(API_BASE + '/api/customers');
+                const data = await resp.json();
+                let html = '<table><tr><th>Name</th><th>Type</th><th>Phone</th></tr>';
+                data.forEach(c => { html += `<tr><td>${c.name}</td><td>${c.customer_type}</td><td>${c.phone || ''}</td></tr>`; });
+                html += '</table>';
+                document.getElementById('module-content').innerHTML = '<h3>Customers</h3>' + html;
+            }
+
+            async function loadOrders() {
+                const resp = await fetch(API_BASE + '/api/orders');
+                const data = await resp.json();
+                let html = '<table><tr><th>Order #</th><th>Status</th><th>Total</th></tr>';
+                data.forEach(o => { html += `<tr><td>${o.order_number}</td><td>${o.status}</td><td>${o.total_amount}</td></tr>`; });
+                html += '</table>';
+                document.getElementById('module-content').innerHTML = '<h3>Sales Orders</h3>' + html;
+            }
+
+            async function loadQuotations() {
+                const resp = await fetch(API_BASE + '/api/quotations');
+                const data = await resp.json();
+                let html = '<table><tr><th>Quotation #</th><th>Status</th><th>Total</th></tr>';
+                data.forEach(q => { html += `<tr><td>${q.quotation_number}</td><td>${q.status}</td><td>${q.total_amount}</td></tr>`; });
+                html += '</table>';
+                document.getElementById('module-content').innerHTML = '<h3>Quotations</h3>' + html;
+            }
+
+            async function loadInvoices() {
+                const resp = await fetch(API_BASE + '/api/invoices');
+                const data = await resp.json();
+                let html = '<table><tr><th>Invoice #</th><th>Amount</th><th>Status</th></tr>';
+                data.forEach(inv => { html += `<tr><td>${inv.invoice_number}</td><td>${inv.amount}</td><td>${inv.status}</td></tr>`; });
+                html += '</table>';
+                document.getElementById('module-content').innerHTML = '<h3>Invoices</h3>' + html;
+            }
+
+            async function loadPayments() {
+                const resp = await fetch(API_BASE + '/api/payments');
+                const data = await resp.json();
+                let html = '<table><tr><th>Invoice ID</th><th>Amount</th><th>Method</th></tr>';
+                data.forEach(p => { html += `<tr><td>${p.invoice_id}</td><td>${p.amount}</td><td>${p.payment_method}</td></tr>`; });
+                html += '</table>';
+                document.getElementById('module-content').innerHTML = '<h3>Payments</h3>' + html;
+            }
+
+            async function loadProducts() {
+                const resp = await fetch(API_BASE + '/api/products');
+                const data = await resp.json();
+                let html = '<table><tr><th>Product</th><th>Quantity</th><th>Unit</th></tr>';
+                data.forEach(p => { html += `<tr><td>${p.name}</td><td>${p.quantity}</td><td>${p.unit}</td></tr>`; });
+                html += '</table>';
+                document.getElementById('warehouse-content').innerHTML = html;
+            }
+
+            async function loadSuppliers() {
+                const resp = await fetch(API_BASE + '/api/suppliers');
+                const data = await resp.json();
+                let html = '<table><tr><th>Name</th><th>Email</th><th>Phone</th></tr>';
+                data.forEach(s => { html += `<tr><td>${s.name}</td><td>${s.email}</td><td>${s.phone}</td></tr>`; });
+                html += '</table>';
+                document.getElementById('procurement-content').innerHTML = html;
+            }
+
+            async function loadMilling() {
+                const resp = await fetch(API_BASE + '/api/dashboard/summary');
+                const data = await resp.json();
+                document.getElementById('milling-content').innerHTML = `<p>Active batches: ${data.milling_batches}</p>`;
+            }
+
+            async function loadPackaging() {
+                const resp = await fetch(API_BASE + '/api/dashboard/summary');
+                const data = await resp.json();
+                document.getElementById('packaging-content').innerHTML = `<p>Active batches: ${data.packaging_batches}</p>`;
+            }
+
+            async function loadFinanceSummary() {
+                const resp = await fetch(API_BASE + '/api/dashboard/summary');
+                const data = await resp.json();
+                document.getElementById('finance-content').innerHTML = `<p>Invoices: ${data.invoices} | Payments: ...</p>`;
+            }
+
             // Auto-login if session exists
             window.onload = () => {
                 const user = sessionStorage.getItem('user');
@@ -250,8 +468,9 @@ def root():
                     const parsed = JSON.parse(user);
                     document.getElementById('login-overlay').classList.add('hidden');
                     document.getElementById('app').style.display = 'flex';
-                    document.getElementById('sidebar-username').innerText = '✅ User: ' + parsed.username;
-                    document.getElementById('sidebar-role').innerText = 'ℹ️ Role: ' + parsed.role;
+                    document.getElementById('sidebar-username').innerText = parsed.full_name || parsed.username;
+                    document.getElementById('sidebar-role').innerText = parsed.role;
+                    navigate('overview');
                 }
             };
         </script>
