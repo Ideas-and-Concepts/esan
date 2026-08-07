@@ -365,3 +365,408 @@ def login(username, password):
     finally:
 
         db.close()
+
+
+# ==================================================
+# LOGIN SCREEN
+# ==================================================
+
+if not st.session_state.logged_in:
+
+
+    st.markdown(
+        """
+        <div style="text-align:center">
+
+        <h1>🌾 Esan ERP</h1>
+
+        <h3>Nile Harvest Foods Ltd.</h3>
+
+        <p>
+        Enterprise Milling & Packaging Management System
+        </p>
+
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+    col1, col2, col3 = st.columns(
+        [1,2,1]
+    )
+
+
+    with col2:
+
+
+        username = st.text_input(
+            "Username"
+        )
+
+
+        password = st.text_input(
+            "Password",
+            type="password"
+        )
+
+
+        if st.button(
+            "Login",
+            use_container_width=True
+        ):
+
+
+            if login(
+                username,
+                password
+            ):
+
+
+                st.success(
+                    "Login successful"
+                )
+
+                st.rerun()
+
+
+            else:
+
+
+                st.error(
+                    "Invalid username or password"
+                )
+
+
+
+        st.info(
+            "Default administrator: admin / admin123"
+        )
+
+
+    st.stop()
+
+
+
+# ==================================================
+# MODULE REGISTRY
+# ==================================================
+
+dashboard_home = safe_import(
+    "modules.dashboard.home",
+    "dashboard_home"
+)
+
+
+
+procurement_dashboard = safe_import(
+    "modules.procurement.dashboard",
+    "procurement_dashboard"
+)
+
+
+
+warehouse_dashboard = safe_import(
+    "modules.warehouse.dashboard",
+    "warehouse_dashboard"
+)
+
+
+
+milling_dashboard = safe_import(
+    "modules.milling.dashboard",
+    "milling_dashboard"
+)
+
+
+
+packaging_dashboard = safe_import(
+    "modules.packaging.dashboard",
+    "packaging_dashboard"
+)
+
+
+
+sales_dashboard = safe_import(
+    "modules.sales.dashboard",
+    "sales_dashboard"
+)
+
+
+
+customers_page = safe_import(
+    "modules.sales.customers",
+    "customers_page"
+)
+
+
+
+quotations_page = safe_import(
+    "modules.sales.quotations",
+    "quotations_page"
+)
+
+
+
+sales_orders_page = safe_import(
+    "modules.sales.orders",
+    "sales_orders_page"
+)
+
+
+
+dispatch_page = safe_import(
+    "modules.sales.dispatch",
+    "dispatch_page"
+)
+
+
+
+delivery_page = safe_import(
+    "modules.sales.delivery",
+    "delivery_page"
+)
+
+
+
+invoices_page = safe_import(
+    "modules.finance.invoices",
+    "invoices_page"
+)
+
+
+
+payments_page = safe_import(
+    "modules.finance.payments",
+    "payments_page"
+)
+
+
+
+finance_dashboard = safe_import(
+    "modules.finance.dashboard",
+    "finance_dashboard"
+)
+
+
+
+reports_dashboard = safe_import(
+    "modules.reports.dashboard",
+    "reports_dashboard"
+)
+
+
+
+user_management_page = safe_import(
+    "modules.administration.user_management",
+    "user_management_page"
+)
+
+
+
+change_password_page = safe_import(
+    "modules.administration.change_password",
+    "change_password_page"
+)
+
+
+
+# ==================================================
+# MAIN HEADER
+# ==================================================
+
+st.title(
+    "🌾 Esan ERP"
+)
+
+
+st.caption(
+    f"{COMPANY_NAME} | Version {VERSION}"
+)
+
+
+
+# ==================================================
+# ERP SIDEBAR NAVIGATION
+# ==================================================
+
+with st.sidebar:
+
+
+    st.markdown(
+        """
+        <h2 style="text-align:center">
+        🌾 Esan ERP
+        </h2>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+    st.divider()
+
+
+
+    def nav_button(label):
+
+
+        if st.button(
+            label,
+            use_container_width=True
+        ):
+
+            st.session_state.current_page = label
+
+
+
+    # -------------------------------
+    # MAIN
+    # -------------------------------
+
+    nav_button(
+        "🏠 Overview"
+    )
+
+
+
+    # -------------------------------
+    # OPERATIONS
+    # -------------------------------
+
+    st.markdown(
+        "**OPERATIONS**"
+    )
+
+
+    nav_button(
+        "🌾 Procurement"
+    )
+
+
+    nav_button(
+        "📦 Warehouse"
+    )
+
+
+    nav_button(
+        "🏭 Milling"
+    )
+
+
+    nav_button(
+        "📦 Packaging"
+    )
+
+
+
+    # -------------------------------
+    # COMMERCIAL
+    # -------------------------------
+
+    st.markdown(
+        "**COMMERCIAL**"
+    )
+
+
+    nav_button(
+        "🚚 Sales & Distribution"
+    )
+
+
+
+    # -------------------------------
+    # FINANCE
+    # -------------------------------
+
+    st.markdown(
+        "**FINANCE**"
+    )
+
+
+    nav_button(
+        "💰 Finance"
+    )
+
+
+
+    # -------------------------------
+    # REPORTING
+    # -------------------------------
+
+    st.markdown(
+        "**REPORTING**"
+    )
+
+
+    nav_button(
+        "📊 Reports"
+    )
+
+
+
+    # -------------------------------
+    # ADMINISTRATION
+    # -------------------------------
+
+    if st.session_state.role == "Administrator":
+
+
+        st.markdown(
+            "**ADMINISTRATION**"
+        )
+
+
+        nav_button(
+            "🔐 Administration"
+        )
+
+
+
+    st.divider()
+
+
+
+    # -------------------------------
+    # USER PANEL
+    # -------------------------------
+
+    st.markdown(
+        "### 👤 User Panel"
+    )
+
+
+    st.write(
+        f"User: **{st.session_state.username}**"
+    )
+
+
+    st.write(
+        f"Role: **{st.session_state.role}**"
+    )
+
+
+
+    if st.button(
+        "🚪 Logout",
+        use_container_width=True
+    ):
+
+
+        st.session_state.logged_in = False
+
+        st.session_state.username = None
+
+        st.session_state.role = None
+
+        st.session_state.current_page = (
+            "🏠 Overview"
+        )
+
+
+        st.rerun()
+
+
+
+# Current selected page
+
+menu = st.session_state.current_page
