@@ -1,35 +1,53 @@
 """
 Esan ERP API – FastAPI Backend for Vercel
+==========================================
+Works both locally and on Vercel serverless.
+Ensure the root requirements.txt contains: fastapi, uvicorn, sqlalchemy, psycopg2-binary
 """
+
+import os
+import sys
+from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from typing import List
 
-# Import database and models (adjust import paths as needed)
-from .database import SessionLocal, engine, Base
-import sys
-import os
-# Add the parent directory to sys.path so we can import models
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Make sure the repo root is in sys.path so we can import models, etc.
+# This is safe both locally and on Vercel.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from database import SessionLocal, engine, Base   # root database.py (not api/database.py)
 from models import Customer, Invoice, Payment, SalesOrder, Product
 
-# Create tables (only needed if the database is fresh)
-Base.metadata.create_all(bind=engine)
-
+# ------------------------------------------------------------------
+# App init
+# ------------------------------------------------------------------
 app = FastAPI(title="Esan ERP API", version="1.0")
 
-# Allow requests from your Streamlit frontend (update the origin if needed)
+# Allow requests from your Streamlit frontend (update in production)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # restrict to your Streamlit domain in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# ------------------------------------------------------------------
+# Database setup (only create tables if they don't exist)
+# ------------------------------------------------------------------
+# We do NOT use Base.metadata.create_all here because it runs on every
+# cold start. Instead, we create tables lazily or use a startup event.
+# For Vercel, it's better to keep the database pre‑created.
+# If you really need auto‑creation, uncomment the next two lines:
+# @app.on_event("startup")
+# def on_startup():
+#     Base.metadata.create_all(bind=engine)
+
+# ------------------------------------------------------------------
 # Dependency
+# ------------------------------------------------------------------
 def get_db():
     db = SessionLocal()
     try:
@@ -37,10 +55,25 @@ def get_db():
     finally:
         db.close()
 
-# -------------------------------
-#  Customers
-# -------------------------------
-@app.get("/customers", response_model=List[dict])
+# ------------------------------------------------------------------
+# Error handler helper
+# ------------------------------------------------------------------
+def handle_db_error(func):
+    """Decorator to catch database errors and return a 500 response."""
+    from functools import wraps
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    return wrapper
+
+# ------------------------------------------------------------------
+# Customers
+# ------------------------------------------------------------------
+@app.get("/customers")
+@handle_db_error
 def list_customers(db: Session = Depends(get_db)):
     customers = db.query(Customer).all()
     return [
@@ -56,15 +89,15 @@ def list_customers(db: Session = Depends(get_db)):
         for c in customers
     ]
 
-# -------------------------------
-#  Invoices
-# -------------------------------
-@app.get("/invoices", response_model=List[dict])
+# ------------------------------------------------------------------
+# Invoices
+# ------------------------------------------------------------------
+@app.get("/invoices")
+@handle_db_error
 def list_invoices(db: Session = Depends(get_db)):
     invoices = db.query(Invoice).all()
     result = []
     for inv in invoices:
-        # Calculate balance (sum of payments)
         payments = db.query(Payment).filter(Payment.invoice_id == inv.id).all()
         total_paid = sum(p.amount for p in payments)
         balance = inv.amount - total_paid
@@ -80,10 +113,11 @@ def list_invoices(db: Session = Depends(get_db)):
         })
     return result
 
-# -------------------------------
-#  Payments
-# -------------------------------
-@app.get("/payments", response_model=List[dict])
+# ------------------------------------------------------------------
+# Payments
+# ------------------------------------------------------------------
+@app.get("/payments")
+@handle_db_error
 def list_payments(db: Session = Depends(get_db)):
     payments = db.query(Payment).all()
     return [
@@ -99,10 +133,11 @@ def list_payments(db: Session = Depends(get_db)):
         for p in payments
     ]
 
-# -------------------------------
-#  Sales Orders
-# -------------------------------
-@app.get("/orders", response_model=List[dict])
+# ------------------------------------------------------------------
+# Sales Orders
+# ------------------------------------------------------------------
+@app.get("/orders")
+@handle_db_error
 def list_orders(db: Session = Depends(get_db)):
     orders = db.query(SalesOrder).all()
     return [
@@ -117,10 +152,11 @@ def list_orders(db: Session = Depends(get_db)):
         for o in orders
     ]
 
-# -------------------------------
-#  Products (Inventory)
-# -------------------------------
-@app.get("/products", response_model=List[dict])
+# ------------------------------------------------------------------
+# Products (Inventory)
+# ------------------------------------------------------------------
+@app.get("/products")
+@handle_db_error
 def list_products(db: Session = Depends(get_db)):
     products = db.query(Product).all()
     return [
@@ -136,9 +172,9 @@ def list_products(db: Session = Depends(get_db)):
         for p in products
     ]
 
-# -------------------------------
-#  Root (health check)
-# -------------------------------
+# ------------------------------------------------------------------
+# Root (health check)
+# ------------------------------------------------------------------
 @app.get("/")
 def root():
     return {"message": "Esan ERP API is running", "version": "1.0"}
