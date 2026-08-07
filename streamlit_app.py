@@ -770,3 +770,310 @@ with st.sidebar:
 # Current selected page
 
 menu = st.session_state.current_page
+
+
+# ==================================================
+# ERP ROUTER
+# ==================================================
+
+if menu == "🏠 Overview":
+
+
+    if dashboard_home:
+
+        dashboard_home()
+
+    else:
+
+        st.info(
+            "Overview dashboard not available"
+        )
+
+
+
+# ==================================================
+# OPERATIONS
+# ==================================================
+
+elif menu == "🌾 Procurement":
+
+
+    if procurement_dashboard:
+
+        procurement_dashboard()
+
+    else:
+
+        st.warning(
+            "Procurement module unavailable"
+        )
+
+
+
+elif menu == "📦 Warehouse":
+
+
+    if warehouse_dashboard:
+
+        warehouse_dashboard()
+
+    else:
+
+        st.warning(
+            "Warehouse module unavailable"
+        )
+
+
+
+elif menu == "🏭 Milling":
+
+
+    if milling_dashboard:
+
+        milling_dashboard()
+
+    else:
+
+        st.warning(
+            "Milling module unavailable"
+        )
+
+
+
+elif menu == "📦 Packaging":
+
+
+    if packaging_dashboard:
+
+        packaging_dashboard()
+
+    else:
+
+        st.warning(
+            "Packaging module unavailable"
+        )
+
+
+
+# ==================================================
+# COMMERCIAL
+# ==================================================
+
+elif menu == "🚚 Sales & Distribution":
+
+
+    st.header(
+        "🚚 Sales & Distribution"
+    )
+
+
+    sales_menu = st.radio(
+
+        "Sales Module",
+
+        [
+            "Dashboard",
+            "Customers",
+            "Quotations",
+            "Sales Orders",
+            "Dispatch",
+            "Deliveries",
+            "Invoices",
+            "Payments"
+        ]
+
+    )
+
+
+    sales_pages = {
+
+
+        "Dashboard":
+            sales_dashboard,
+
+
+        "Customers":
+            customers_page,
+
+
+        "Quotations":
+            quotations_page,
+
+
+        "Sales Orders":
+            sales_orders_page,
+
+
+        "Dispatch":
+            dispatch_page,
+
+
+        "Deliveries":
+            delivery_page,
+
+
+        "Invoices":
+            invoices_page,
+
+
+        "Payments":
+            payments_page
+
+    }
+
+
+
+    selected_sales_page = sales_pages.get(
+        sales_menu
+    )
+
+
+
+    if selected_sales_page:
+
+
+        selected_sales_page()
+
+
+    else:
+
+
+        st.warning(
+            "Sales page unavailable"
+        )
+
+
+
+# ==================================================
+# FINANCE
+# ==================================================
+
+elif menu == "💰 Finance":
+
+
+    if finance_dashboard:
+
+        finance_dashboard()
+
+    else:
+
+        st.warning(
+            "Finance module unavailable"
+        )
+
+
+
+# ==================================================
+# REPORTS
+# ==================================================
+
+elif menu == "📊 Reports":
+
+
+    if reports_dashboard:
+
+        reports_dashboard()
+
+    else:
+
+        st.warning(
+            "Reports module unavailable"
+        )
+
+
+
+# ==================================================
+# ADMINISTRATION
+# ==================================================
+
+elif menu == "🔐 Administration":
+
+
+    st.header(
+        "🔐 Administration"
+    )
+
+
+    if st.session_state.role != "Administrator":
+
+
+        st.error(
+            "Access denied"
+        )
+
+
+    else:
+
+
+        admin_menu = st.radio(
+
+            "Administration",
+
+            [
+                "User Management",
+                "Change Password"
+            ]
+
+        )
+
+
+
+        if admin_menu == "User Management":
+
+
+            if user_management_page:
+
+                user_management_page()
+
+            else:
+
+                st.info(
+                    "User management module unavailable"
+                )
+
+
+
+        elif admin_menu == "Change Password":
+
+
+            if change_password_page:
+
+                change_password_page()
+
+            else:
+
+                st.info(
+                    "Password module unavailable"
+                )
+
+
+
+# ==================================================
+# MODULE IMPORT WARNINGS
+# ==================================================
+
+if module_errors:
+
+
+    with st.expander(
+        "⚠️ Module Loading Information"
+    ):
+
+        for error in module_errors:
+
+            st.write(
+                error
+            )
+
+
+
+# ==================================================
+# FOOTER
+# ==================================================
+
+st.divider()
+
+
+st.caption(
+    "© Nile Harvest Foods Ltd. | Esan ERP Enterprise Platform"
+)
