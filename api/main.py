@@ -11,7 +11,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.orm import Session
-from sqlalchemy import inspect
 
 # Logging
 logging.basicConfig(level=logging.INFO)
@@ -102,7 +101,7 @@ def login(credentials: HTTPBasicCredentials = Depends(security), db: Session = D
     }
 
 # ------------------------------------------------------------------
-# API data endpoints
+# API data endpoints (identical to previous working version)
 # ------------------------------------------------------------------
 @app.get("/api/customers")
 def list_customers(db: Session = Depends(get_db)):
@@ -209,7 +208,7 @@ def dashboard_summary(db: Session = Depends(get_db)):
     }
 
 # ------------------------------------------------------------------
-# Full ERP frontend at /
+# Full ERP frontend at / with sidebar always visible after login
 # ------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def erp_frontend():
@@ -232,11 +231,11 @@ def erp_frontend():
             .login-card button:hover { background:#1b5e20; }
             .error { color:#d32f2f; font-size:0.9rem; margin-top:10px; }
             #app { display: flex; height: 100vh; }
-            .sidebar { width:280px; background:#f8f9fa; padding:1rem; display:flex; flex-direction:column; border-right:1px solid #ddd; }
+            .sidebar { width:280px; background:#f8f9fa; padding:1rem; display:flex; flex-direction:column; border-right:1px solid #ddd; overflow-y:auto; }
             .sidebar h2 { text-align:center; color:#2d3748; margin-bottom:1rem; }
             .sidebar .nav-group { margin-bottom:1.5rem; }
             .sidebar .nav-group-title { font-weight:600; color:#555; margin-bottom:0.3rem; text-transform:uppercase; font-size:0.8rem; }
-            .sidebar button { display:block; width:100%; padding:8px 12px; margin-bottom:4px; text-align:left; background:none; border:none; border-radius:6px; cursor:pointer; color:#333; font-size:0.95rem; }
+            .sidebar button { display:block; width:100%; padding:10px 12px; margin-bottom:4px; text-align:left; background:white; border:1px solid #e0e0e0; border-radius:6px; cursor:pointer; color:#333; font-size:0.95rem; transition: background 0.2s; }
             .sidebar button:hover { background:#e2e8f0; }
             .user-panel { margin-top:auto; padding-top:1rem; border-top:1px solid #ddd; }
             .logout-btn { background:#e53e3e !important; color:white !important; margin-top:0.5rem; }
@@ -251,7 +250,7 @@ def erp_frontend():
             th { background:#f5f5f5; padding:10px; text-align:left; border-bottom:2px solid #ddd; }
             td { padding:10px; border-bottom:1px solid #eee; }
             .footer { margin-top:2rem; color:#999; font-size:0.85rem; }
-            @media (max-width:768px) { .sidebar { display:none; } }
+            /* Remove the mobile hide rule so sidebar always shows */
         </style>
     </head>
     <body>
@@ -268,7 +267,7 @@ def erp_frontend():
             </div>
         </div>
 
-        <!-- Main App -->
+        <!-- Main App (sidebar visible after login) -->
         <div id="app" style="display:none">
             <div class="sidebar">
                 <h2>🌾 Esan ERP</h2>
@@ -437,6 +436,7 @@ def erp_frontend():
                 document.getElementById('procurement-content').innerHTML = html;
             }
 
+            // On page load, check for saved session
             window.onload = () => {
                 const user = sessionStorage.getItem('user');
                 if (user) {
