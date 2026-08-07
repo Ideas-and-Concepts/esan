@@ -1,15 +1,18 @@
 """
-Sales Orders Module
-Nile Harvest Foods Ltd.
-Esan ERP
+Esan ERP Sales Orders Module
 
-Sales Order Workflow:
-Quotation → Sales Order → Approval → Stock Reservation → Delivery → Invoice → Payment
+Nile Harvest Foods Ltd.
+Enterprise Milling & Packaging ERP
+
+Handles:
+- Create Sales Orders
+- View Orders
+- Update Order Status
+- Create Delivery from Order
 """
 
 import streamlit as st
 import pandas as pd
-
 
 from services.sales_service import (
     get_all_sales_orders,
@@ -18,138 +21,56 @@ from services.sales_service import (
     get_all_customers
 )
 
-
-# Optional service connections
-
-try:
-    from services.inventory_service import reserve_stock
-except Exception:
-    reserve_stock = None
-
-
-try:
-    from services.delivery_service import create_delivery
-except Exception:
-    create_delivery = None
-
-
-try:
-    from services.invoice_service import create_invoice
-except Exception:
-    create_invoice = None
-
-
-try:
-    from services.payment_service import get_payment_status
-except Exception:
-    get_payment_status = None
+from services.delivery_service import (
+    create_delivery
+)
 
 
 
-# =====================================
+# ==================================================
 # MAIN PAGE
-# =====================================
+# ==================================================
 
 def sales_orders_page():
 
-    st.title("🚚 Sales Order Management")
+    st.title("📋 Sales Orders")
 
 
-    orders = get_all_sales_orders()
-
-
-    # KPI SECTION
-
-    total_orders = len(orders)
-
-    pending = len(
+    tabs = st.tabs(
         [
-            o for o in orders
-            if o.status in ["Pending", "Draft"]
+            "Create Order",
+            "View Orders",
+            "Order Workflow"
         ]
     )
 
 
-    completed = len(
-        [
-            o for o in orders
-            if o.status == "Delivered"
-        ]
-    )
+    with tabs[0]:
 
-
-    revenue = sum(
-        o.total_amount or 0
-        for o in orders
-    )
-
-
-    col1, col2, col3, col4 = st.columns(4)
-
-
-    col1.metric(
-        "📋 Total Orders",
-        total_orders
-    )
-
-
-    col2.metric(
-        "⏳ Pending",
-        pending
-    )
-
-
-    col3.metric(
-        "🚚 Delivered",
-        completed
-    )
-
-
-    col4.metric(
-        "💰 Sales Value",
-        f"UGX {revenue:,.0f}"
-    )
-
-
-    st.divider()
-
-
-    tab1, tab2, tab3, tab4 = st.tabs(
-        [
-            "➕ Create Order",
-            "📋 Orders",
-            "✅ Approval",
-            "🔄 Workflow"
-        ]
-    )
-
-
-    with tab1:
         create_order()
 
 
-    with tab2:
+
+    with tabs[1]:
+
         view_orders()
 
 
-    with tab3:
-        approve_orders()
 
+    with tabs[2]:
 
-    with tab4:
         order_workflow()
 
 
 
-# =====================================
+# ==================================================
 # CREATE ORDER
-# =====================================
+# ==================================================
 
 def create_order():
 
-
     st.subheader(
-        "Create Sales Order"
+        "Create New Sales Order"
     )
 
 
@@ -159,7 +80,7 @@ def create_order():
     if not customers:
 
         st.warning(
-            "No customers available. Create customers first."
+            "No customers available."
         )
 
         return
@@ -167,15 +88,33 @@ def create_order():
 
 
     customer_map = {
+
         c.name: c.id
+
         for c in customers
+
     }
 
 
+    selected_customer = st.selectbox(
 
-    customer = st.selectbox(
         "Customer",
+
         list(customer_map.keys())
+
+    )
+
+
+    status = st.selectbox(
+
+        "Initial Status",
+
+        [
+            "Pending",
+            "Confirmed",
+            "Processing"
+        ]
+
     )
 
 
@@ -191,7 +130,7 @@ def create_order():
 
 
     with st.form(
-        "item_form"
+        "order_item_form"
     ):
 
 
@@ -205,34 +144,38 @@ def create_order():
 
         quantity = col2.number_input(
             "Quantity",
-            min_value=0.0
+            min_value=0.0,
+            step=1.0
         )
 
 
         price = col3.number_input(
             "Unit Price",
-            min_value=0.0
+            min_value=0.0,
+            step=100.0
         )
 
 
 
-        add = st.form_submit_button(
+        add_item = st.form_submit_button(
             "Add Item"
         )
 
 
-
-        if add:
+        if add_item:
 
             if product and quantity > 0:
 
                 st.session_state.order_items.append(
+
                     {
                         "product_name": product,
                         "quantity": quantity,
                         "unit_price": price
                     }
+
                 )
+
 
                 st.success(
                     "Item added"
@@ -254,57 +197,90 @@ def create_order():
         )
 
 
-
         total = sum(
-            i["quantity"] * i["unit_price"]
-            for i in st.session_state.order_items
+
+            item["quantity"] *
+            item["unit_price"]
+
+            for item in
+            st.session_state.order_items
+
         )
 
 
-        st.info(
-            f"Order Total: UGX {total:,.0f}"
+        st.metric(
+            "Order Total",
+            f"{total:,.2f}"
         )
 
 
 
         if st.button(
-            "Create Sales Order",
-            type="primary"
+            "Clear Items"
         ):
 
+            st.session_state.order_items = []
 
-            try:
-
-                order = create_sales_order(
-                    customer_map[customer],
-                    st.session_state.order_items,
-                    "Pending"
-                )
-
-
-                st.success(
-                    f"Created Order {order.order_number}"
-                )
-
-
-                st.session_state.order_items = []
-
-
-                st.rerun()
-
-
-            except Exception as e:
-
-                st.error(
-                    str(e)
-                )
+            st.rerun()
 
 
 
+    if st.button(
+        "Create Sales Order",
+        type="primary"
+    ):
 
-# =====================================
+
+        if not st.session_state.order_items:
+
+            st.error(
+                "Add at least one item"
+            )
+
+            return
+
+
+
+        try:
+
+
+            order = create_sales_order(
+
+                customer_map[selected_customer],
+
+                st.session_state.order_items,
+
+                status
+
+            )
+
+
+            st.success(
+
+                f"Order {order.order_number} created"
+
+            )
+
+
+            st.session_state.order_items = []
+
+
+            st.rerun()
+
+
+
+        except Exception as e:
+
+
+            st.error(
+                f"Order creation failed: {e}"
+            )
+
+
+
+# ==================================================
 # VIEW ORDERS
-# =====================================
+# ==================================================
 
 def view_orders():
 
@@ -321,114 +297,64 @@ def view_orders():
     if not orders:
 
         st.info(
-            "No sales orders found."
+            "No sales orders found"
         )
 
         return
 
 
 
-    rows = []
+    data=[]
 
 
     for order in orders:
 
-        rows.append(
-            {
-                "Order": order.order_number,
-                "Customer": order.customer_id,
-                "Status": order.status,
-                "Amount": order.total_amount,
-                "Date": order.created_at.strftime("%Y-%m-%d")
-            }
-        )
 
+        data.append(
+
+            {
+
+                "Order Number":
+                    order.order_number,
+
+                "Customer ID":
+                    order.customer_id,
+
+                "Status":
+                    order.status,
+
+                "Amount":
+                    order.total_amount,
+
+                "Date":
+                    order.created_at.strftime(
+                        "%Y-%m-%d"
+                    )
+
+            }
+
+        )
 
 
     st.dataframe(
-        pd.DataFrame(rows),
+
+        pd.DataFrame(data),
+
         use_container_width=True
+
     )
 
 
 
-
-
-# =====================================
-# APPROVAL
-# =====================================
-
-def approve_orders():
-
-
-    st.subheader(
-        "Approve Sales Orders"
-    )
-
-
-    orders = get_all_sales_orders()
-
-
-    pending_orders = [
-        o for o in orders
-        if o.status == "Pending"
-    ]
-
-
-    if not pending_orders:
-
-        st.info(
-            "No pending approvals."
-        )
-
-        return
-
-
-
-    order_map = {
-        o.order_number:o.id
-        for o in pending_orders
-    }
-
-
-
-    selected = st.selectbox(
-        "Select Order",
-        list(order_map.keys())
-    )
-
-
-
-    if st.button(
-        "Approve Order"
-    ):
-
-
-        update_order_status(
-            order_map[selected],
-            "Approved"
-        )
-
-
-        st.success(
-            "Order approved"
-        )
-
-
-        st.rerun()
-
-
-
-
-# =====================================
-# WORKFLOW
-# =====================================
+# ==================================================
+# ORDER WORKFLOW
+# ==================================================
 
 def order_workflow():
 
 
     st.subheader(
-        "Order Processing Workflow"
+        "🚚 Order Fulfillment Workflow"
     )
 
 
@@ -438,149 +364,177 @@ def order_workflow():
 
     if not orders:
 
+
         st.info(
-            "No orders available."
+            "No orders available"
         )
 
         return
 
 
 
+    order_map = {
+
+        o.order_number:o
+
+        for o in orders
+
+    }
+
+
+
     selected = st.selectbox(
-        "Order",
-        [
-            o.order_number
-            for o in orders
-        ]
+
+        "Select Order",
+
+        list(order_map.keys())
+
     )
 
 
-
-    order = next(
-        o for o in orders
-        if o.order_number == selected
-    )
+    order = order_map[selected]
 
 
 
     st.write(
-        f"Current Status: **{order.status}**"
+        f"Customer ID: {order.customer_id}"
+    )
+
+
+    st.write(
+        f"Current Status: {order.status}"
     )
 
 
 
-    col1, col2, col3 = st.columns(3)
+    st.divider()
 
 
 
-    with col1:
+    new_status = st.selectbox(
 
-        if st.button(
-            "📦 Reserve Stock"
-        ):
+        "Update Status",
 
+        [
+            "Pending",
+            "Confirmed",
+            "Processing",
+            "Ready",
+            "Dispatched",
+            "Delivered",
+            "Cancelled"
+        ]
 
-            if reserve_stock:
-
-                reserve_stock(order.id)
-
-                st.success(
-                    "Stock reserved"
-                )
-
-            else:
-
-                st.warning(
-                    "Inventory service not connected yet."
-                )
+    )
 
 
 
-    with col2:
+    if st.button(
+        "Update Order Status"
+    ):
 
-        if st.button(
-        if st.button(
-    "🚚 Create Delivery"
-):
 
-    if create_delivery:
+        update_order_status(
 
-        destination = st.text_input(
-            "Delivery Destination",
-            key=f"destination_{order.id}"
-        )
+            order.id,
 
-        driver = st.text_input(
-            "Driver Name",
-            key=f"driver_{order.id}"
-        )
+            new_status
 
-        vehicle = st.text_input(
-            "Vehicle Number",
-            key=f"vehicle_{order.id}"
         )
 
 
-        if st.button(
-            "Confirm Delivery",
-            key=f"confirm_delivery_{order.id}"
-        ):
-
-            try:
-
-                delivery = create_delivery(
-                    order.id,
-                    destination,
-                    driver,
-                    vehicle
-                )
+        st.success(
+            "Order status updated"
+        )
 
 
-                st.success(
-                    f"Delivery {delivery.delivery_number} created"
-                )
-
-
-                st.rerun()
-
-
-            except Exception as e:
-
-                st.error(
-                    f"Delivery error: {e}"
-                )
-
-    else:
-
-        st.warning(
-            "Delivery service not connected."
-)
-
-            else:
-
-                st.warning(
-                    "Delivery service not connected."
-                )
+        st.rerun()
 
 
 
-    with col3:
-
-        if st.button(
-            "🧾 Generate Invoice"
-        ):
+    st.divider()
 
 
-            if create_invoice:
 
-                create_invoice(order.id)
+    st.subheader(
+        "Create Delivery"
+    )
 
-                st.success(
-                    "Invoice generated"
-                )
 
-            else:
 
-                st.warning(
-                    "Invoice service not connected."
-                )
+    destination = st.text_input(
+
+        "Destination"
+
+    )
+
+
+    driver = st.text_input(
+
+        "Driver"
+
+    )
+
+
+    vehicle = st.text_input(
+
+        "Vehicle"
+
+    )
+
+
+
+    if st.button(
+        "Create Delivery",
+        type="primary"
+    ):
+
+
+
+        if not destination:
+
+
+            st.error(
+                "Destination is required"
+            )
+
+            return
+
+
+
+        try:
+
+
+            delivery = create_delivery(
+
+                order_id=order.id,
+
+                destination=destination,
+
+                driver=driver,
+
+                vehicle=vehicle
+
+            )
+
+
+
+            st.success(
+
+                f"Delivery {delivery.delivery_number} created"
+
+            )
+
+
+            st.rerun()
+
+
+
+        except Exception as e:
+
+
+            st.error(
+
+                f"Delivery failed: {e}"
+
+            )
