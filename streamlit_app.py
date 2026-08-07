@@ -544,31 +544,157 @@ st.caption(
 )
 
 
-
 # ==================================================
-# SIDEBAR
+# SIDEBAR NAVIGATION PANEL
 # ==================================================
 
 with st.sidebar:
 
+    st.markdown(
+        """
+        <h2 style="text-align:center;">
+        🌾 Esan ERP
+        </h2>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.divider()
+
+
+    # Initialize menu state
+
+    if "current_page" not in st.session_state:
+
+        st.session_state.current_page = "Overview"
+
+
+
+    # -------------------------
+    # Navigation Helper
+    # -------------------------
+
+    def nav_button(label):
+
+        if st.button(
+            label,
+            use_container_width=True
+        ):
+
+            st.session_state.current_page = label
+
+
+
+    # -------------------------
+    # MAIN MENU
+    # -------------------------
+
+    nav_button(
+        "🏠 Overview"
+    )
+
 
     st.markdown(
-        "## 👤 User Panel"
+        "**OPERATIONS**"
     )
 
 
-    st.success(
-        f"User: {st.session_state.username}"
+    nav_button(
+        "🌾 Procurement"
     )
 
 
-    st.info(
-        f"Role: {st.session_state.role}"
+    nav_button(
+        "📦 Warehouse"
+    )
+
+
+    nav_button(
+        "🏭 Milling"
+    )
+
+
+    nav_button(
+        "📦 Packaging"
+    )
+
+
+
+    st.markdown(
+        "**COMMERCIAL**"
+    )
+
+
+    nav_button(
+        "🚚 Sales & Distribution"
+    )
+
+
+
+    st.markdown(
+        "**FINANCE**"
+    )
+
+
+    nav_button(
+        "💰 Finance"
+    )
+
+
+
+    st.markdown(
+        "**REPORTING**"
+    )
+
+
+    nav_button(
+        "📊 Reports"
+    )
+
+
+
+    # -------------------------
+    # ADMINISTRATION
+    # -------------------------
+
+    if st.session_state.role == "Administrator":
+
+        st.markdown(
+            "**ADMINISTRATION**"
+        )
+
+
+        nav_button(
+            "🔐 Administration"
+        )
+
+
+
+    st.divider()
+
+
+    # -------------------------
+    # USER PANEL
+    # -------------------------
+
+    st.markdown(
+        "### 👤 User Panel"
+    )
+
+
+    st.write(
+        f"User: **{st.session_state.username}**"
+    )
+
+
+    st.write(
+        f"Role: **{st.session_state.role}**"
     )
 
 
     if st.button(
-        "🚪 Logout"
+        "🚪 Logout",
+        use_container_width=True
     ):
 
         st.session_state.logged_in = False
@@ -577,58 +703,13 @@ with st.sidebar:
 
         st.session_state.role = None
 
+        st.session_state.current_page = "Overview"
+
         st.rerun()
+ 
 
 
-
-    st.divider()
-
-
-    st.markdown(
-        "## 📋 Navigation"
-    )
-
-
-    menu_items = [
-
-        "Overview",
-
-        "🌾 Procurement",
-
-        "📦 Warehouse",
-
-        "🏭 Milling",
-
-        "📦 Packaging",
-
-        "🚚 Sales & Distribution",
-
-        "💰 Finance",
-
-        "🚚 Logistics",
-
-        "👥 HR & Employees",
-
-        "🔧 Maintenance",
-
-        "📊 Reports",
-
-        "🤖 AI Assistant"
-
-    ]
-
-
-    if st.session_state.role == "Administrator":
-
-        menu_items.append(
-            "🔐 Administration"
-        )
-
-
-    menu = st.selectbox(
-        "",
-        menu_items
-    )
+    
 
 
 
