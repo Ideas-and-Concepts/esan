@@ -1,8 +1,6 @@
 """
-Esan ERP API for Vercel
-- Root health check
-- Full ERP frontend at /app
-- API endpoints under /api/
+Esan ERP API – FastAPI Backend for Vercel
+Full ERP frontend at /, API endpoints under /api/, health check at /health
 """
 
 import os
@@ -13,23 +11,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.orm import Session
+from sqlalchemy import inspect
 
-# Basic logging
+# Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("esan_api")
 
 # Make repo root importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-app = FastAPI(title="Esan ERP API", version="1.4.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
-
 # ------------------------------------------------------------------
-# Try to import database and models – don't crash if unavailable
+# Database / models / auth – graceful fallback
 # ------------------------------------------------------------------
 try:
     from database import SessionLocal, engine, Base
-    from models import User, Customer, Invoice, Payment, SalesOrder, Product
+    from models import (
+        User, Customer, Invoice, Payment, SalesOrder, Product,
+        Quotation, Supplier, Delivery, MillingBatch, PackagingBatch,
+        FinanceTransaction
+    )
     from auth import verify_password, hash_password
     DB_AVAILABLE = True
 except Exception as e:
@@ -37,15 +37,24 @@ except Exception as e:
     DB_AVAILABLE = False
 
 # ------------------------------------------------------------------
-# Startup: create tables and admin (only if DB available)
+# FastAPI app
+# ------------------------------------------------------------------
+app = FastAPI(title="Esan ERP API", version="1.4.0")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+# ------------------------------------------------------------------
+# Startup: create tables + admin (safe)
 # ------------------------------------------------------------------
 @app.on_event("startup")
 def startup():
     if not DB_AVAILABLE:
-        logger.warning("Database not available – skipping startup setup.")
+        logger.warning("Database not available – skipping setup.")
         return
     try:
+        # Ensure tables exist
         Base.metadata.create_all(bind=engine)
+
+        # Create admin user if missing
         db = SessionLocal()
         try:
             admin = db.query(User).filter(User.username == "admin").first()
@@ -69,7 +78,7 @@ def startup():
 # ------------------------------------------------------------------
 def get_db():
     if not DB_AVAILABLE:
-        raise HTTPException(status_code=503, detail="Database not available")
+        raise HTTPException(status_code=503, detail="Database unavailable")
     db = SessionLocal()
     try:
         yield db
@@ -77,14 +86,7 @@ def get_db():
         db.close()
 
 # ------------------------------------------------------------------
-# Simple health check (root)
-# ------------------------------------------------------------------
-@app.get("/")
-def health():
-    return {"message": "Esan ERP API is running"}
-
-# ------------------------------------------------------------------
-# Authentication endpoint
+# Authentication
 # ------------------------------------------------------------------
 security = HTTPBasic()
 
@@ -93,43 +95,124 @@ def login(credentials: HTTPBasicCredentials = Depends(security), db: Session = D
     user = db.query(User).filter(User.username == credentials.username).first()
     if not user or not verify_password(credentials.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    return {"username": user.username, "full_name": user.full_name or user.username, "role": user.role}
+    return {
+        "username": user.username,
+        "full_name": user.full_name or user.username,
+        "role": user.role
+    }
 
 # ------------------------------------------------------------------
-# Example data endpoints (add more as needed)
+# API data endpoints
 # ------------------------------------------------------------------
 @app.get("/api/customers")
-def customers(db: Session = Depends(get_db)):
-    return [{"id": c.id, "name": c.name, "email": c.email} for c in db.query(Customer).all()]
+def list_customers(db: Session = Depends(get_db)):
+    customers = db.query(Customer).all()
+    return [
+        {
+            "id": c.id, "name": c.name, "email": c.email, "phone": c.phone,
+            "customer_type": c.customer_type, "location": c.location, "country": c.country
+        } for c in customers
+    ]
 
 @app.get("/api/orders")
-def orders(db: Session = Depends(get_db)):
-    return [{"id": o.id, "order_number": o.order_number, "status": o.status} for o in db.query(SalesOrder).all()]
+def list_orders(db: Session = Depends(get_db)):
+    orders = db.query(SalesOrder).all()
+    return [
+        {
+            "id": o.id, "order_number": o.order_number,
+            "customer_id": o.customer_id, "status": o.status,
+            "total_amount": o.total_amount,
+            "created_at": o.created_at.isoformat() if o.created_at else None
+        } for o in orders
+    ]
 
 @app.get("/api/invoices")
-def invoices(db: Session = Depends(get_db)):
+def list_invoices(db: Session = Depends(get_db)):
     invoices = db.query(Invoice).all()
     result = []
     for inv in invoices:
         payments = db.query(Payment).filter(Payment.invoice_id == inv.id).all()
-        paid = sum(p.amount for p in payments)
+        total_paid = sum(p.amount for p in payments)
         result.append({
             "id": inv.id, "invoice_number": inv.invoice_number,
-            "amount": inv.amount, "paid": paid, "balance": inv.amount - paid,
-            "status": inv.status
+            "customer_id": inv.customer_id, "amount": inv.amount,
+            "paid": total_paid, "balance": inv.amount - total_paid,
+            "status": inv.status,
+            "created_at": inv.created_at.isoformat() if inv.created_at else None
         })
     return result
 
+@app.get("/api/payments")
+def list_payments(db: Session = Depends(get_db)):
+    payments = db.query(Payment).all()
+    return [
+        {
+            "id": p.id, "invoice_id": p.invoice_id, "amount": p.amount,
+            "payment_method": p.payment_method, "reference": p.reference,
+            "status": p.status,
+            "created_at": p.created_at.isoformat() if p.created_at else None
+        } for p in payments
+    ]
+
 @app.get("/api/products")
-def products(db: Session = Depends(get_db)):
-    return [{"id": p.id, "name": p.name, "quantity": p.quantity} for p in db.query(Product).all()]
+def list_products(db: Session = Depends(get_db)):
+    products = db.query(Product).all()
+    return [
+        {
+            "id": p.id, "name": p.name, "category": p.category,
+            "unit": p.unit, "quantity": p.quantity,
+            "cost_price": p.cost_price, "selling_price": p.selling_price
+        } for p in products
+    ]
+
+@app.get("/api/suppliers")
+def list_suppliers(db: Session = Depends(get_db)):
+    suppliers = db.query(Supplier).all()
+    return [
+        {"id": s.id, "name": s.name, "email": s.email, "phone": s.phone}
+        for s in suppliers
+    ]
+
+@app.get("/api/quotations")
+def list_quotations(db: Session = Depends(get_db)):
+    quotations = db.query(Quotation).all()
+    return [
+        {
+            "id": q.id, "quotation_number": q.quotation_number,
+            "customer_id": q.customer_id, "status": q.status,
+            "total_amount": q.total_amount
+        } for q in quotations
+    ]
+
+@app.get("/api/deliveries")
+def list_deliveries(db: Session = Depends(get_db)):
+    deliveries = db.query(Delivery).all()
+    return [
+        {
+            "id": d.id, "delivery_number": d.delivery_number,
+            "order_id": d.order_id, "destination": d.destination,
+            "driver": d.driver, "status": d.status
+        } for d in deliveries
+    ]
+
+@app.get("/api/dashboard/summary")
+def dashboard_summary(db: Session = Depends(get_db)):
+    return {
+        "customers": db.query(Customer).count(),
+        "orders": db.query(SalesOrder).count(),
+        "products": db.query(Product).count(),
+        "invoices": db.query(Invoice).count(),
+        "quotations": db.query(Quotation).count(),
+        "suppliers": db.query(Supplier).count(),
+        "milling_batches": db.query(MillingBatch).count(),
+        "packaging_batches": db.query(PackagingBatch).count(),
+    }
 
 # ------------------------------------------------------------------
-# Full ERP frontend (identical to your Streamlit UI)
+# Full ERP frontend at /
 # ------------------------------------------------------------------
-@app.get("/app", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse)
 def erp_frontend():
-    # This is the exact HTML you had – unchanged, but now behind /app
     return """
     <!DOCTYPE html>
     <html lang="en">
@@ -270,7 +353,7 @@ def erp_frontend():
                     case 'warehouse': content.innerHTML = '<h3>Warehouse</h3><div id="warehouse-content">Loading...</div>'; loadProducts(); break;
                     case 'milling': content.innerHTML = '<h3>Milling</h3><p>Coming soon.</p>'; break;
                     case 'packaging': content.innerHTML = '<h3>Packaging</h3><p>Coming soon.</p>'; break;
-                    case 'sales': content.innerHTML = '<h3>Sales & Distribution</h3><div id="sales-content">Choose a sub-module: <button onclick="loadCustomers()">Customers</button> <button onclick="loadOrders()">Orders</button> <button onclick="loadInvoices()">Invoices</button></div>'; break;
+                    case 'sales': content.innerHTML = '<h3>Sales & Distribution</h3><div id="sales-content">Choose a sub-module: <button onclick="loadCustomers()">Customers</button> <button onclick="loadOrders()">Orders</button> <button onclick="loadQuotations()">Quotations</button> <button onclick="loadInvoices()">Invoices</button> <button onclick="loadPayments()">Payments</button></div>'; break;
                     case 'finance': content.innerHTML = '<h3>Finance</h3><p>Coming soon.</p>'; break;
                     case 'reports': content.innerHTML = '<h3>Reports</h3><p>Coming soon.</p>'; break;
                     default: content.innerHTML = '<p>Module not found.</p>';
@@ -309,6 +392,15 @@ def erp_frontend():
                 document.getElementById('module-content').innerHTML = '<h3>Sales Orders</h3>' + html;
             }
 
+            async function loadQuotations() {
+                const resp = await fetch(API_BASE + '/api/quotations');
+                const data = await resp.json();
+                let html = '<table><tr><th>Quotation #</th><th>Status</th><th>Total</th></tr>';
+                data.forEach(q => { html += `<tr><td>${q.quotation_number}</td><td>${q.status}</td><td>${q.total_amount}</td></tr>`; });
+                html += '</table>';
+                document.getElementById('module-content').innerHTML = '<h3>Quotations</h3>' + html;
+            }
+
             async function loadInvoices() {
                 const resp = await fetch(API_BASE + '/api/invoices');
                 const data = await resp.json();
@@ -316,6 +408,15 @@ def erp_frontend():
                 data.forEach(inv => { html += `<tr><td>${inv.invoice_number}</td><td>${inv.amount}</td><td>${inv.status}</td></tr>`; });
                 html += '</table>';
                 document.getElementById('module-content').innerHTML = '<h3>Invoices</h3>' + html;
+            }
+
+            async function loadPayments() {
+                const resp = await fetch(API_BASE + '/api/payments');
+                const data = await resp.json();
+                let html = '<table><tr><th>Invoice ID</th><th>Amount</th><th>Method</th></tr>';
+                data.forEach(p => { html += `<tr><td>${p.invoice_id}</td><td>${p.amount}</td><td>${p.payment_method}</td></tr>`; });
+                html += '</table>';
+                document.getElementById('module-content').innerHTML = '<h3>Payments</h3>' + html;
             }
 
             async function loadProducts() {
@@ -351,3 +452,10 @@ def erp_frontend():
     </body>
     </html>
     """
+
+# ------------------------------------------------------------------
+# Health check (still available)
+# ------------------------------------------------------------------
+@app.get("/health")
+def health():
+    return {"message": "Esan ERP API is running"}
