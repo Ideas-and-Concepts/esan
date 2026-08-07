@@ -1,6 +1,12 @@
 """
 Esan ERP API – FastAPI Backend for Vercel
-Full ERP frontend at /, API endpoints under /api/, health check at /health
+==========================================
+- Full ERP interface at /
+- Sidebar navigation with working module switching
+- Login with admin / admin123
+- API endpoints under /api/
+- Health check at /health
+- Safe database startup (SQLite in /tmp)
 """
 
 import os
@@ -12,11 +18,10 @@ from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.orm import Session
 
-# Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("esan_api")
 
-# Make repo root importable
+# Make repository root importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ------------------------------------------------------------------
@@ -50,10 +55,7 @@ def startup():
         logger.warning("Database not available – skipping setup.")
         return
     try:
-        # Ensure tables exist
         Base.metadata.create_all(bind=engine)
-
-        # Create admin user if missing
         db = SessionLocal()
         try:
             admin = db.query(User).filter(User.username == "admin").first()
@@ -101,28 +103,25 @@ def login(credentials: HTTPBasicCredentials = Depends(security), db: Session = D
     }
 
 # ------------------------------------------------------------------
-# API data endpoints (identical to previous working version)
+# API data endpoints
 # ------------------------------------------------------------------
 @app.get("/api/customers")
 def list_customers(db: Session = Depends(get_db)):
     customers = db.query(Customer).all()
     return [
-        {
-            "id": c.id, "name": c.name, "email": c.email, "phone": c.phone,
-            "customer_type": c.customer_type, "location": c.location, "country": c.country
-        } for c in customers
+        {"id": c.id, "name": c.name, "email": c.email, "phone": c.phone,
+         "customer_type": c.customer_type, "location": c.location, "country": c.country}
+        for c in customers
     ]
 
 @app.get("/api/orders")
 def list_orders(db: Session = Depends(get_db)):
     orders = db.query(SalesOrder).all()
     return [
-        {
-            "id": o.id, "order_number": o.order_number,
-            "customer_id": o.customer_id, "status": o.status,
-            "total_amount": o.total_amount,
-            "created_at": o.created_at.isoformat() if o.created_at else None
-        } for o in orders
+        {"id": o.id, "order_number": o.order_number, "customer_id": o.customer_id,
+         "status": o.status, "total_amount": o.total_amount,
+         "created_at": o.created_at.isoformat() if o.created_at else None}
+        for o in orders
     ]
 
 @app.get("/api/invoices")
@@ -145,53 +144,43 @@ def list_invoices(db: Session = Depends(get_db)):
 def list_payments(db: Session = Depends(get_db)):
     payments = db.query(Payment).all()
     return [
-        {
-            "id": p.id, "invoice_id": p.invoice_id, "amount": p.amount,
-            "payment_method": p.payment_method, "reference": p.reference,
-            "status": p.status,
-            "created_at": p.created_at.isoformat() if p.created_at else None
-        } for p in payments
+        {"id": p.id, "invoice_id": p.invoice_id, "amount": p.amount,
+         "payment_method": p.payment_method, "reference": p.reference,
+         "status": p.status,
+         "created_at": p.created_at.isoformat() if p.created_at else None}
+        for p in payments
     ]
 
 @app.get("/api/products")
 def list_products(db: Session = Depends(get_db)):
     products = db.query(Product).all()
     return [
-        {
-            "id": p.id, "name": p.name, "category": p.category,
-            "unit": p.unit, "quantity": p.quantity,
-            "cost_price": p.cost_price, "selling_price": p.selling_price
-        } for p in products
+        {"id": p.id, "name": p.name, "category": p.category, "unit": p.unit,
+         "quantity": p.quantity, "cost_price": p.cost_price, "selling_price": p.selling_price}
+        for p in products
     ]
 
 @app.get("/api/suppliers")
 def list_suppliers(db: Session = Depends(get_db)):
     suppliers = db.query(Supplier).all()
-    return [
-        {"id": s.id, "name": s.name, "email": s.email, "phone": s.phone}
-        for s in suppliers
-    ]
+    return [{"id": s.id, "name": s.name, "email": s.email, "phone": s.phone} for s in suppliers]
 
 @app.get("/api/quotations")
 def list_quotations(db: Session = Depends(get_db)):
     quotations = db.query(Quotation).all()
     return [
-        {
-            "id": q.id, "quotation_number": q.quotation_number,
-            "customer_id": q.customer_id, "status": q.status,
-            "total_amount": q.total_amount
-        } for q in quotations
+        {"id": q.id, "quotation_number": q.quotation_number, "customer_id": q.customer_id,
+         "status": q.status, "total_amount": q.total_amount}
+        for q in quotations
     ]
 
 @app.get("/api/deliveries")
 def list_deliveries(db: Session = Depends(get_db)):
     deliveries = db.query(Delivery).all()
     return [
-        {
-            "id": d.id, "delivery_number": d.delivery_number,
-            "order_id": d.order_id, "destination": d.destination,
-            "driver": d.driver, "status": d.status
-        } for d in deliveries
+        {"id": d.id, "delivery_number": d.delivery_number, "order_id": d.order_id,
+         "destination": d.destination, "driver": d.driver, "status": d.status}
+        for d in deliveries
     ]
 
 @app.get("/api/dashboard/summary")
@@ -208,7 +197,7 @@ def dashboard_summary(db: Session = Depends(get_db)):
     }
 
 # ------------------------------------------------------------------
-# Full ERP frontend at / with sidebar always visible after login
+# Full ERP frontend (root) with working sidebar navigation
 # ------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def erp_frontend():
@@ -235,10 +224,11 @@ def erp_frontend():
             .sidebar h2 { text-align:center; color:#2d3748; margin-bottom:1rem; }
             .sidebar .nav-group { margin-bottom:1.5rem; }
             .sidebar .nav-group-title { font-weight:600; color:#555; margin-bottom:0.3rem; text-transform:uppercase; font-size:0.8rem; }
-            .sidebar button { display:block; width:100%; padding:10px 12px; margin-bottom:4px; text-align:left; background:white; border:1px solid #e0e0e0; border-radius:6px; cursor:pointer; color:#333; font-size:0.95rem; transition: background 0.2s; }
-            .sidebar button:hover { background:#e2e8f0; }
+            .sidebar .nav-btn { display:block; width:100%; padding:10px 12px; margin-bottom:4px; text-align:left; background:white; border:1px solid #e0e0e0; border-radius:6px; cursor:pointer; color:#333; font-size:0.95rem; transition: background 0.2s; }
+            .sidebar .nav-btn:hover { background:#e2e8f0; }
+            .sidebar .nav-btn.active { background:#c6f6d5; border-color:#38a169; font-weight:600; }
             .user-panel { margin-top:auto; padding-top:1rem; border-top:1px solid #ddd; }
-            .logout-btn { background:#e53e3e !important; color:white !important; margin-top:0.5rem; }
+            .logout-btn { background:#e53e3e !important; color:white !important; margin-top:0.5rem; width:100%; }
             .main { flex:1; padding:2rem; overflow-y:auto; }
             .main h1 { font-size:2rem; color:#2d3748; }
             .main .subtitle { color:#666; margin-bottom:2rem; }
@@ -250,7 +240,6 @@ def erp_frontend():
             th { background:#f5f5f5; padding:10px; text-align:left; border-bottom:2px solid #ddd; }
             td { padding:10px; border-bottom:1px solid #eee; }
             .footer { margin-top:2rem; color:#999; font-size:0.85rem; }
-            /* Remove the mobile hide rule so sidebar always shows */
         </style>
     </head>
     <body>
@@ -267,32 +256,32 @@ def erp_frontend():
             </div>
         </div>
 
-        <!-- Main App (sidebar visible after login) -->
+        <!-- Main App (sidebar + content) -->
         <div id="app" style="display:none">
             <div class="sidebar">
                 <h2>🌾 Esan ERP</h2>
                 <div class="nav-group">
                     <div class="nav-group-title">MAIN</div>
-                    <button onclick="navigate('overview')">🏠 Overview</button>
+                    <button class="nav-btn" data-module="overview">🏠 Overview</button>
                 </div>
                 <div class="nav-group">
                     <div class="nav-group-title">OPERATIONS</div>
-                    <button onclick="navigate('procurement')">🌾 Procurement</button>
-                    <button onclick="navigate('warehouse')">📦 Warehouse</button>
-                    <button onclick="navigate('milling')">🏭 Milling</button>
-                    <button onclick="navigate('packaging')">📦 Packaging</button>
+                    <button class="nav-btn" data-module="procurement">🌾 Procurement</button>
+                    <button class="nav-btn" data-module="warehouse">📦 Warehouse</button>
+                    <button class="nav-btn" data-module="milling">🏭 Milling</button>
+                    <button class="nav-btn" data-module="packaging">📦 Packaging</button>
                 </div>
                 <div class="nav-group">
                     <div class="nav-group-title">COMMERCIAL</div>
-                    <button onclick="navigate('sales')">🚚 Sales & Distribution</button>
+                    <button class="nav-btn" data-module="sales">🚚 Sales & Distribution</button>
                 </div>
                 <div class="nav-group">
                     <div class="nav-group-title">FINANCE</div>
-                    <button onclick="navigate('finance')">💰 Finance</button>
+                    <button class="nav-btn" data-module="finance">💰 Finance</button>
                 </div>
                 <div class="nav-group">
                     <div class="nav-group-title">REPORTING</div>
-                    <button onclick="navigate('reports')">📊 Reports</button>
+                    <button class="nav-btn" data-module="reports">📊 Reports</button>
                 </div>
                 <div class="user-panel" id="sidebar-user">
                     <strong id="sidebar-username"></strong>
@@ -310,7 +299,9 @@ def erp_frontend():
 
         <script>
             const API_BASE = window.location.origin;
+            let currentModule = 'overview';
 
+            // ---------- Authentication ----------
             async function login() {
                 const username = document.getElementById('username').value;
                 const password = document.getElementById('password').value;
@@ -344,7 +335,9 @@ def erp_frontend():
                 document.getElementById('password').value = '';
             }
 
+            // ---------- Navigation ----------
             async function navigate(module) {
+                currentModule = module;
                 const content = document.getElementById('module-content');
                 switch(module) {
                     case 'overview': content.innerHTML = await loadOverview(); break;
@@ -357,8 +350,26 @@ def erp_frontend():
                     case 'reports': content.innerHTML = '<h3>Reports</h3><p>Coming soon.</p>'; break;
                     default: content.innerHTML = '<p>Module not found.</p>';
                 }
+                updateActiveButton(module);
             }
 
+            function updateActiveButton(module) {
+                document.querySelectorAll('.sidebar .nav-btn').forEach(btn => btn.classList.remove('active'));
+                const activeBtn = document.querySelector(`.sidebar .nav-btn[data-module="${module}"]`);
+                if (activeBtn) activeBtn.classList.add('active');
+            }
+
+            // Attach click handlers to all sidebar buttons (alternative to inline onclick)
+            document.addEventListener('DOMContentLoaded', function() {
+                document.querySelectorAll('.sidebar .nav-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const module = this.getAttribute('data-module');
+                        if (module) navigate(module);
+                    });
+                });
+            });
+
+            // ---------- Data loaders ----------
             async function loadOverview() {
                 try {
                     const resp = await fetch(API_BASE + '/api/dashboard/summary');
@@ -436,7 +447,7 @@ def erp_frontend():
                 document.getElementById('procurement-content').innerHTML = html;
             }
 
-            // On page load, check for saved session
+            // Restore session on page load
             window.onload = () => {
                 const user = sessionStorage.getItem('user');
                 if (user) {
@@ -454,7 +465,7 @@ def erp_frontend():
     """
 
 # ------------------------------------------------------------------
-# Health check (still available)
+# Health check
 # ------------------------------------------------------------------
 @app.get("/health")
 def health():
