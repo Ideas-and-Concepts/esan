@@ -499,17 +499,62 @@ def order_workflow():
     with col2:
 
         if st.button(
-            "🚚 Create Delivery"
+        if st.button(
+    "🚚 Create Delivery"
+):
+
+    if create_delivery:
+
+        destination = st.text_input(
+            "Delivery Destination",
+            key=f"destination_{order.id}"
+        )
+
+        driver = st.text_input(
+            "Driver Name",
+            key=f"driver_{order.id}"
+        )
+
+        vehicle = st.text_input(
+            "Vehicle Number",
+            key=f"vehicle_{order.id}"
+        )
+
+
+        if st.button(
+            "Confirm Delivery",
+            key=f"confirm_delivery_{order.id}"
         ):
 
+            try:
 
-            if create_delivery:
+                delivery = create_delivery(
+                    order.id,
+                    destination,
+                    driver,
+                    vehicle
+                )
 
-                create_delivery(order.id)
 
                 st.success(
-                    "Delivery created"
+                    f"Delivery {delivery.delivery_number} created"
                 )
+
+
+                st.rerun()
+
+
+            except Exception as e:
+
+                st.error(
+                    f"Delivery error: {e}"
+                )
+
+    else:
+
+        st.warning(
+            "Delivery service not connected."
+)
 
             else:
 
