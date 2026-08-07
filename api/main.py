@@ -1,11 +1,13 @@
 """
 Esan ERP API – FastAPI Backend for Vercel
 ==========================================
-- Collapsible floating sidebar
-- Full module set (matches streamlit_app.py)
+- Floating collapsible sidebar (open/close)
+- All modules from streamlit_app.py
 - Login with admin / admin123
 - API endpoints under /api/
 - Health check at /health
+- Database auto‑creation (tables + admin)
+- Graceful fallbacks for missing modules
 """
 
 import os
@@ -16,10 +18,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.orm import Session
+from sqlalchemy import inspect
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("esan_api")
 
+# Make repository root importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ---------- Database / models / auth ----------
@@ -153,7 +157,7 @@ def dashboard_summary(db: Session = Depends(get_db)):
         "packaging_batches": db.query(PackagingBatch).count(),
     }
 
-# ---------- Frontend with collapsible sidebar ----------
+# ---------- Full ERP frontend with floating sidebar ----------
 @app.get("/", response_class=HTMLResponse)
 def erp_frontend():
     return """
@@ -213,7 +217,6 @@ def erp_frontend():
             th { background:#f5f5f5; padding:10px; text-align:left; border-bottom:2px solid #ddd; }
             td { padding:10px; border-bottom:1px solid #eee; }
             .footer { margin-top:2rem; color:#999; font-size:0.85rem; }
-            /* Admin menu (hidden by default) */
             #admin-menu { display: none; }
         </style>
     </head>
@@ -265,6 +268,7 @@ def erp_frontend():
                     <button class="nav-btn" data-module="logistics">🚚 Logistics</button>
                     <button class="nav-btn" data-module="hr">👥 HR & Employees</button>
                     <button class="nav-btn" data-module="maintenance">🔧 Maintenance</button>
+                    <button class="nav-btn" data-module="ai">🤖 AI Assistant</button>
                 </div>
                 <div class="nav-group">
                     <div class="nav-group-title">REPORTING</div>
@@ -313,7 +317,6 @@ def erp_frontend():
                         document.getElementById('app').style.display = 'flex';
                         document.getElementById('sidebar-username').innerText = user.full_name || user.username;
                         document.getElementById('sidebar-role').innerText = user.role;
-                        // Show admin menu if role is Administrator
                         if (user.role === 'Administrator') {
                             document.getElementById('admin-menu').style.display = 'block';
                         }
@@ -349,24 +352,38 @@ def erp_frontend():
                 }
             }
 
-            // ---------- Navigation ----------
+            // ---------- Navigation (mirrors streamlit_app.py) ----------
             async function navigate(module) {
                 currentModule = module;
                 const content = document.getElementById('module-content');
                 switch(module) {
                     case 'overview': content.innerHTML = await loadOverview(); break;
-                    case 'procurement': content.innerHTML = '<h3>Procurement</h3><div id="procurement-content">Loading...</div>'; loadSuppliers(); break;
-                    case 'warehouse': content.innerHTML = '<h3>Warehouse</h3><div id="warehouse-content">Loading...</div>'; loadProducts(); break;
-                    case 'milling': content.innerHTML = '<h3>Milling</h3><p>Coming soon.</p>'; break;
-                    case 'packaging': content.innerHTML = '<h3>Packaging</h3><p>Coming soon.</p>'; break;
-                    case 'sales': content.innerHTML = '<h3>Sales & Distribution</h3><div id="sales-content">Choose a sub-module: <button onclick="loadCustomers()">Customers</button> <button onclick="loadOrders()">Orders</button> <button onclick="loadQuotations()">Quotations</button> <button onclick="loadInvoices()">Invoices</button> <button onclick="loadPayments()">Payments</button></div>'; break;
-                    case 'finance': content.innerHTML = '<h3>Finance</h3><p>Coming soon.</p>'; break;
-                    case 'logistics': content.innerHTML = '<h3>Logistics</h3><p>Coming soon.</p>'; break;
-                    case 'hr': content.innerHTML = '<h3>HR & Employees</h3><p>Coming soon.</p>'; break;
-                    case 'maintenance': content.innerHTML = '<h3>Maintenance</h3><p>Coming soon.</p>'; break;
-                    case 'reports': content.innerHTML = '<h3>Reports</h3><p>Coming soon.</p>'; break;
-                    case 'user_management': content.innerHTML = '<h3>User Management</h3><p>Only accessible by admin.</p>'; break;
-                    case 'change_password': content.innerHTML = '<h3>Change Password</h3><p>Form will be available soon.</p>'; break;
+                    case 'procurement': content.innerHTML = '<h3>🌾 Procurement</h3><div id="procurement-content">Loading...</div>'; loadSuppliers(); break;
+                    case 'warehouse': content.innerHTML = '<h3>📦 Warehouse</h3><div id="warehouse-content">Loading...</div>'; loadProducts(); break;
+                    case 'milling': content.innerHTML = '<h3>🏭 Milling</h3><p>Coming soon.</p>'; break;
+                    case 'packaging': content.innerHTML = '<h3>📦 Packaging</h3><p>Coming soon.</p>'; break;
+                    case 'sales':
+                        content.innerHTML = `
+                            <h3>🚚 Sales & Distribution</h3>
+                            <div>
+                                <button onclick="loadCustomers()">👥 Customers</button>
+                                <button onclick="loadQuotations()">📄 Quotations</button>
+                                <button onclick="loadOrders()">📋 Sales Orders</button>
+                                <button onclick="loadDeliveries()">🚛 Deliveries</button>
+                                <button onclick="loadInvoices()">🧾 Invoices</button>
+                                <button onclick="loadPayments()">💰 Payments</button>
+                            </div>
+                            <div id="sales-sub-content"></div>
+                        `;
+                        break;
+                    case 'finance': content.innerHTML = '<h3>💰 Finance</h3><p>Coming soon.</p>'; break;
+                    case 'logistics': content.innerHTML = '<h3>🚚 Logistics</h3><p>Coming soon.</p>'; break;
+                    case 'hr': content.innerHTML = '<h3>👥 HR & Employees</h3><p>Coming soon.</p>'; break;
+                    case 'maintenance': content.innerHTML = '<h3>🔧 Maintenance</h3><p>Coming soon.</p>'; break;
+                    case 'ai': content.innerHTML = '<h3>🤖 AI Assistant</h3><p>Coming soon.</p>'; break;
+                    case 'reports': content.innerHTML = '<h3>📊 Reports</h3><p>Coming soon.</p>'; break;
+                    case 'user_management': content.innerHTML = '<h3>🔐 User Management</h3><p>Admin only.</p>'; break;
+                    case 'change_password': content.innerHTML = '<h3>🔑 Change Password</h3><p>Coming soon.</p>'; break;
                     default: content.innerHTML = '<p>Module not found.</p>';
                 }
                 updateActiveButton(module);
@@ -413,7 +430,7 @@ def erp_frontend():
                 let html = '<table><tr><th>Name</th><th>Type</th><th>Phone</th></tr>';
                 data.forEach(c => { html += `<tr><td>${c.name}</td><td>${c.customer_type || ''}</td><td>${c.phone || ''}</td></tr>`; });
                 html += '</table>';
-                document.getElementById('module-content').innerHTML = '<h3>Customers</h3>' + html;
+                document.getElementById('module-content').innerHTML = '<h3>👥 Customers</h3>' + html;
             }
 
             async function loadOrders() {
@@ -422,7 +439,7 @@ def erp_frontend():
                 let html = '<table><tr><th>Order #</th><th>Status</th><th>Total</th></tr>';
                 data.forEach(o => { html += `<tr><td>${o.order_number}</td><td>${o.status}</td><td>${o.total_amount}</td></tr>`; });
                 html += '</table>';
-                document.getElementById('module-content').innerHTML = '<h3>Sales Orders</h3>' + html;
+                document.getElementById('module-content').innerHTML = '<h3>📋 Sales Orders</h3>' + html;
             }
 
             async function loadQuotations() {
@@ -431,7 +448,7 @@ def erp_frontend():
                 let html = '<table><tr><th>Quotation #</th><th>Status</th><th>Total</th></tr>';
                 data.forEach(q => { html += `<tr><td>${q.quotation_number}</td><td>${q.status}</td><td>${q.total_amount}</td></tr>`; });
                 html += '</table>';
-                document.getElementById('module-content').innerHTML = '<h3>Quotations</h3>' + html;
+                document.getElementById('module-content').innerHTML = '<h3>📄 Quotations</h3>' + html;
             }
 
             async function loadInvoices() {
@@ -440,7 +457,7 @@ def erp_frontend():
                 let html = '<table><tr><th>Invoice #</th><th>Amount</th><th>Status</th></tr>';
                 data.forEach(inv => { html += `<tr><td>${inv.invoice_number}</td><td>${inv.amount}</td><td>${inv.status}</td></tr>`; });
                 html += '</table>';
-                document.getElementById('module-content').innerHTML = '<h3>Invoices</h3>' + html;
+                document.getElementById('module-content').innerHTML = '<h3>🧾 Invoices</h3>' + html;
             }
 
             async function loadPayments() {
@@ -449,7 +466,16 @@ def erp_frontend():
                 let html = '<table><tr><th>Invoice ID</th><th>Amount</th><th>Method</th></tr>';
                 data.forEach(p => { html += `<tr><td>${p.invoice_id}</td><td>${p.amount}</td><td>${p.payment_method}</td></tr>`; });
                 html += '</table>';
-                document.getElementById('module-content').innerHTML = '<h3>Payments</h3>' + html;
+                document.getElementById('module-content').innerHTML = '<h3>💰 Payments</h3>' + html;
+            }
+
+            async function loadDeliveries() {
+                const resp = await fetch(API_BASE + '/api/deliveries');
+                const data = await resp.json();
+                let html = '<table><tr><th>Delivery #</th><th>Order ID</th><th>Status</th></tr>';
+                data.forEach(d => { html += `<tr><td>${d.delivery_number}</td><td>${d.order_id}</td><td>${d.status}</td></tr>`; });
+                html += '</table>';
+                document.getElementById('module-content').innerHTML = '<h3>🚛 Deliveries</h3>' + html;
             }
 
             async function loadProducts() {
