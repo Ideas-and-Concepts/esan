@@ -1,12 +1,11 @@
 """
 Esan ERP API – FastAPI Backend for Vercel
 ==========================================
+- Floating sidebar (fixed) for navigation
 - Full ERP interface at /
-- Sidebar navigation with working module switching
 - Login with admin / admin123
 - API endpoints under /api/
 - Health check at /health
-- Safe database startup (SQLite in /tmp)
 """
 
 import os
@@ -197,7 +196,7 @@ def dashboard_summary(db: Session = Depends(get_db)):
     }
 
 # ------------------------------------------------------------------
-# Full ERP frontend (root) with working sidebar navigation
+# Full ERP frontend with floating sidebar
 # ------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def erp_frontend():
@@ -219,8 +218,12 @@ def erp_frontend():
             .login-card button { width:100%; padding:10px; background:#2e7d32; color:white; border:none; border-radius:5px; font-weight:600; cursor:pointer; }
             .login-card button:hover { background:#1b5e20; }
             .error { color:#d32f2f; font-size:0.9rem; margin-top:10px; }
-            #app { display: flex; height: 100vh; }
-            .sidebar { width:280px; background:#f8f9fa; padding:1rem; display:flex; flex-direction:column; border-right:1px solid #ddd; overflow-y:auto; }
+            /* ----- floating sidebar layout ----- */
+            .app-container { display: flex; height: 100vh; }
+            .sidebar { width: 280px; background: #f8f9fa; border-right: 1px solid #ddd;
+                       position: fixed; top: 0; left: 0; height: 100vh; overflow-y: auto;
+                       padding: 1rem; display: flex; flex-direction: column; z-index: 10; }
+            .main-content { margin-left: 280px; flex: 1; padding: 2rem; overflow-y: auto; }
             .sidebar h2 { text-align:center; color:#2d3748; margin-bottom:1rem; }
             .sidebar .nav-group { margin-bottom:1.5rem; }
             .sidebar .nav-group-title { font-weight:600; color:#555; margin-bottom:0.3rem; text-transform:uppercase; font-size:0.8rem; }
@@ -228,8 +231,8 @@ def erp_frontend():
             .sidebar .nav-btn:hover { background:#e2e8f0; }
             .sidebar .nav-btn.active { background:#c6f6d5; border-color:#38a169; font-weight:600; }
             .user-panel { margin-top:auto; padding-top:1rem; border-top:1px solid #ddd; }
-            .logout-btn { background:#e53e3e !important; color:white !important; margin-top:0.5rem; width:100%; }
-            .main { flex:1; padding:2rem; overflow-y:auto; }
+            .logout-btn { background:#e53e3e !important; color:white !important; margin-top:0.5rem; width:100%; border:none; padding:10px; border-radius:6px; cursor:pointer; }
+            /* Main area */
             .main h1 { font-size:2rem; color:#2d3748; }
             .main .subtitle { color:#666; margin-bottom:2rem; }
             .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap:1rem; margin-bottom:2rem; }
@@ -240,6 +243,10 @@ def erp_frontend():
             th { background:#f5f5f5; padding:10px; text-align:left; border-bottom:2px solid #ddd; }
             td { padding:10px; border-bottom:1px solid #eee; }
             .footer { margin-top:2rem; color:#999; font-size:0.85rem; }
+            @media (max-width:768px) {
+                .sidebar { width: 220px; }
+                .main-content { margin-left: 220px; }
+            }
         </style>
     </head>
     <body>
@@ -289,7 +296,7 @@ def erp_frontend():
                     <button class="logout-btn" onclick="logout()">🚪 Logout</button>
                 </div>
             </div>
-            <div class="main">
+            <div class="main-content">
                 <h1>🌾 Esan ERP</h1>
                 <p class="subtitle">Nile Harvest Foods Ltd. | Version 1.4.0 Alpha</p>
                 <div id="module-content"></div>
@@ -359,7 +366,7 @@ def erp_frontend():
                 if (activeBtn) activeBtn.classList.add('active');
             }
 
-            // Attach click handlers to all sidebar buttons (alternative to inline onclick)
+            // Attach click handlers to all sidebar buttons
             document.addEventListener('DOMContentLoaded', function() {
                 document.querySelectorAll('.sidebar .nav-btn').forEach(btn => {
                     btn.addEventListener('click', function() {
