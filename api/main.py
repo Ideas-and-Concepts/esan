@@ -1,31 +1,28 @@
 """
-Esan ERP API – FastAPI Backend for Vercel
-==========================================
-Works both locally and on Vercel serverless.
-Ensure the root requirements.txt contains: fastapi, uvicorn, sqlalchemy, psycopg2-binary
+Esan ERP – Vercel Unified Endpoint
+Serves a static HTML page that looks like the Streamlit UI,
+with the API available under /api/
 """
 
 import os
 import sys
-from typing import List, Optional
-
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
+from typing import List
 
-# Make sure the repo root is in sys.path so we can import models, etc.
-# This is safe both locally and on Vercel.
+# Ensure the repo root is importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import SessionLocal, engine, Base   # root database.py (not api/database.py)
+from database import SessionLocal, engine, Base
 from models import Customer, Invoice, Payment, SalesOrder, Product
 
 # ------------------------------------------------------------------
-# App init
+# App setup
 # ------------------------------------------------------------------
 app = FastAPI(title="Esan ERP API", version="1.0")
 
-# Allow requests from your Streamlit frontend (update in production)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -33,17 +30,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ------------------------------------------------------------------
-# Database setup (only create tables if they don't exist)
-# ------------------------------------------------------------------
-# We do NOT use Base.metadata.create_all here because it runs on every
-# cold start. Instead, we create tables lazily or use a startup event.
-# For Vercel, it's better to keep the database pre‑created.
-# If you really need auto‑creation, uncomment the next two lines:
-# @app.on_event("startup")
-# def on_startup():
-#     Base.metadata.create_all(bind=engine)
 
 # ------------------------------------------------------------------
 # Dependency
@@ -56,125 +42,110 @@ def get_db():
         db.close()
 
 # ------------------------------------------------------------------
-# Error handler helper
+# Error handler
 # ------------------------------------------------------------------
 def handle_db_error(func):
-    """Decorator to catch database errors and return a 500 response."""
     from functools import wraps
     @wraps(func)
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
     return wrapper
 
 # ------------------------------------------------------------------
-# Customers
+# API Endpoints (kept separate under /api/)
 # ------------------------------------------------------------------
-@app.get("/customers")
+@app.get("/api/customers")
 @handle_db_error
 def list_customers(db: Session = Depends(get_db)):
     customers = db.query(Customer).all()
-    return [
-        {
-            "id": c.id,
-            "name": c.name,
-            "email": c.email,
-            "phone": c.phone,
-            "customer_type": c.customer_type,
-            "location": c.location,
-            "country": c.country
-        }
-        for c in customers
-    ]
+    return [{"id": c.id, "name": c.name, "email": c.email} for c in customers]
 
-# ------------------------------------------------------------------
-# Invoices
-# ------------------------------------------------------------------
-@app.get("/invoices")
+@app.get("/api/invoices")
 @handle_db_error
 def list_invoices(db: Session = Depends(get_db)):
     invoices = db.query(Invoice).all()
-    result = []
-    for inv in invoices:
-        payments = db.query(Payment).filter(Payment.invoice_id == inv.id).all()
-        total_paid = sum(p.amount for p in payments)
-        balance = inv.amount - total_paid
-        result.append({
-            "id": inv.id,
-            "invoice_number": inv.invoice_number,
-            "customer_id": inv.customer_id,
-            "amount": inv.amount,
-            "paid": total_paid,
-            "balance": balance,
-            "status": inv.status,
-            "created_at": inv.created_at.isoformat() if inv.created_at else None
-        })
-    return result
+    return [{"id": i.id, "invoice_number": i.invoice_number, "amount": i.amount} for i in invoices]
 
-# ------------------------------------------------------------------
-# Payments
-# ------------------------------------------------------------------
-@app.get("/payments")
-@handle_db_error
-def list_payments(db: Session = Depends(get_db)):
-    payments = db.query(Payment).all()
-    return [
-        {
-            "id": p.id,
-            "invoice_id": p.invoice_id,
-            "amount": p.amount,
-            "payment_method": p.payment_method,
-            "reference": p.reference,
-            "status": p.status,
-            "created_at": p.created_at.isoformat() if p.created_at else None
-        }
-        for p in payments
-    ]
-
-# ------------------------------------------------------------------
-# Sales Orders
-# ------------------------------------------------------------------
-@app.get("/orders")
+@app.get("/api/orders")
 @handle_db_error
 def list_orders(db: Session = Depends(get_db)):
     orders = db.query(SalesOrder).all()
-    return [
-        {
-            "id": o.id,
-            "order_number": o.order_number,
-            "customer_id": o.customer_id,
-            "status": o.status,
-            "total_amount": o.total_amount,
-            "created_at": o.created_at.isoformat() if o.created_at else None
-        }
-        for o in orders
-    ]
+    return [{"id": o.id, "order_number": o.order_number, "status": o.status} for o in orders]
 
-# ------------------------------------------------------------------
-# Products (Inventory)
-# ------------------------------------------------------------------
-@app.get("/products")
+@app.get("/api/products")
 @handle_db_error
 def list_products(db: Session = Depends(get_db)):
     products = db.query(Product).all()
-    return [
-        {
-            "id": p.id,
-            "name": p.name,
-            "category": p.category,
-            "unit": p.unit,
-            "quantity": p.quantity,
-            "cost_price": p.cost_price,
-            "selling_price": p.selling_price
-        }
-        for p in products
-    ]
+    return [{"id": p.id, "name": p.name, "quantity": p.quantity} for p in products]
 
 # ------------------------------------------------------------------
-# Root (health check)
+# Static HTML that mimics the Streamlit UI
 # ------------------------------------------------------------------
-@app.get("/")
+STREAMLIT_APP_URL = "https://YOUR-STREAMLIT-APP.streamlit.app"  # <-- change this
+
+@app.get("/", response_class=HTMLResponse)
 def root():
-    return {"message": "Esan ERP API is running", "version": "1.0"}
+    return f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Esan ERP</title>
+        <style>
+            * {{ margin:0; padding:0; box-sizing:border-box; }}
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }}
+            .app {{ display: flex; height: 100vh; }}
+            .sidebar {{ width: 280px; background: #f8f9fa; padding: 1.5rem; display: flex; flex-direction: column; }}
+            .sidebar h2 {{ margin-bottom: 1rem; color: #2d3748; }}
+            .user-panel {{ margin-bottom: 2rem; }}
+            .user-panel .success {{ color: #2f855a; }}
+            .user-panel .info {{ color: #2b6cb0; }}
+            .logout {{ margin: 1rem 0; }}
+            .logout button {{ padding: 8px 16px; background: #e53e3e; color: white; border: none; border-radius: 6px; cursor: pointer; }}
+            .nav {{ flex: 1; }}
+            .nav select {{ width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e0; }}
+            .main {{ flex: 1; padding: 2rem; }}
+            .main h1 {{ font-size: 2rem; color: #2d3748; }}
+            .footer {{ margin-top: 2rem; color: #a0aec0; font-size: 0.9rem; }}
+            @media (max-width: 768px) {{ .sidebar {{ display: none; }} }}
+        </style>
+    </head>
+    <body>
+        <div class="app">
+            <div class="sidebar">
+                <h2>🌾 Esan ERP</h2>
+                <div class="user-panel">
+                    <p class="success">✅ User: admin</p>
+                    <p class="info">ℹ️ Role: Administrator</p>
+                </div>
+                <div class="logout">
+                    <button onclick="window.location.href='{STREAMLIT_APP_URL}'">🚀 Launch Full App</button>
+                </div>
+                <div class="nav">
+                    <label>📋 Navigation</label>
+                    <select onchange="if(this.value) alert('Open the full app at {STREAMLIT_APP_URL}')">
+                        <option>Overview</option>
+                        <option>🌾 Procurement</option>
+                        <option>📦 Warehouse</option>
+                        <option>🏭 Milling</option>
+                        <option>📦 Packaging</option>
+                        <option>🚚 Sales & Distribution</option>
+                        <option>💰 Finance</option>
+                        <option>📊 Reports</option>
+                    </select>
+                </div>
+            </div>
+            <div class="main">
+                <h1>🌾 Esan ERP</h1>
+                <p>Nile Harvest Foods Ltd. | Version 1.3.0 Alpha</p>
+                <p>This is a static preview. <a href="{STREAMLIT_APP_URL}">Open the full interactive ERP →</a></p>
+                <div class="footer">© Nile Harvest Foods Ltd. | Esan ERP Enterprise Platform</div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
