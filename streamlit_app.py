@@ -18,6 +18,10 @@ from
 modules.finance.dashboard
 import finance_dashboard
 from 
+modules.sales.dashboard
+import sales_dashboard
+from modules.reports.dashboard
+import reports_dashboard
 
 
 from config import COMPANY_NAME, VERSION
