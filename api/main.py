@@ -1,7 +1,6 @@
 """
-Esan ERP – Vercel Unified Endpoint
-Serves a static HTML page that looks like the Streamlit UI,
-with the API available under /api/
+Esan ERP API – FastAPI Backend for Vercel
+Starts reliably, creates tables/admin, serves login + UI.
 """
 
 import os
@@ -11,14 +10,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.orm import Session
-from typing import List
 
-# Ensure the repo root is importable
+# Make the repo root importable (so we can import models, database, auth)
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import SessionLocal, engine, Base
 from models import Customer, Invoice, Payment, SalesOrder, Product, User
-from auth import verify_password, hash_password   # <-- added hash_password
+from auth import verify_password, hash_password   # ensure auth.py has these
 
 # ------------------------------------------------------------------
 # App setup
@@ -34,11 +32,14 @@ app.add_middleware(
 )
 
 # ------------------------------------------------------------------
-# Startup: create tables + default admin
+# Startup: create tables and default admin (runs once per cold start)
 # ------------------------------------------------------------------
 @app.on_event("startup")
 def on_startup():
+    # Create tables if they don't exist
     Base.metadata.create_all(bind=engine)
+
+    # Insert admin if missing
     db = SessionLocal()
     try:
         admin = db.query(User).filter(User.username == "admin").first()
@@ -66,7 +67,7 @@ def get_db():
         db.close()
 
 # ------------------------------------------------------------------
-# Error handler
+# Error handler (prevents 500 from leaking traceback)
 # ------------------------------------------------------------------
 def handle_db_error(func):
     from functools import wraps
@@ -79,7 +80,7 @@ def handle_db_error(func):
     return wrapper
 
 # ------------------------------------------------------------------
-# Authentication endpoint
+# Authentication
 # ------------------------------------------------------------------
 security = HTTPBasic()
 
@@ -95,7 +96,7 @@ def login(credentials: HTTPBasicCredentials = Depends(security), db: Session = D
     }
 
 # ------------------------------------------------------------------
-# API Endpoints (kept separate under /api/)
+# API endpoints (simplified – you can add more)
 # ------------------------------------------------------------------
 @app.get("/api/customers")
 @handle_db_error
@@ -122,7 +123,7 @@ def list_products(db: Session = Depends(get_db)):
     return [{"id": p.id, "name": p.name, "quantity": p.quantity} for p in products]
 
 # ------------------------------------------------------------------
-# Root – full ERP frontend with login
+# Frontend – full HTML with login and sidebar (Streamlit‑like UI)
 # ------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def root():
@@ -151,7 +152,6 @@ def root():
             .user-panel .success { color:#2f855a; }
             .user-panel .info { color:#2b6cb0; }
             .logout-btn { padding:8px 16px; background:#e53e3e; color:white; border:none; border-radius:6px; cursor:pointer; margin-bottom:1.5rem; }
-            .nav { flex:1; }
             .nav select { width:100%; padding:8px; border-radius:6px; border:1px solid #cbd5e0; }
             .main { flex:1; padding:2rem; }
             .main h1 { font-size:2rem; color:#2d3748; }
@@ -184,7 +184,7 @@ def root():
                 <button class="logout-btn" onclick="logout()">🚪 Logout</button>
                 <div class="nav">
                     <label>📋 Navigation</label>
-                    <select onchange="if(this.value) alert('Module navigation is coming soon.')">
+                    <select onchange="if(this.value) alert('Module navigation coming soon.')">
                         <option>Overview</option>
                         <option>🌾 Procurement</option>
                         <option>📦 Warehouse</option>
@@ -199,7 +199,7 @@ def root():
             <div class="main">
                 <h1>🌾 Esan ERP</h1>
                 <p>Nile Harvest Foods Ltd. | Version 1.3.0 Alpha</p>
-                <p>Welcome to the Esan ERP web interface. Use the sidebar to navigate.</p>
+                <p>Welcome to Esan ERP. Use the sidebar to explore modules.</p>
                 <div class="footer">© Nile Harvest Foods Ltd. | Esan ERP Enterprise Platform</div>
             </div>
         </div>
