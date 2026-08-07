@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Esan ERP – Nile Harvest Foods Ltd.</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            padding: 3rem 2rem;
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 { font-size: 2.5rem; color: #2d3748; margin-bottom: 0.5rem; }
+        h1 span { color: #48bb78; }
+        h2 { font-weight: 400; color: #4a5568; margin-bottom: 0.5rem; }
+        p { color: #718096; margin-bottom: 2rem; }
+        .btn {
+            display: inline-block;
+            padding: 12px 32px;
+            margin: 8px;
+            background: #48bb78;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: #38a169; }
+        .btn.secondary { background: #edf2f7; color: #2d3748; }
+        .btn.secondary:hover { background: #e2e8f0; }
+        .status { margin-top: 2rem; padding: 1rem; background: #f0fff4; border-radius: 8px; color: #2f855a; }
+        .footer { margin-top: 2rem; font-size: 0.9rem; color: #a0aec0; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🌾 <span>Esan ERP</span></h1>
+        <h2>Nile Harvest Foods Ltd.</h2>
+        <p>Enterprise Milling & Packaging Management System</p>
+
+        <a href="https://YOUR-STREAMLIT-APP.streamlit.app" class="btn" target="_blank">
+            🚀 Launch Full ERP
+        </a>
+        <a href="/api/" class="btn secondary" target="_blank">
+            📡 API Status
+        </a>
+
+        <div class="status">
+            ✅ API is operational · Login with <strong>admin / admin123</strong>
+        </div>
+
+        <div class="footer">
+            © Nile Harvest Foods Ltd. | Version 1.3.0 Alpha
+        </div>
+    </div>
+</body>
+</html>
