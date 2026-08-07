@@ -2,11 +2,14 @@
 Esan ERP Controller
 Nile Harvest Foods Ltd.
 Enterprise Milling & Packaging Management System
-Version 1.2.0 Alpha
+
+Version 1.3.0 Alpha
 """
 
 import streamlit as st
 import os
+import logging
+from datetime import datetime
 from sqlalchemy import inspect
 
 from config import COMPANY_NAME, VERSION
@@ -14,301 +17,300 @@ from database import Base, engine, SessionLocal, DATABASE_URL
 from models import User
 from auth import verify_password
 
-# ------------------------------------------------------------------------------
-# SAFE IMPORTS
-# ------------------------------------------------------------------------------
-def safe_import(module_path, func_name):
+
+# ==================================================
+# LOGGING
+# ==================================================
+
+logging.basicConfig(
+    filename="esan_erp.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+
+# ==================================================
+# PAGE CONFIGURATION
+# ==================================================
+
+st.set_page_config(
+    page_title="Esan ERP",
+    page_icon="🌾",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+
+# ==================================================
+# CLEAN UI
+# ==================================================
+
+st.markdown(
+    """
+    <style>
+
+    #MainMenu {
+        display:none;
+    }
+
+    footer {
+        display:none;
+    }
+
+    header {
+        display:none;
+    }
+
+    .block-container {
+        padding-top:2rem;
+        padding-bottom:1rem;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# ==================================================
+# SAFE MODULE IMPORT SYSTEM
+# ==================================================
+
+module_errors = []
+
+
+def safe_import(module_path, function_name):
+
     try:
-        mod = __import__(module_path, fromlist=[func_name])
-        return getattr(mod, func_name) if hasattr(mod, func_name) else None
-    except Exception:
+
+        module = __import__(
+            module_path,
+            fromlist=[function_name]
+        )
+
+        if hasattr(module, function_name):
+
+            return getattr(
+                module,
+                function_name
+            )
+
+        module_errors.append(
+            f"{module_path}: Missing {function_name}"
+        )
+
         return None
 
-# --- services (critical ones) ---
+
+    except Exception as e:
+
+        module_errors.append(
+            f"{module_path}: {str(e)}"
+        )
+
+        logging.error(
+            f"{module_path} failed: {e}"
+        )
+
+        return None
+
+
+
+# ==================================================
+# ADMIN CREATION
+# ==================================================
+
 try:
+
     from services.user_service import create_admin
+
+
 except ImportError:
+
+
     def create_admin(db):
-        admin = db.query(User).filter(User.username == "admin").first()
-        if not admin:
-            from auth import hash_password
-            admin = User(
-                username="admin", password_hash=hash_password("admin123"),
-                role="Administrator", full_name="System Administrator",
-                email="admin@nileharvest.com"
+
+        admin = (
+            db.query(User)
+            .filter(
+                User.username=="admin"
             )
+            .first()
+        )
+
+
+        if not admin:
+
+            from auth import hash_password
+
+
+            admin = User(
+
+                username="admin",
+
+                password_hash=
+                hash_password(
+                    "admin123"
+                ),
+
+                role="Administrator",
+
+                full_name=
+                "System Administrator",
+
+                email=
+                "admin@nileharvest.com"
+
+            )
+
+
             db.add(admin)
+
             db.commit()
 
-# --- components ---
-try:
-    from components.navigation import esan_navigation
-except ImportError:
-    def esan_navigation():
-        menu = [
-            "🏠 Overview", "🌾 Procurement", "📦 Warehouse", "🏭 Milling",
-            "📦 Packaging", "🚚 Sales", "💰 Finance", "📊 Reports"
-        ]
-        if st.session_state.get("role", "user") == "Administrator":
-            menu.append("🔐 Administration")
-        return st.sidebar.selectbox("Navigation", menu)
+
+
+# ==================================================
+# SEED DATA
+# ==================================================
 
 try:
-    from components.themes import esan_theme
-except ImportError:
-    def esan_theme(t): pass
 
-# --- seed ---
-try:
     from seed.seed_data import load_seed_data
+
+
 except ImportError:
+
     load_seed_data = None
 
-# ------------------------------------------------------------------------------
-# MODULE PAGES (with fallbacks)
-# ------------------------------------------------------------------------------
-dashboard_home = safe_import("modules.dashboard.home", "dashboard_home")
-procurement_dashboard = safe_import("modules.procurement.dashboard", "procurement_dashboard")
-warehouse_dashboard = safe_import("modules.warehouse.dashboard", "warehouse_dashboard")
-milling_dashboard = safe_import("modules.milling.dashboard", "milling_dashboard")
-packaging_dashboard = safe_import("modules.packaging.dashboard", "packaging_dashboard")
-sales_dashboard = safe_import("modules.sales.dashboard", "sales_dashboard")
-customers_page = safe_import("modules.sales.customers", "customers_page")
-quotations_page = safe_import("modules.sales.quotations", "quotations_page")
-sales_orders_page = safe_import("modules.sales.orders", "sales_orders_page")
-delivery_page = safe_import("modules.sales.delivery", "delivery_page")
-dispatch_page = safe_import("modules.sales.dispatch", "dispatch_page")
-finance_dashboard = safe_import("modules.finance.dashboard", "finance_dashboard")
-invoices_page = safe_import("modules.finance.invoices", "invoices_page")
-payments_page = safe_import("modules.finance.payments", "payments_page")
-accounting_page = safe_import("modules.finance.accounting", "accounting_page")
-costing_page = safe_import("modules.finance.costing", "costing_page")
-profitability_page = safe_import("modules.finance.profitability", "profitability_page")
-reports_dashboard = safe_import("modules.reports.dashboard", "reports_dashboard")
-# administration
-user_management_page = safe_import("modules.administration.user_management", "user_management_page")
-change_password_page = safe_import("modules.administration.change_password", "change_password_page")
 
-# ------------------------------------------------------------------------------
-# PAGE CONFIG & CLEAN UI
-# ------------------------------------------------------------------------------
-st.set_page_config(page_title="Esan ERP", page_icon="🌾", layout="wide")
-st.markdown("""
-<style>
-#MainMenu {display:none;} footer {display:none;} header {display:none;}
-[data-testid="stSidebar"] { background-color: #f8f9fa; }
-.block-container { padding-top: 2rem; padding-bottom: 1rem; }
-</style>
-""", unsafe_allow_html=True)
 
-# ------------------------------------------------------------------------------
-# DATABASE INIT (auto-repair)
-# ------------------------------------------------------------------------------
-def rebuild_database():
-    try:
-        if "sqlite:///" in DATABASE_URL:
-            db_path = DATABASE_URL.replace("sqlite:///", "")
-            if os.path.exists(db_path):
-                os.remove(db_path)
-    except Exception:
-        pass
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
+# ==================================================
+# MODULE REGISTRY
+# ==================================================
 
-try:
-    needs_rebuild = False
-    inspector = inspect(engine)
-    existing_tables = inspector.get_table_names()
-    if existing_tables:
-        for table_name, table in Base.metadata.tables.items():
-            if table_name in existing_tables:
-                existing_cols = {col['name'] for col in inspector.get_columns(table_name)}
-                model_cols = {c.name for c in table.columns}
-                if model_cols - existing_cols:
-                    needs_rebuild = True
-                    break
-    if needs_rebuild:
-        st.warning("🔄 Database schema updated. Rebuilding...")
-        rebuild_database()
-    else:
-        Base.metadata.create_all(bind=engine)
+dashboard_home = safe_import(
+    "modules.dashboard.home",
+    "dashboard_home"
+)
 
-    db = SessionLocal()
-    try:
-        create_admin(db)
-    finally:
-        db.close()
 
-    if load_seed_data:
-        load_seed_data()
-except Exception as e:
-    st.error("Database initialization failed")
-    st.exception(e)
+procurement_dashboard = safe_import(
+    "modules.procurement.dashboard",
+    "procurement_dashboard"
+)
 
-# ------------------------------------------------------------------------------
-# SESSION STATE
-# ------------------------------------------------------------------------------
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.username = None
-    st.session_state.role = None
 
-def login(username, password):
-    db = SessionLocal()
-    try:
-        user = db.query(User).filter(User.username == username).first()
-        if user and verify_password(password, user.password_hash):
-            st.session_state.logged_in = True
-            st.session_state.username = user.username
-            st.session_state.role = user.role
-            return True
-        return False
-    finally:
-        db.close()
+warehouse_dashboard = safe_import(
+    "modules.warehouse.dashboard",
+    "warehouse_dashboard"
+)
 
-# ------------------------------------------------------------------------------
-# LOGIN
-# ------------------------------------------------------------------------------
-if not st.session_state.logged_in:
-    st.markdown("""
-    <div style="text-align:center; margin-top: 10vh;">
-        <h1>🌾 Esan ERP</h1>
-        <h3>Nile Harvest Foods Ltd.</h3>
-        <p>Enterprise Milling & Packaging Management System</p>
-    </div>
-    """, unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        if st.button("Login", use_container_width=True):
-            if login(username, password):
-                st.success("Login successful")
-                st.rerun()
-            else:
-                st.error("Invalid username or password")
-        st.info("Default administrator: admin / admin123")
-    st.stop()
 
-# ------------------------------------------------------------------------------
-# MAIN APP (after login)
-# ------------------------------------------------------------------------------
-st.title("🌾 Esan ERP")
-st.caption(f"{COMPANY_NAME} | Version {VERSION}")
+milling_dashboard = safe_import(
+    "modules.milling.dashboard",
+    "milling_dashboard"
+)
 
-# --- Sidebar ---
-with st.sidebar:
-    st.markdown("## 👤 User Panel")
-    st.success(f"User: **{st.session_state.username}**")
-    st.info(f"Role: **{st.session_state.role}**")
-    theme = st.selectbox("🎨 Appearance", ["Light", "Dark"])
-    esan_theme(theme)
-    if st.button("🚪 Logout"):
-        st.session_state.logged_in = False
-        st.session_state.username = None
-        st.session_state.role = None
-        st.rerun()
-    st.divider()
-    st.markdown("## 📋 Navigation")
-    menu = esan_navigation()
 
-# --- Router ---
-if menu == "🏠 Overview":
-    if dashboard_home: dashboard_home()
-    else: st.info("Dashboard module not available.")
+packaging_dashboard = safe_import(
+    "modules.packaging.dashboard",
+    "packaging_dashboard"
+)
 
-elif menu == "🌾 Procurement":
-    if procurement_dashboard: procurement_dashboard()
-    else: st.warning("Procurement module not available.")
 
-elif menu == "📦 Warehouse":
-    if warehouse_dashboard: warehouse_dashboard()
-    else: st.warning("Warehouse module not available.")
+sales_dashboard = safe_import(
+    "modules.sales.dashboard",
+    "sales_dashboard"
+)
 
-elif menu == "🏭 Milling":
-    if milling_dashboard: milling_dashboard()
-    else: st.warning("Milling module not available.")
 
-elif menu == "📦 Packaging":
-    if packaging_dashboard: packaging_dashboard()
-    else: st.warning("Packaging module not available.")
+customers_page = safe_import(
+    "modules.sales.customers",
+    "customers_page"
+)
 
-elif menu == "🚚 Sales":
-    st.header("🚚 Sales & Distribution")
-    sales_menu = st.radio("Sales Module", [
-        "Dashboard", "Customers", "Quotations", "Sales Orders",
-        "Dispatch", "Deliveries", "Invoices", "Payments"
-    ])
-    if sales_menu == "Dashboard":
-        if sales_dashboard: sales_dashboard()
-        else: st.warning("Sales dashboard unavailable.")
-    elif sales_menu == "Customers":
-        if customers_page: customers_page()
-        else: st.warning("Customers module unavailable.")
-    elif sales_menu == "Quotations":
-        if quotations_page: quotations_page()
-        else: st.warning("Quotation module unavailable.")
-    elif sales_menu == "Sales Orders":
-        if sales_orders_page: sales_orders_page()
-        else: st.warning("Sales Orders module unavailable.")
-    elif sales_menu == "Dispatch":
-        if dispatch_page: dispatch_page()
-        else: st.warning("Dispatch module unavailable.")
-    elif sales_menu == "Deliveries":
-        if delivery_page: delivery_page()
-        else: st.warning("Delivery module unavailable.")
-    elif sales_menu == "Invoices":
-        if invoices_page: invoices_page()
-        else: st.warning("Invoices module unavailable.")
-    elif sales_menu == "Payments":
-        if payments_page: payments_page()
-        else: st.warning("Payments module unavailable.")
-    else: st.info(f"{sales_menu} module under development.")
 
-elif menu == "💰 Finance":
-    st.header("💰 Finance Management")
-    finance_menu = st.radio("Finance Module", [
-        "Dashboard", "Invoices", "Payments", "Accounting", "Costing", "Profitability"
-    ])
-    if finance_menu == "Dashboard":
-        if finance_dashboard: finance_dashboard()
-        else: st.warning("Finance dashboard unavailable.")
-    elif finance_menu == "Invoices":
-        if invoices_page: invoices_page()
-        else: st.warning("Invoices module unavailable.")
-    elif finance_menu == "Payments":
-        if payments_page: payments_page()
-        else: st.warning("Payments module unavailable.")
-    elif finance_menu == "Accounting":
-        if accounting_page: accounting_page()
-        else: st.warning("Accounting module unavailable.")
-    elif finance_menu == "Costing":
-        if costing_page: costing_page()
-        else: st.warning("Costing module unavailable.")
-    elif finance_menu == "Profitability":
-        if profitability_page: profitability_page()
-        else: st.warning("Profitability module unavailable.")
-    else: st.info(f"{finance_menu} module under development.")
+quotations_page = safe_import(
+    "modules.sales.quotations",
+    "quotations_page"
+)
 
-elif menu == "📊 Reports":
-    if reports_dashboard: reports_dashboard()
-    else: st.warning("Reports module not available.")
 
-elif menu == "🔐 Administration":
-    if st.session_state.get("role") != "Administrator":
-        st.error("Access denied. Administrator role required.")
-    else:
-        st.header("🔐 Administration")
-        admin_tabs = st.radio("Admin Menu", ["User Management", "Change Password"])
-        if admin_tabs == "User Management":
-            if user_management_page: user_management_page()
-            else: st.warning("User Management module unavailable.")
-        elif admin_tabs == "Change Password":
-            if change_password_page: change_password_page()
-            else: st.warning("Change Password module unavailable.")
+sales_orders_page = safe_import(
+    "modules.sales.orders",
+    "sales_orders_page"
+)
 
-else:
-    st.info("Select a module from the navigation menu.")
 
-st.divider()
-st.caption("© Nile Harvest Foods Ltd. | Esan ERP Enterprise Platform")
+delivery_page = safe_import(
+    "modules.sales.delivery",
+    "delivery_page"
+)
+
+
+dispatch_page = safe_import(
+    "modules.sales.dispatch",
+    "dispatch_page"
+)
+
+
+finance_dashboard = safe_import(
+    "modules.finance.dashboard",
+    "finance_dashboard"
+)
+
+
+invoices_page = safe_import(
+    "modules.finance.invoices",
+    "invoices_page"
+)
+
+
+payments_page = safe_import(
+    "modules.finance.payments",
+    "payments_page"
+)
+
+
+reports_dashboard = safe_import(
+    "modules.reports.dashboard",
+    "reports_dashboard"
+)
+
+
+logistics_dashboard = safe_import(
+    "modules.logistics.dashboard",
+    "logistics_dashboard"
+)
+
+
+hr_dashboard = safe_import(
+    "modules.hr.dashboard",
+    "hr_dashboard"
+)
+
+
+maintenance_dashboard = safe_import(
+    "modules.maintenance.dashboard",
+    "maintenance_dashboard"
+)
+
+
+ai_assistant_page = safe_import(
+    "modules.ai_assistant.ai_page",
+    "ai_assistant_page"
+)
+
+
+user_management_page = safe_import(
+    "modules.administration.user_management",
+    "user_management_page"
+)
+
+
+change_password_page = safe_import(
+    "modules.administration.change_password",
+    "change_password_page"
+)
+
