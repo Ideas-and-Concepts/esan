@@ -89,7 +89,7 @@ st.markdown(
 
 
     /* ==========================================
-       LOGO – GROWING SPROUT (same as before)
+       LOGO – GROWING SPROUT
        ========================================== */
 
     .logo {
@@ -147,11 +147,6 @@ st.markdown(
         right: 24px;
         transform: rotate(30deg);
     }
-
-
-    /* ==========================================
-       NO WORDMARK, NO TAGLINE
-       ========================================== */
 
 
     /* ==========================================
@@ -366,8 +361,6 @@ if not st.session_state.logged_in:
         unsafe_allow_html=True,
     )
 
-    # --- No wordmark, no tagline, no footer text ---
-
     # Login form
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -384,11 +377,8 @@ if not st.session_state.logged_in:
 
 
 # ==================================================
-# MAIN HEADER (keep as is)
+# MAIN HEADER REMOVED – no logo or text after login
 # ==================================================
-
-st.title("🌱 Enterprise Resource Planning")
-st.caption(f"{COMPANY_NAME} | Version {VERSION}")
 
 
 # ==================================================
@@ -545,7 +535,7 @@ if module_errors:
 
 
 # ==================================================
-# FOOTER
+# FOOTER (optional, you may also remove it if desired)
 # ==================================================
 
 st.divider()
