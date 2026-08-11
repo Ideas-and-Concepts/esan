@@ -218,6 +218,11 @@ procurement_purchases = safe_import(
     "purchase_orders_page"
 )
 
+procurement_purchases = safe_import(
+    "modules.procurement.purchases",
+    "purchases_page"
+)
+
 
 # ==================================================
 # WAREHOUSE
