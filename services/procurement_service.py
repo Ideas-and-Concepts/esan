@@ -7,9 +7,9 @@ Enterprise Milling & Packaging Management System
 Handles:
 - Suppliers
 - Purchase Orders
-- Purchases / Receiving
+- Purchase Order Items
+- Add / Edit / Delete
 - Status management
-- Edit / Delete operations
 """
 
 from datetime import datetime
@@ -17,13 +17,10 @@ from datetime import datetime
 from sqlalchemy.orm import joinedload
 
 from database import SessionLocal
-
 from models import (
     Supplier,
     PurchaseOrder,
     PurchaseOrderItem,
-    Purchase,
-    PurchaseItem,
 )
 
 
@@ -32,6 +29,10 @@ from models import (
 # ==================================================
 
 def get_all_suppliers():
+    """
+    Return all suppliers ordered alphabetically.
+    """
+
     db = SessionLocal()
 
     try:
@@ -46,6 +47,10 @@ def get_all_suppliers():
 
 
 def get_supplier(supplier_id):
+    """
+    Get a single supplier by ID.
+    """
+
     db = SessionLocal()
 
     try:
@@ -69,6 +74,10 @@ def create_supplier(
     country=None,
     contact_person=None,
 ):
+    """
+    Create a new supplier.
+    """
+
     db = SessionLocal()
 
     try:
@@ -88,6 +97,9 @@ def create_supplier(
         db.add(supplier)
         db.commit()
         db.refresh(supplier)
+
+        # Detach object safely before closing session
+        db.expunge(supplier)
 
         return supplier
 
@@ -110,6 +122,10 @@ def update_supplier(
     country=None,
     contact_person=None,
 ):
+    """
+    Update an existing supplier.
+    """
+
     db = SessionLocal()
 
     try:
@@ -135,6 +151,8 @@ def update_supplier(
         db.commit()
         db.refresh(supplier)
 
+        db.expunge(supplier)
+
         return supplier
 
     except Exception:
@@ -146,6 +164,13 @@ def update_supplier(
 
 
 def delete_supplier(supplier_id):
+    """
+    Delete a supplier.
+
+    A supplier with existing purchase orders is not deleted
+    in order to preserve procurement history.
+    """
+
     db = SessionLocal()
 
     try:
@@ -157,34 +182,28 @@ def delete_supplier(supplier_id):
         )
 
         if not supplier:
-            return False
+            return False, "Supplier not found."
 
-        existing_po = (
+        purchase_count = (
             db.query(PurchaseOrder)
             .filter(
                 PurchaseOrder.supplier_id == supplier_id
             )
-            .first()
+            .count()
         )
 
-        existing_purchase = (
-            db.query(Purchase)
-            .filter(
-                Purchase.supplier_id == supplier_id
-            )
-            .first()
-        )
+        if purchase_count > 0:
 
-        if existing_po or existing_purchase:
-            raise ValueError(
-                "This supplier cannot be deleted because "
-                "purchase records already exist for this supplier."
+            return (
+                False,
+                "Supplier cannot be deleted because "
+                f"{purchase_count} purchase order(s) are linked to it.",
             )
 
         db.delete(supplier)
         db.commit()
 
-        return True
+        return True, "Supplier deleted successfully."
 
     except Exception:
         db.rollback()
@@ -199,11 +218,18 @@ def delete_supplier(supplier_id):
 # ==================================================
 
 def get_all_purchase_orders():
+    """
+    Return all purchase orders.
+
+    joinedload() prevents DetachedInstanceError when the
+    supplier relationship is accessed after the session closes.
+    """
+
     db = SessionLocal()
 
     try:
 
-        return (
+        orders = (
             db.query(PurchaseOrder)
             .options(
                 joinedload(PurchaseOrder.supplier),
@@ -215,16 +241,33 @@ def get_all_purchase_orders():
             .all()
         )
 
+        # Detach complete object graph from session
+        for order in orders:
+
+            if order.supplier:
+                db.expunge(order.supplier)
+
+            for item in order.items:
+                db.expunge(item)
+
+            db.expunge(order)
+
+        return orders
+
     finally:
         db.close()
 
 
 def get_purchase_order(po_id):
+    """
+    Get one purchase order with supplier and items loaded.
+    """
+
     db = SessionLocal()
 
     try:
 
-        return (
+        order = (
             db.query(PurchaseOrder)
             .options(
                 joinedload(PurchaseOrder.supplier),
@@ -233,6 +276,19 @@ def get_purchase_order(po_id):
             .filter(PurchaseOrder.id == po_id)
             .first()
         )
+
+        if not order:
+            return None
+
+        if order.supplier:
+            db.expunge(order.supplier)
+
+        for item in order.items:
+            db.expunge(item)
+
+        db.expunge(order)
+
+        return order
 
     finally:
         db.close()
@@ -243,28 +299,73 @@ def create_purchase_order(
     items_data,
     status="Draft",
 ):
+    """
+    Create a purchase order.
+
+    items_data format:
+
+    [
+        {
+            "product_name": "Maize Grain",
+            "quantity": 10,
+            "unit_price": 40000
+        }
+    ]
+    """
+
+    if not items_data:
+        raise ValueError(
+            "Purchase order must contain at least one item."
+        )
+
     db = SessionLocal()
 
     try:
 
-        if not items_data:
-            raise ValueError(
-                "Purchase Order must contain at least one item."
-            )
-
-        total = sum(
-            float(item["quantity"])
-            * float(item["unit_price"])
-            for item in items_data
+        supplier = (
+            db.query(Supplier)
+            .filter(Supplier.id == supplier_id)
+            .first()
         )
 
-        count = db.query(
-            PurchaseOrder
-        ).count()
+        if not supplier:
+            raise ValueError(
+                "Selected supplier does not exist."
+            )
+
+        total = 0.0
+
+        for item in items_data:
+
+            quantity = float(
+                item.get("quantity", 0)
+            )
+
+            unit_price = float(
+                item.get("unit_price", 0)
+            )
+
+            if quantity <= 0:
+                raise ValueError(
+                    "Quantity must be greater than zero."
+                )
+
+            if unit_price < 0:
+                raise ValueError(
+                    "Unit price cannot be negative."
+                )
+
+            total += quantity * unit_price
+
+        # Generate PO number
+        count = (
+            db.query(PurchaseOrder)
+            .count()
+        )
 
         po_number = (
             f"PO-"
-            f"{datetime.utcnow().strftime('%Y%m%d')}-"
+            f"{datetime.utcnow().strftime('%Y%m')}-"
             f"{count + 1:04d}"
         )
 
@@ -281,6 +382,16 @@ def create_purchase_order(
 
         for item in items_data:
 
+            product_name = (
+                item.get("product_name", "")
+                .strip()
+            )
+
+            if not product_name:
+                raise ValueError(
+                    "Product name cannot be empty."
+                )
+
             quantity = float(
                 item["quantity"]
             )
@@ -289,21 +400,168 @@ def create_purchase_order(
                 item["unit_price"]
             )
 
-            purchase_order_item = PurchaseOrderItem(
+            purchase_item = PurchaseOrderItem(
                 purchase_order_id=purchase_order.id,
-                product_name=item["product_name"],
+                product_name=product_name,
                 quantity=quantity,
                 unit_price=unit_price,
                 total=quantity * unit_price,
             )
 
-            db.add(purchase_order_item)
+            db.add(purchase_item)
 
         db.commit()
 
-        db.refresh(purchase_order)
+        # Reload with relationships
+        purchase_order = (
+            db.query(PurchaseOrder)
+            .options(
+                joinedload(PurchaseOrder.supplier),
+                joinedload(PurchaseOrder.items),
+            )
+            .filter(
+                PurchaseOrder.id == purchase_order.id
+            )
+            .first()
+        )
+
+        db.expunge(purchase_order)
+
+        if purchase_order.supplier:
+            db.expunge(
+                purchase_order.supplier
+            )
+
+        for item in purchase_order.items:
+            db.expunge(item)
 
         return purchase_order
+
+    except Exception:
+        db.rollback()
+        raise
+
+    finally:
+        db.close()
+
+
+def update_purchase_order(
+    po_id,
+    supplier_id,
+    items_data,
+    status="Draft",
+):
+    """
+    Edit an existing purchase order.
+
+    Existing items are replaced with the supplied items.
+    """
+
+    if not items_data:
+        raise ValueError(
+            "Purchase order must contain at least one item."
+        )
+
+    db = SessionLocal()
+
+    try:
+
+        purchase_order = (
+            db.query(PurchaseOrder)
+            .options(
+                joinedload(PurchaseOrder.items)
+            )
+            .filter(
+                PurchaseOrder.id == po_id
+            )
+            .first()
+        )
+
+        if not purchase_order:
+            return None
+
+        supplier = (
+            db.query(Supplier)
+            .filter(Supplier.id == supplier_id)
+            .first()
+        )
+
+        if not supplier:
+            raise ValueError(
+                "Selected supplier does not exist."
+            )
+
+        total = 0.0
+
+        for item in items_data:
+
+            quantity = float(
+                item.get("quantity", 0)
+            )
+
+            unit_price = float(
+                item.get("unit_price", 0)
+            )
+
+            product_name = (
+                item.get("product_name", "")
+                .strip()
+            )
+
+            if not product_name:
+                raise ValueError(
+                    "Product name cannot be empty."
+                )
+
+            if quantity <= 0:
+                raise ValueError(
+                    "Quantity must be greater than zero."
+                )
+
+            if unit_price < 0:
+                raise ValueError(
+                    "Unit price cannot be negative."
+                )
+
+            total += quantity * unit_price
+
+        # Update header
+        purchase_order.supplier_id = supplier_id
+        purchase_order.status = status
+        purchase_order.total_amount = total
+
+        # Remove old items
+        for old_item in list(
+            purchase_order.items
+        ):
+            db.delete(old_item)
+
+        db.flush()
+
+        # Add new items
+        for item in items_data:
+
+            quantity = float(
+                item["quantity"]
+            )
+
+            unit_price = float(
+                item["unit_price"]
+            )
+
+            new_item = PurchaseOrderItem(
+                purchase_order_id=purchase_order.id,
+                product_name=item["product_name"].strip(),
+                quantity=quantity,
+                unit_price=unit_price,
+                total=quantity * unit_price,
+            )
+
+            db.add(new_item)
+
+        db.commit()
+
+        return get_purchase_order(po_id)
 
     except Exception:
         db.rollback()
@@ -317,13 +575,19 @@ def update_purchase_order_status(
     po_id,
     new_status,
 ):
+    """
+    Update purchase order status.
+    """
+
     db = SessionLocal()
 
     try:
 
         purchase_order = (
             db.query(PurchaseOrder)
-            .filter(PurchaseOrder.id == po_id)
+            .filter(
+                PurchaseOrder.id == po_id
+            )
             .first()
         )
 
@@ -333,9 +597,8 @@ def update_purchase_order_status(
         purchase_order.status = new_status
 
         db.commit()
-        db.refresh(purchase_order)
 
-        return purchase_order
+        return get_purchase_order(po_id)
 
     except Exception:
         db.rollback()
@@ -346,37 +609,41 @@ def update_purchase_order_status(
 
 
 def delete_purchase_order(po_id):
+    """
+    Delete a purchase order and its items.
+    """
+
     db = SessionLocal()
 
     try:
 
         purchase_order = (
             db.query(PurchaseOrder)
-            .filter(PurchaseOrder.id == po_id)
+            .options(
+                joinedload(PurchaseOrder.items)
+            )
+            .filter(
+                PurchaseOrder.id == po_id
+            )
             .first()
         )
 
         if not purchase_order:
-            return False
+            return False, "Purchase Order not found."
 
-        existing_purchase = (
-            db.query(Purchase)
-            .filter(
-                Purchase.purchase_order_id == po_id
-            )
-            .first()
-        )
-
-        if existing_purchase:
-            raise ValueError(
-                "This Purchase Order cannot be deleted "
-                "because a purchase/receiving record is linked to it."
-            )
+        for item in list(
+            purchase_order.items
+        ):
+            db.delete(item)
 
         db.delete(purchase_order)
+
         db.commit()
 
-        return True
+        return (
+            True,
+            "Purchase Order deleted successfully.",
+        )
 
     except Exception:
         db.rollback()
@@ -387,271 +654,29 @@ def delete_purchase_order(po_id):
 
 
 # ==================================================
-# PURCHASES / RECEIVING
+# PURCHASE ORDER ITEMS
 # ==================================================
 
-def get_all_purchases():
+def get_purchase_order_items(po_id):
+    """
+    Return all items belonging to a purchase order.
+    """
+
     db = SessionLocal()
 
     try:
 
         return (
-            db.query(Purchase)
-            .options(
-                joinedload(Purchase.supplier),
-                joinedload(Purchase.purchase_order),
-                joinedload(Purchase.items),
+            db.query(PurchaseOrderItem)
+            .filter(
+                PurchaseOrderItem.purchase_order_id
+                == po_id
             )
             .order_by(
-                Purchase.created_at.desc()
+                PurchaseOrderItem.id.asc()
             )
             .all()
         )
-
-    finally:
-        db.close()
-
-
-def get_purchase(purchase_id):
-    db = SessionLocal()
-
-    try:
-
-        return (
-            db.query(Purchase)
-            .options(
-                joinedload(Purchase.supplier),
-                joinedload(Purchase.purchase_order),
-                joinedload(Purchase.items),
-            )
-            .filter(Purchase.id == purchase_id)
-            .first()
-        )
-
-    finally:
-        db.close()
-
-
-def create_purchase(
-    supplier_id,
-    items_data,
-    purchase_order_id=None,
-    status="Received",
-    received_date=None,
-    warehouse=None,
-    notes=None,
-):
-    db = SessionLocal()
-
-    try:
-
-        if not items_data:
-            raise ValueError(
-                "Purchase must contain at least one item."
-            )
-
-        total = sum(
-            float(item["quantity"])
-            * float(item["unit_price"])
-            for item in items_data
-        )
-
-        count = db.query(Purchase).count()
-
-        purchase_number = (
-            f"PUR-"
-            f"{datetime.utcnow().strftime('%Y%m%d')}-"
-            f"{count + 1:04d}"
-        )
-
-        purchase = Purchase(
-            purchase_number=purchase_number,
-            purchase_order_id=purchase_order_id,
-            supplier_id=supplier_id,
-            status=status,
-            total_amount=total,
-            received_date=(
-                received_date
-                or datetime.utcnow()
-            ),
-            warehouse=warehouse,
-            notes=notes,
-            created_at=datetime.utcnow(),
-        )
-
-        db.add(purchase)
-        db.flush()
-
-        for item in items_data:
-
-            quantity = float(
-                item["quantity"]
-            )
-
-            unit_price = float(
-                item["unit_price"]
-            )
-
-            purchase_item = PurchaseItem(
-                purchase_id=purchase.id,
-                product_name=item["product_name"],
-                quantity=quantity,
-                unit_price=unit_price,
-                total=quantity * unit_price,
-            )
-
-            db.add(purchase_item)
-
-        db.commit()
-
-        db.refresh(purchase)
-
-        return purchase
-
-    except Exception:
-        db.rollback()
-        raise
-
-    finally:
-        db.close()
-
-
-def update_purchase_status(
-    purchase_id,
-    new_status,
-):
-    db = SessionLocal()
-
-    try:
-
-        purchase = (
-            db.query(Purchase)
-            .filter(Purchase.id == purchase_id)
-            .first()
-        )
-
-        if not purchase:
-            return None
-
-        purchase.status = new_status
-
-        db.commit()
-        db.refresh(purchase)
-
-        return purchase
-
-    except Exception:
-        db.rollback()
-        raise
-
-    finally:
-        db.close()
-
-
-def update_purchase(
-    purchase_id,
-    supplier_id,
-    items_data,
-    purchase_order_id=None,
-    status="Received",
-    received_date=None,
-    warehouse=None,
-    notes=None,
-):
-    db = SessionLocal()
-
-    try:
-
-        purchase = (
-            db.query(Purchase)
-            .options(
-                joinedload(Purchase.items)
-            )
-            .filter(Purchase.id == purchase_id)
-            .first()
-        )
-
-        if not purchase:
-            return None
-
-        if not items_data:
-            raise ValueError(
-                "Purchase must contain at least one item."
-            )
-
-        total = sum(
-            float(item["quantity"])
-            * float(item["unit_price"])
-            for item in items_data
-        )
-
-        purchase.supplier_id = supplier_id
-        purchase.purchase_order_id = purchase_order_id
-        purchase.status = status
-        purchase.total_amount = total
-        purchase.received_date = (
-            received_date
-            or purchase.received_date
-        )
-        purchase.warehouse = warehouse
-        purchase.notes = notes
-
-        purchase.items.clear()
-
-        for item in items_data:
-
-            quantity = float(
-                item["quantity"]
-            )
-
-            unit_price = float(
-                item["unit_price"]
-            )
-
-            purchase.items.append(
-                PurchaseItem(
-                    product_name=item["product_name"],
-                    quantity=quantity,
-                    unit_price=unit_price,
-                    total=quantity * unit_price,
-                )
-            )
-
-        db.commit()
-        db.refresh(purchase)
-
-        return purchase
-
-    except Exception:
-        db.rollback()
-        raise
-
-    finally:
-        db.close()
-
-
-def delete_purchase(purchase_id):
-    db = SessionLocal()
-
-    try:
-
-        purchase = (
-            db.query(Purchase)
-            .filter(Purchase.id == purchase_id)
-            .first()
-        )
-
-        if not purchase:
-            return False
-
-        db.delete(purchase)
-        db.commit()
-
-        return True
-
-    except Exception:
-        db.rollback()
-        raise
 
     finally:
         db.close()
