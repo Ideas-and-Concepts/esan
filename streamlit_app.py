@@ -1,5 +1,5 @@
 """
-Esan ERP
+Esan ERP Controller
 Nile Harvest Foods Ltd.
 Enterprise Milling & Packaging Management System
 
@@ -10,7 +10,7 @@ Architecture
 streamlit_app.py
     ├── Authentication
     ├── Database initialization
-    ├── Floating navigation
+    ├── Floating ERP navigation
     └── Module router
 
 modules/
@@ -23,7 +23,10 @@ modules/
     ├── finance/
     └── reports/
 
-The Streamlit pages/ directory is NOT required.
+IMPORTANT
+---------
+The Streamlit pages/ directory is NOT used.
+All navigation is controlled by this file and modules/.
 """
 
 import logging
@@ -43,7 +46,7 @@ from auth import verify_password
 logging.basicConfig(
     filename="esan_erp.log",
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
+    format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
 logger = logging.getLogger("esan_erp")
@@ -57,19 +60,22 @@ st.set_page_config(
     page_title="Esan ERP",
     page_icon="🌾",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 
 # ============================================================
-# GLOBAL UI
+# GLOBAL ERP STYLE
 # ============================================================
 
 st.markdown(
     """
     <style>
 
-    /* Hide Streamlit branding */
+    /* -------------------------------------------------------
+       STREAMLIT CLEANUP
+       ------------------------------------------------------- */
+
     #MainMenu {
         visibility: hidden;
     }
@@ -82,16 +88,16 @@ st.markdown(
         visibility: hidden;
     }
 
-    /* Main page */
     .block-container {
         padding-top: 1.2rem;
         padding-bottom: 2rem;
         max-width: 1600px;
     }
 
-    /* =====================================================
+
+    /* -------------------------------------------------------
        SIDEBAR
-       ===================================================== */
+       ------------------------------------------------------- */
 
     section[data-testid="stSidebar"] {
         background: transparent;
@@ -99,20 +105,18 @@ st.markdown(
     }
 
     section[data-testid="stSidebar"] > div {
-        background: #f8faf9;
-        border-right: 1px solid #dfe5e1;
-        box-shadow: 5px 0 20px rgba(0,0,0,0.05);
+        background: #f7faf8;
+        border-right: 1px solid #dfe6e1;
+        box-shadow: 5px 0 20px rgba(0, 0, 0, 0.05);
     }
-
-    /* Brand */
 
     .esan-brand {
         text-align: center;
-        padding: 10px 5px 18px 5px;
+        padding: 12px 5px 18px 5px;
     }
 
     .esan-logo {
-        font-size: 2.3rem;
+        font-size: 2.4rem;
         line-height: 1;
     }
 
@@ -120,7 +124,7 @@ st.markdown(
         font-size: 1.35rem;
         font-weight: 750;
         color: #263238;
-        margin-top: 6px;
+        margin-top: 7px;
     }
 
     .esan-company {
@@ -132,15 +136,13 @@ st.markdown(
     .esan-version {
         display: inline-block;
         margin-top: 8px;
-        padding: 3px 9px;
+        padding: 4px 10px;
         border-radius: 20px;
         background: #e8f5e9;
         color: #2e7d32;
         font-size: 0.65rem;
         font-weight: 700;
     }
-
-    /* Navigation section */
 
     .nav-section {
         margin: 17px 5px 6px 5px;
@@ -150,8 +152,6 @@ st.markdown(
         text-transform: uppercase;
         letter-spacing: 0.08em;
     }
-
-    /* Sidebar buttons */
 
     section[data-testid="stSidebar"] .stButton > button {
         width: 100%;
@@ -170,8 +170,6 @@ st.markdown(
         border-color: #c8e6c9;
         color: #1b5e20;
     }
-
-    /* User panel */
 
     .esan-user {
         background: white;
@@ -193,9 +191,10 @@ st.markdown(
         margin-top: 3px;
     }
 
-    /* =====================================================
-       MAIN HEADER
-       ===================================================== */
+
+    /* -------------------------------------------------------
+       MAIN ERP HEADER
+       ------------------------------------------------------- */
 
     .esan-header {
         display: flex;
@@ -206,7 +205,7 @@ st.markdown(
         border-radius: 14px;
         padding: 15px 20px;
         margin-bottom: 18px;
-        box-shadow: 0 3px 14px rgba(0,0,0,0.035);
+        box-shadow: 0 3px 14px rgba(0, 0, 0, 0.035);
     }
 
     .esan-header-title {
@@ -231,38 +230,35 @@ st.markdown(
         white-space: nowrap;
     }
 
-    /* =====================================================
-       MODULE TITLE
-       ===================================================== */
 
-    .module-title {
-        color: #263238;
-        font-size: 1.35rem;
-        font-weight: 750;
-        margin-bottom: 2px;
-    }
+    /* -------------------------------------------------------
+       SUB NAVIGATION
+       ------------------------------------------------------- */
 
-    .module-subtitle {
+    .subnav-label {
         color: #718096;
-        font-size: 0.78rem;
-        margin-bottom: 15px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        margin-bottom: 5px;
+        text-transform: uppercase;
     }
 
-    /* =====================================================
+
+    /* -------------------------------------------------------
        FOOTER
-       ===================================================== */
+       ------------------------------------------------------- */
 
     .esan-footer {
         text-align: center;
         color: #9ca3af;
         font-size: 0.7rem;
-        margin-top: 30px;
+        margin-top: 35px;
         padding-bottom: 10px;
     }
 
     </style>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 
@@ -276,38 +272,42 @@ DEFAULT_SESSION = {
     "role": None,
     "current_page": "🏠 Overview",
     "current_subpage": "Dashboard",
+    "seed_loaded": False,
 }
 
 for key, value in DEFAULT_SESSION.items():
-
     if key not in st.session_state:
         st.session_state[key] = value
 
 
 # ============================================================
-# SAFE MODULE IMPORT
+# SAFE MODULE LOADER
 # ============================================================
 
 module_errors = []
 
 
 def safe_import(module_path, function_name):
+    """
+    Import a module function without crashing the whole ERP.
+
+    This allows the main controller to start even if one optional
+    module has a problem.
+    """
 
     try:
-
         module = __import__(
             module_path,
-            fromlist=[function_name]
+            fromlist=[function_name],
         )
 
         function = getattr(
             module,
             function_name,
-            None
+            None,
         )
 
         if function is None:
-
             error = (
                 f"{module_path}: "
                 f"function '{function_name}' not found"
@@ -328,122 +328,129 @@ def safe_import(module_path, function_name):
 
         logger.exception(
             "Module import failed: %s",
-            error
+            error,
         )
 
         return None
 
 
 # ============================================================
-# MODULES
+# DASHBOARD
 # ============================================================
-
-# Dashboard
 
 dashboard_home = safe_import(
     "modules.dashboard.home",
-    "dashboard_home"
+    "dashboard_home",
 )
 
 
-# Procurement
+# ============================================================
+# PROCUREMENT
+# ============================================================
 
 procurement_dashboard = safe_import(
     "modules.procurement.dashboard",
-    "procurement_dashboard"
+    "procurement_dashboard",
 )
 
 procurement_suppliers = safe_import(
     "modules.procurement.suppliers",
-    "suppliers_page"
+    "suppliers_page",
 )
 
-procurement_purchases = safe_import(
-    "modules.procurement.purchases",
-    "purchases_page"
+procurement_purchase_orders = safe_import(
+    "modules.procurement.purchase_orders",
+    "purchase_orders_page",
 )
 
 
-# Warehouse
+# ============================================================
+# WAREHOUSE
+# ============================================================
 
 warehouse_dashboard = safe_import(
     "modules.warehouse.dashboard",
-    "warehouse_dashboard"
-)
-
-warehouse_inventory = safe_import(
-    "modules.warehouse.inventory",
-    "inventory_page"
+    "warehouse_dashboard",
 )
 
 
-# Milling
+# ============================================================
+# MILLING
+# ============================================================
 
 milling_dashboard = safe_import(
     "modules.milling.dashboard",
-    "milling_dashboard"
+    "milling_dashboard",
 )
 
 
-# Packaging
+# ============================================================
+# PACKAGING
+# ============================================================
 
 packaging_dashboard = safe_import(
     "modules.packaging.dashboard",
-    "packaging_dashboard"
+    "packaging_dashboard",
 )
 
 
-# Sales
+# ============================================================
+# SALES
+# ============================================================
 
 sales_dashboard = safe_import(
     "modules.sales.dashboard",
-    "sales_dashboard"
+    "sales_dashboard",
 )
 
 sales_customers = safe_import(
     "modules.sales.customers",
-    "customers_page"
+    "customers_page",
 )
 
 sales_quotations = safe_import(
     "modules.sales.quotations",
-    "quotations_page"
+    "quotations_page",
 )
 
 sales_orders = safe_import(
     "modules.sales.orders",
-    "sales_orders_page"
+    "sales_orders_page",
 )
 
-sales_deliveries = safe_import(
-    "modules.sales.deliveries",
-    "deliveries_page"
+sales_dispatch = safe_import(
+    "modules.sales.dispatch",
+    "dispatch_page",
 )
 
-sales_invoices = safe_import(
-    "modules.sales.invoices",
-    "invoices_page"
+sales_delivery = safe_import(
+    "modules.sales.delivery",
+    "delivery_page",
 )
 
 sales_payments = safe_import(
     "modules.sales.payments",
-    "payments_page"
+    "payments_page",
 )
 
 
-# Finance
+# ============================================================
+# FINANCE
+# ============================================================
 
 finance_dashboard = safe_import(
     "modules.finance.dashboard",
-    "finance_dashboard"
+    "finance_dashboard",
 )
 
 
-# Reports
+# ============================================================
+# REPORTS
+# ============================================================
 
 reports_dashboard = safe_import(
     "modules.reports.dashboard",
-    "reports_dashboard"
+    "reports_dashboard",
 )
 
 
@@ -467,7 +474,7 @@ MODULES = {
         "children": {
             "Dashboard": procurement_dashboard,
             "Suppliers": procurement_suppliers,
-            "Purchase Orders": procurement_purchases,
+            "Purchase Orders": procurement_purchase_orders,
         },
     },
 
@@ -477,7 +484,6 @@ MODULES = {
         "function": warehouse_dashboard,
         "children": {
             "Dashboard": warehouse_dashboard,
-            "Inventory": warehouse_inventory,
         },
     },
 
@@ -504,8 +510,8 @@ MODULES = {
             "Customers": sales_customers,
             "Quotations": sales_quotations,
             "Sales Orders": sales_orders,
-            "Deliveries": sales_deliveries,
-            "Invoices": sales_invoices,
+            "Dispatch": sales_dispatch,
+            "Deliveries": sales_delivery,
             "Payments": sales_payments,
         },
     },
@@ -540,7 +546,9 @@ except ImportError:
 
         admin = (
             db.query(User)
-            .filter(User.username == "admin")
+            .filter(
+                User.username == "admin"
+            )
             .first()
         )
 
@@ -551,8 +559,13 @@ except ImportError:
 
         admin = User(
             username="admin",
-            password_hash=hash_password("admin123"),
-            role="Administrator"
+            password_hash=hash_password(
+                "admin123"
+            ),
+            role="Administrator",
+            full_name="System Administrator",
+            email="admin@nileharvest.com",
+            active=True,
         )
 
         db.add(admin)
@@ -596,14 +609,17 @@ def initialize_database():
         )
 
         missing_tables = (
-            required_tables - existing_tables
+            required_tables
+            - existing_tables
         )
 
         if missing_tables:
 
             logger.info(
-                "Missing tables detected: %s",
-                ", ".join(sorted(missing_tables))
+                "Creating missing tables: %s",
+                ", ".join(
+                    sorted(missing_tables)
+                ),
             )
 
         Base.metadata.create_all(
@@ -637,44 +653,43 @@ db_ok, db_error = initialize_database()
 if not db_ok:
 
     st.error(
-        "Database initialization failed."
+        "❌ Database initialization failed."
     )
 
     with st.expander(
         "Technical details"
     ):
-
-        st.code(db_error)
+        st.code(
+            str(db_error)
+        )
 
     st.stop()
 
 
 # ============================================================
-# OPTIONAL SEED DATA
+# SEED DATA
 # ============================================================
 
-if load_seed_data:
+if load_seed_data and not st.session_state.seed_loaded:
 
-    if "seed_loaded" not in st.session_state:
+    try:
 
-        try:
+        load_seed_data()
 
-            load_seed_data()
+        st.session_state.seed_loaded = True
 
-            st.session_state.seed_loaded = True
+        logger.info(
+            "Seed data loaded."
+        )
 
-            logger.info(
-                "Seed data loaded successfully."
-            )
+    except Exception as exc:
 
-        except Exception as exc:
+        st.session_state.seed_loaded = True
 
-            logger.warning(
-                "Seed data failed: %s",
-                exc
-            )
-
-            st.session_state.seed_loaded = True
+        logger.warning(
+            "Seed data failed: %s",
+            exc,
+        )
 
 
 # ============================================================
@@ -689,34 +704,37 @@ def login(username, password):
 
         user = (
             db.query(User)
-            .filter(User.username == username)
+            .filter(
+                User.username == username
+            )
             .first()
         )
 
         if not user:
-
             return False
 
         if not verify_password(
             password,
-            user.password_hash
+            user.password_hash,
         ):
-
             return False
 
-        # Check active field when available.
         if hasattr(user, "active"):
 
             if user.active is False:
                 return False
 
         st.session_state.logged_in = True
-        st.session_state.username = user.username
-        st.session_state.role = user.role
+        st.session_state.username = (
+            user.username
+        )
+        st.session_state.role = (
+            user.role
+        )
 
         logger.info(
             "User '%s' logged in.",
-            username
+            username,
         )
 
         return True
@@ -725,7 +743,7 @@ def login(username, password):
 
         logger.exception(
             "Login error: %s",
-            exc
+            exc,
         )
 
         return False
@@ -739,14 +757,18 @@ def logout():
 
     logger.info(
         "User '%s' logged out.",
-        st.session_state.username
+        st.session_state.username,
     )
 
     st.session_state.logged_in = False
     st.session_state.username = None
     st.session_state.role = None
-    st.session_state.current_page = "🏠 Overview"
-    st.session_state.current_subpage = "Dashboard"
+    st.session_state.current_page = (
+        "🏠 Overview"
+    )
+    st.session_state.current_subpage = (
+        "Dashboard"
+    )
 
     st.rerun()
 
@@ -797,7 +819,7 @@ if not st.session_state.logged_in:
 
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     left, center, right = st.columns(
@@ -806,30 +828,33 @@ if not st.session_state.logged_in:
 
     with center:
 
-        st.markdown("### 🔐 Sign in")
+        st.markdown(
+            "### 🔐 Sign in"
+        )
 
         username = st.text_input(
             "Username",
             placeholder="Enter username",
-            key="login_username"
+            key="login_username",
         )
 
         password = st.text_input(
             "Password",
             type="password",
             placeholder="Enter password",
-            key="login_password"
+            key="login_password",
         )
 
         if st.button(
             "Login",
             type="primary",
-            use_container_width=True
+            use_container_width=True,
+            key="login_button",
         ):
 
             if login(
                 username.strip(),
-                password
+                password,
             ):
 
                 st.success(
@@ -845,25 +870,30 @@ if not st.session_state.logged_in:
                 )
 
         st.caption(
-            "Default administrator: admin / admin123"
+            "Default administrator: "
+            "admin / admin123"
         )
 
     st.stop()
 
 
 # ============================================================
-# NAVIGATION FUNCTIONS
+# NAVIGATION
 # ============================================================
 
 def navigate(page):
 
     st.session_state.current_page = page
-    st.session_state.current_subpage = "Dashboard"
+    st.session_state.current_subpage = (
+        "Dashboard"
+    )
 
 
 def navigate_subpage(subpage):
 
-    st.session_state.current_subpage = subpage
+    st.session_state.current_subpage = (
+        subpage
+    )
 
 
 # ============================================================
@@ -871,6 +901,10 @@ def navigate_subpage(subpage):
 # ============================================================
 
 with st.sidebar:
+
+    # --------------------------------------------------------
+    # BRAND
+    # --------------------------------------------------------
 
     st.markdown(
         f"""
@@ -894,140 +928,173 @@ with st.sidebar:
 
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
-    # ========================================================
+
+    # --------------------------------------------------------
     # MAIN
-    # ========================================================
+    # --------------------------------------------------------
 
     st.markdown(
         '<div class="nav-section">Main</div>',
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     if st.button(
         "🏠  Overview",
-        key="sidebar_overview",
-        use_container_width=True
+        key="nav_overview",
+        use_container_width=True,
     ):
 
-        navigate("🏠 Overview")
+        navigate(
+            "🏠 Overview"
+        )
+
         st.rerun()
 
 
-    # ========================================================
+    # --------------------------------------------------------
     # OPERATIONS
-    # ========================================================
+    # --------------------------------------------------------
 
     st.markdown(
         '<div class="nav-section">Operations</div>',
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     if st.button(
         "🌾  Procurement",
-        key="sidebar_procurement",
-        use_container_width=True
+        key="nav_procurement",
+        use_container_width=True,
     ):
 
-        navigate("🌾 Procurement")
+        navigate(
+            "🌾 Procurement"
+        )
+
         st.rerun()
+
 
     if st.button(
         "📦  Warehouse",
-        key="sidebar_warehouse",
-        use_container_width=True
+        key="nav_warehouse",
+        use_container_width=True,
     ):
 
-        navigate("📦 Warehouse")
+        navigate(
+            "📦 Warehouse"
+        )
+
         st.rerun()
+
 
     if st.button(
         "🏭  Milling",
-        key="sidebar_milling",
-        use_container_width=True
+        key="nav_milling",
+        use_container_width=True,
     ):
 
-        navigate("🏭 Milling")
+        navigate(
+            "🏭 Milling"
+        )
+
         st.rerun()
+
 
     if st.button(
         "📦  Packaging",
-        key="sidebar_packaging",
-        use_container_width=True
+        key="nav_packaging",
+        use_container_width=True,
     ):
 
-        navigate("📦 Packaging")
+        navigate(
+            "📦 Packaging"
+        )
+
         st.rerun()
 
 
-    # ========================================================
+    # --------------------------------------------------------
     # COMMERCIAL
-    # ========================================================
+    # --------------------------------------------------------
 
     st.markdown(
         '<div class="nav-section">Commercial</div>',
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     if st.button(
         "🚚  Sales & Distribution",
-        key="sidebar_sales",
-        use_container_width=True
+        key="nav_sales",
+        use_container_width=True,
     ):
 
-        navigate("🚚 Sales & Distribution")
+        navigate(
+            "🚚 Sales & Distribution"
+        )
+
         st.rerun()
 
 
-    # ========================================================
+    # --------------------------------------------------------
     # FINANCE
-    # ========================================================
+    # --------------------------------------------------------
 
     st.markdown(
         '<div class="nav-section">Finance</div>',
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     if st.button(
         "💰  Finance",
-        key="sidebar_finance",
-        use_container_width=True
+        key="nav_finance",
+        use_container_width=True,
     ):
 
-        navigate("💰 Finance")
+        navigate(
+            "💰 Finance"
+        )
+
         st.rerun()
 
 
-    # ========================================================
+    # --------------------------------------------------------
     # REPORTING
-    # ========================================================
+    # --------------------------------------------------------
 
     st.markdown(
         '<div class="nav-section">Reporting</div>',
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     if st.button(
         "📊  Reports",
-        key="sidebar_reports",
-        use_container_width=True
+        key="nav_reports",
+        use_container_width=True,
     ):
 
-        navigate("📊 Reports")
+        navigate(
+            "📊 Reports"
+        )
+
         st.rerun()
 
 
-    # ========================================================
+    # --------------------------------------------------------
     # ADMINISTRATION
-    # ========================================================
+    # --------------------------------------------------------
 
-    if st.session_state.role == "Administrator":
+    if (
+        st.session_state.role
+        == "Administrator"
+    ):
 
         st.markdown(
-            '<div class="nav-section">Administration</div>',
-            unsafe_allow_html=True
+            '<div class="nav-section">'
+            'Administration'
+            '</div>',
+            unsafe_allow_html=True,
         )
 
         st.caption(
@@ -1035,9 +1102,9 @@ with st.sidebar:
         )
 
 
-    # ========================================================
-    # USER
-    # ========================================================
+    # --------------------------------------------------------
+    # USER PANEL
+    # --------------------------------------------------------
 
     st.markdown(
         f"""
@@ -1053,15 +1120,15 @@ with st.sidebar:
 
         </div>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
     st.write("")
 
     if st.button(
         "🚪  Logout",
-        key="sidebar_logout",
-        use_container_width=True
+        key="nav_logout",
+        use_container_width=True,
     ):
 
         logout()
@@ -1071,7 +1138,9 @@ with st.sidebar:
 # CURRENT MODULE
 # ============================================================
 
-current_page = st.session_state.current_page
+current_page = (
+    st.session_state.current_page
+)
 
 current_module = MODULES.get(
     current_page
@@ -1082,123 +1151,51 @@ current_module = MODULES.get(
 # ERP HEADER
 # ============================================================
 
-if current_module:
+module_title = (
+    current_module["title"]
+    if current_module
+    else "Unknown Module"
+)
 
-    st.markdown(
-        f"""
-        <div class="esan-header">
+st.markdown(
+    f"""
+    <div class="esan-header">
 
-            <div>
+        <div>
 
-                <div class="esan-header-title">
-                    🌾 Esan ERP
-                </div>
-
-                <div class="esan-header-subtitle">
-                    {COMPANY_NAME}
-                    &nbsp;|&nbsp;
-                    Enterprise Milling & Packaging
-                    Management System
-                </div>
-
+            <div class="esan-header-title">
+                🌾 Esan ERP
             </div>
 
-            <div class="esan-header-module">
-                {current_module["title"]}
+            <div class="esan-header-subtitle">
+                {COMPANY_NAME}
+                &nbsp;|&nbsp;
+                Enterprise Milling & Packaging
+                Management System
             </div>
 
         </div>
-        """,
-        unsafe_allow_html=True
-    )
 
-
-# ============================================================
-# MODULE TITLE
-# ============================================================
-
-if current_module:
-
-    st.markdown(
-        f"""
-        <div class="module-title">
-            {current_page}
+        <div class="esan-header-module">
+            {module_title}
         </div>
 
-        <div class="module-subtitle">
-            {current_module["title"]} module
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 # ============================================================
-# SUB-NAVIGATION
+# MODULE ROUTER
 # ============================================================
 
-children = None
-
-if current_module:
-
-    children = current_module.get(
-        "children"
-    )
-
-
-if children:
-
-    subpages = list(
-        children.keys()
-    )
-
-    current_subpage = (
-        st.session_state.current_subpage
-    )
-
-    if current_subpage not in subpages:
-
-        current_subpage = subpages[0]
-
-        st.session_state.current_subpage = (
-            current_subpage
-        )
-
-    columns = st.columns(
-        len(subpages)
-    )
-
-    for index, subpage in enumerate(subpages):
-
-        with columns[index]:
-
-            if st.button(
-                subpage,
-                key=(
-                    f"subpage_"
-                    f"{current_page}_"
-                    f"{subpage}"
-                ),
-                use_container_width=True
-            ):
-
-                navigate_subpage(
-                    subpage
-                )
-
-                st.rerun()
-
-
-# ============================================================
-# MODULE RENDERER
-# ============================================================
-
-def render(function, name):
+def render_module(function, label):
 
     if function is None:
 
         st.warning(
-            f"{name} is not available."
+            f"⚠️ {label} is not available yet."
         )
 
         return
@@ -1210,13 +1207,12 @@ def render(function, name):
     except Exception as exc:
 
         logger.exception(
-            "Error in %s: %s",
-            name,
-            exc
+            "Error rendering module %s",
+            label,
         )
 
         st.error(
-            f"{name} encountered an error."
+            f"❌ {label} encountered an error."
         )
 
         with st.expander(
@@ -1229,36 +1225,117 @@ def render(function, name):
 
 
 # ============================================================
-# ROUTER
+# INVALID MODULE PROTECTION
 # ============================================================
 
 if current_module is None:
 
     st.error(
-        f"Module '{current_page}' was not found."
+        f"Module '{current_page}' "
+        "could not be found."
     )
 
 else:
 
+    children = current_module.get(
+        "children"
+    )
+
+
+    # --------------------------------------------------------
+    # MODULE WITH SUBMODULES
+    # --------------------------------------------------------
+
     if children:
 
-        selected_function = children.get(
+        subpages = list(
+            children.keys()
+        )
+
+        current_subpage = (
             st.session_state.current_subpage
         )
 
-        render(
+        if current_subpage not in subpages:
+
+            current_subpage = subpages[0]
+
+            st.session_state.current_subpage = (
+                current_subpage
+            )
+
+
+        st.markdown(
+            '<div class="subnav-label">'
+            'Module Navigation'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+
+        columns = st.columns(
+            len(subpages)
+        )
+
+
+        for index, subpage in enumerate(
+            subpages
+        ):
+
+            with columns[index]:
+
+                button_type = (
+                    "primary"
+                    if (
+                        subpage
+                        == current_subpage
+                    )
+                    else "secondary"
+                )
+
+                if st.button(
+                    subpage,
+                    key=(
+                        "subnav_"
+                        + current_page
+                        + "_"
+                        + subpage
+                    ),
+                    type=button_type,
+                    use_container_width=True,
+                ):
+
+                    navigate_subpage(
+                        subpage
+                    )
+
+                    st.rerun()
+
+
+        selected_function = children.get(
+            current_subpage
+        )
+
+        render_module(
             selected_function,
             (
-                f"{current_module['title']} / "
-                f"{st.session_state.current_subpage}"
-            )
+                f"{module_title} / "
+                f"{current_subpage}"
+            ),
         )
+
+
+    # --------------------------------------------------------
+    # SIMPLE MODULE
+    # --------------------------------------------------------
 
     else:
 
-        render(
-            current_module["function"],
-            current_module["title"]
+        render_module(
+            current_module.get(
+                "function"
+            ),
+            module_title,
         )
 
 
@@ -1273,14 +1350,16 @@ if module_errors:
     ):
 
         st.caption(
-            "The following module imports need attention. "
-            "The rest of the ERP can continue running."
+            "These are module import warnings. "
+            "They do not necessarily prevent the "
+            "rest of Esan ERP from running."
         )
 
         for error in module_errors:
 
             st.write(
-                f"• {error}"
+                "• "
+                + error
             )
 
 
@@ -1298,5 +1377,5 @@ st.markdown(
         Version {VERSION}
     </div>
     """,
-    unsafe_allow_html=True
-      )
+    unsafe_allow_html=True,
+    )
