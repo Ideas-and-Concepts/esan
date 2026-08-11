@@ -33,7 +33,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ---------- Global UI ----------
+# ---------- Global UI (polished from first version) ----------
 st.markdown(
     """
     <style>
@@ -106,7 +106,7 @@ try:
 except ImportError:
     load_seed_data = None
 
-# ---------- Module registry ----------
+# ---------- Module registry (matching actual repo files) ----------
 dashboard_home = safe_import("modules.dashboard.home", "dashboard_home")
 procurement_dashboard = safe_import("modules.procurement.dashboard", "procurement_dashboard")
 procurement_suppliers = safe_import("modules.procurement.suppliers", "suppliers_page")
@@ -122,7 +122,7 @@ sales_orders = safe_import("modules.sales.orders", "sales_orders_page")
 sales_delivery = safe_import("modules.sales.delivery", "delivery_page")
 sales_payments = safe_import("modules.sales.payments", "payments_page")
 
-# Invoice page inline
+# Inline invoice page (uses invoicing service)
 def sales_invoice_page():
     st.subheader("🧾 Invoice Management")
     try:
@@ -244,7 +244,7 @@ if not st.session_state.logged_in:
         st.caption("Default: admin / admin123")
     st.stop()
 
-# ---------- Sidebar ----------
+# ---------- Sidebar with buttons (reliable navigation) ----------
 with st.sidebar:
     st.markdown(f"""
     <div class="esan-brand">
@@ -255,17 +255,38 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # Navigation using selectbox – always visible and works
+    st.divider()
     st.markdown("### 📋 Navigation")
-    menu_options = list(MODULES.keys())
-    current_page = st.session_state.current_page
-    # Use index of current_page if it exists, else 0
-    default_idx = menu_options.index(current_page) if current_page in menu_options else 0
-    selected = st.selectbox("", menu_options, index=default_idx, label_visibility="collapsed")
-    if selected != current_page:
-        st.session_state.current_page = selected
-        st.session_state.current_subpage = "Dashboard"
-        st.rerun()
+
+    # Define navigation button function
+    def nav_button(label):
+        if st.button(label, use_container_width=True):
+            st.session_state.current_page = label
+            st.session_state.current_subpage = "Dashboard"
+            st.rerun()
+
+    # MAIN
+    st.markdown("**MAIN**")
+    nav_button("🏠 Overview")
+
+    # OPERATIONS
+    st.markdown("**OPERATIONS**")
+    nav_button("🌾 Procurement")
+    nav_button("📦 Warehouse")
+    nav_button("🏭 Milling")
+    nav_button("📦 Packaging")
+
+    # COMMERCIAL
+    st.markdown("**COMMERCIAL**")
+    nav_button("🚚 Sales & Distribution")
+
+    # FINANCE
+    st.markdown("**FINANCE**")
+    nav_button("💰 Finance")
+
+    # REPORTING
+    st.markdown("**REPORTING**")
+    nav_button("📊 Reports")
 
     st.divider()
     st.markdown(f"**👤 {st.session_state.full_name}**")
@@ -287,7 +308,7 @@ if cur_mod:
     </div>
     """, unsafe_allow_html=True)
 
-# ---------- Sub-navigation ----------
+# ---------- Sub-navigation (for modules with children) ----------
 children = cur_mod.get("children") if cur_mod else None
 if children:
     subpages = list(children.keys())
@@ -298,7 +319,8 @@ if children:
     cols = st.columns(len(subpages))
     for i, sp in enumerate(subpages):
         with cols[i]:
-            if st.button(f"✓ {sp}" if cur_sub == sp else sp, key=f"sub_{sp}", use_container_width=True, type="primary" if cur_sub == sp else "secondary"):
+            if st.button(sp, key=f"sub_{sp}", use_container_width=True,
+                         type="primary" if cur_sub == sp else "secondary"):
                 st.session_state.current_subpage = sp
                 st.rerun()
 
