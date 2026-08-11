@@ -3,7 +3,6 @@ Esan ERP
 Main Dashboard / Overview
 
 Nile Harvest Foods Ltd.
-Enterprise Milling & Packaging Management System
 """
 
 import streamlit as st
@@ -12,53 +11,53 @@ from services.dashboard_service import get_kpis
 
 
 def dashboard_home():
+    """
+    Render the main Esan ERP Overview dashboard.
+    """
 
     st.title("🏠 Overview")
+    st.caption(
+        "Nile Harvest Foods Ltd. | Enterprise Milling & Packaging Management System"
+    )
 
     try:
-
         kpis = get_kpis()
 
     except Exception as e:
-
-        st.error(
-            f"Unable to load dashboard data: {e}"
-        )
-
+        st.error("Unable to load dashboard information.")
+        st.exception(e)
         return
 
     # ==================================================
-    # PRIMARY KPIs
+    # SALES & CUSTOMER KPIs
     # ==================================================
+
+    st.subheader("📊 Business Overview")
 
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-
         st.metric(
             "Customers",
-            kpis.get("customers", 0),
+            f"{kpis['customers']:,}",
         )
 
     with col2:
-
         st.metric(
             "Sales Orders",
-            kpis.get("orders", 0),
+            f"{kpis['orders']:,}",
         )
 
     with col3:
-
         st.metric(
             "Invoiced",
-            f"UGX {kpis.get('invoiced', 0):,.2f}",
+            f"UGX {kpis['invoiced']:,.0f}",
         )
 
     with col4:
-
         st.metric(
             "Collected",
-            f"UGX {kpis.get('collected', 0):,.2f}",
+            f"UGX {kpis['collected']:,.0f}",
         )
 
     st.divider()
@@ -67,65 +66,55 @@ def dashboard_home():
     # OPERATIONS KPIs
     # ==================================================
 
-    col5, col6, col7, col8 = st.columns(4)
+    st.subheader("🏭 Operations")
 
-    with col5:
+    col1, col2, col3, col4 = st.columns(4)
 
+    with col1:
         st.metric(
             "Products",
-            kpis.get("products", 0),
+            f"{kpis['products']:,}",
         )
 
-    with col6:
-
+    with col2:
         st.metric(
-            "Stock (Kg)",
-            f"{kpis.get('stock_kg', 0):,.1f}",
+            "Stock",
+            f"{kpis['stock_kg']:,.1f} Kg",
         )
 
-    with col7:
-
+    with col3:
         st.metric(
             "Milling Batches",
-            kpis.get("milling_batches", 0),
+            f"{kpis['milling_batches']:,}",
         )
 
-    with col8:
-
+    with col4:
         st.metric(
             "Packaging Batches",
-            kpis.get("packaging_batches", 0),
+            f"{kpis['packaging_batches']:,}",
         )
 
     st.divider()
 
     # ==================================================
-    # ERP STATUS
+    # FACTORY STATUS
     # ==================================================
 
-    st.subheader(
-        "🏭 Factory & Operations Status"
+    st.subheader("🏭 Factory Status")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.success("🟢 Milling Line 1\n\nRunning")
+
+    with col2:
+        st.success("🟢 Warehouse\n\nOperational")
+
+    with col3:
+        st.info("🔵 Packaging Line\n\nScheduled Maintenance")
+
+    st.divider()
+
+    st.caption(
+        "Esan ERP | Nile Harvest Foods Ltd."
     )
-
-    status_col1, status_col2, status_col3 = st.columns(3)
-
-    with status_col1:
-
-        st.success(
-            "🌾 Procurement\n\n"
-            "Supplier and purchase management operational."
-        )
-
-    with status_col2:
-
-        st.success(
-            "📦 Warehouse\n\n"
-            "Inventory management operational."
-        )
-
-    with status_col3:
-
-        st.info(
-            "🏭 Production\n\n"
-            "Milling and packaging modules available."
-        )
