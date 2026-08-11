@@ -3,7 +3,7 @@ Esan ERP Controller
 Nile Harvest Foods Ltd.
 Enterprise Milling & Packaging Management System
 
-Version 1.4.0 Alpha (Merged)
+Version 1.4.0 Alpha – Full Module Integration
 """
 
 import streamlit as st
@@ -123,35 +123,43 @@ except ImportError:
 
 
 # ==================================================
-# MODULE REGISTRY (all modules from both versions)
+# MODULE REGISTRY – every module from the repository
 # ==================================================
 
-dashboard_home           = safe_import("modules.dashboard.home",            "dashboard_home")
-procurement_dashboard    = safe_import("modules.procurement.dashboard",     "procurement_dashboard")
-warehouse_dashboard      = safe_import("modules.warehouse.dashboard",       "warehouse_dashboard")
-milling_dashboard        = safe_import("modules.milling.dashboard",        "milling_dashboard")
-packaging_dashboard      = safe_import("modules.packaging.dashboard",      "packaging_dashboard")
+# --- Dashboard ---
+dashboard_home = safe_import("modules.dashboard.home", "dashboard_home")
 
-sales_dashboard          = safe_import("modules.sales.dashboard",           "sales_dashboard")
-customers_page           = safe_import("modules.sales.customers",           "customers_page")
-quotations_page          = safe_import("modules.sales.quotations",          "quotations_page")
-sales_orders_page        = safe_import("modules.sales.orders",              "sales_orders_page")
-dispatch_page            = safe_import("modules.sales.dispatch",            "dispatch_page")
-delivery_page            = safe_import("modules.sales.delivery",            "delivery_page")
+# --- Operations ---
+procurement_dashboard = safe_import("modules.procurement.dashboard", "procurement_dashboard")
+warehouse_dashboard   = safe_import("modules.warehouse.dashboard",   "warehouse_dashboard")
+milling_dashboard     = safe_import("modules.milling.dashboard",    "milling_dashboard")
+packaging_dashboard   = safe_import("modules.packaging.dashboard",  "packaging_dashboard")
 
-invoices_page            = safe_import("modules.finance.invoices",          "invoices_page")
-payments_page            = safe_import("modules.finance.payments",          "payments_page")
-finance_dashboard        = safe_import("modules.finance.dashboard",         "finance_dashboard")
+# --- Sales & Distribution ---
+sales_dashboard   = safe_import("modules.sales.dashboard",   "sales_dashboard")
+customers_page    = safe_import("modules.sales.customers",    "customers_page")
+quotations_page   = safe_import("modules.sales.quotations",   "quotations_page")
+sales_orders_page = safe_import("modules.sales.orders",      "sales_orders_page")
+dispatch_page     = safe_import("modules.sales.dispatch",     "dispatch_page")
+delivery_page     = safe_import("modules.sales.delivery",     "delivery_page")
 
-reports_dashboard        = safe_import("modules.reports.dashboard",         "reports_dashboard")
+# --- Finance ---
+finance_dashboard = safe_import("modules.finance.dashboard", "finance_dashboard")
+invoices_page     = safe_import("modules.finance.invoices",   "invoices_page")
+payments_page     = safe_import("modules.finance.payments",   "payments_page")
 
-logistics_dashboard      = safe_import("modules.logistics.dashboard",       "logistics_dashboard")
-hr_dashboard             = safe_import("modules.hr.dashboard",              "hr_dashboard")
-maintenance_dashboard    = safe_import("modules.maintenance.dashboard",     "maintenance_dashboard")
-ai_assistant_page        = safe_import("modules.ai_assistant.ai_page",      "ai_assistant_page")
+# --- Logistics & HR ---
+logistics_dashboard   = safe_import("modules.logistics.dashboard",   "logistics_dashboard")
+hr_dashboard          = safe_import("modules.hr.dashboard",          "hr_dashboard")
+maintenance_dashboard = safe_import("modules.maintenance.dashboard", "maintenance_dashboard")
+ai_assistant_page     = safe_import("modules.ai_assistant.ai_page",  "ai_assistant_page")
 
-user_management_page     = safe_import("modules.administration.user_management", "user_management_page")
-change_password_page     = safe_import("modules.administration.change_password", "change_password_page")
+# --- Reports ---
+reports_dashboard = safe_import("modules.reports.dashboard", "reports_dashboard")
+
+# --- Administration ---
+user_management_page = safe_import("modules.administration.user_management", "user_management_page")
+change_password_page = safe_import("modules.administration.change_password", "change_password_page")
 
 
 # ==================================================
@@ -260,7 +268,7 @@ st.caption(f"{COMPANY_NAME} | Version {VERSION}")
 
 
 # ==================================================
-# ERP SIDEBAR NAVIGATION (merged with all modules)
+# SIDEBAR NAVIGATION
 # ==================================================
 
 with st.sidebar:
@@ -374,11 +382,11 @@ elif menu == "🚚 Sales & Distribution":
         "Invoices": invoices_page,
         "Payments": payments_page
     }
-    selected_page = sales_pages.get(sales_menu)
-    if selected_page:
-        selected_page()
+    page = sales_pages.get(sales_menu)
+    if page:
+        page()
     else:
-        st.warning("Sales page unavailable")
+        st.warning(f"{sales_menu} page unavailable")
 
 elif menu == "💰 Finance":
     if finance_dashboard:
