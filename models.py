@@ -2,8 +2,7 @@
 Esan ERP Database Models
 Nile Harvest Foods Ltd.
 Enterprise Milling & Packaging ERP
-
-Version 1.4.0 Alpha
+Version 1.4.0
 """
 
 from datetime import datetime
@@ -32,36 +31,13 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-
-    username = Column(
-        String,
-        unique=True,
-        nullable=False,
-    )
-
-    password_hash = Column(
-        String,
-        nullable=False,
-    )
-
+    username = Column(String, unique=True, nullable=False)
+    password_hash = Column(String, nullable=False)
     full_name = Column(String)
-
-    role = Column(
-        String,
-        default="user",
-    )
-
+    role = Column(String, default="user")
     email = Column(String)
-
-    active = Column(
-        Boolean,
-        default=True,
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # ==================================================
@@ -71,43 +47,25 @@ class User(Base):
 class Customer(Base):
     __tablename__ = "customers"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True,
-    )
-
-    name = Column(
-        String,
-        nullable=False,
-    )
-
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
     phone = Column(String)
     email = Column(String)
     address = Column(String)
-
-    customer_type = Column(
-        String,
-        default="Retail",
-    )
-
+    customer_type = Column(String, default="Retail")
     location = Column(String)
     country = Column(String)
     contact_person = Column(String)
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     quotations = relationship(
         "Quotation",
-        back_populates="customer",
+        back_populates="customer"
     )
 
     orders = relationship(
         "SalesOrder",
-        back_populates="customer",
+        back_populates="customer"
     )
 
 
@@ -118,81 +76,38 @@ class Customer(Base):
 class Quotation(Base):
     __tablename__ = "quotations"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
-    quotation_number = Column(
-        String,
-        unique=True,
-    )
-
-    customer_id = Column(
-        Integer,
-        ForeignKey("customers.id"),
-    )
-
-    status = Column(
-        String,
-        default="Draft",
-    )
-
-    total_amount = Column(
-        Float,
-        default=0,
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
+    id = Column(Integer, primary_key=True)
+    quotation_number = Column(String, unique=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"))
+    status = Column(String, default="Draft")
+    total_amount = Column(Float, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     customer = relationship(
         "Customer",
-        back_populates="quotations",
+        back_populates="quotations"
     )
 
     items = relationship(
         "QuotationItem",
         back_populates="quotation",
-        cascade="all, delete-orphan",
+        cascade="all, delete-orphan"
     )
 
 
 class QuotationItem(Base):
     __tablename__ = "quotation_items"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
-    quotation_id = Column(
-        Integer,
-        ForeignKey("quotations.id"),
-    )
-
+    id = Column(Integer, primary_key=True)
+    quotation_id = Column(Integer, ForeignKey("quotations.id"))
     product_name = Column(String)
-
-    quantity = Column(
-        Float,
-        default=0,
-    )
-
-    unit_price = Column(
-        Float,
-        default=0,
-    )
-
-    total = Column(
-        Float,
-        default=0,
-    )
+    quantity = Column(Float)
+    unit_price = Column(Float)
+    total = Column(Float)
 
     quotation = relationship(
         "Quotation",
-        back_populates="items",
+        back_populates="items"
     )
 
 
@@ -203,294 +118,235 @@ class QuotationItem(Base):
 class SalesOrder(Base):
     __tablename__ = "sales_orders"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
-    order_number = Column(
-        String,
-        unique=True,
-    )
-
-    customer_id = Column(
-        Integer,
-        ForeignKey("customers.id"),
-    )
-
-    status = Column(
-        String,
-        default="Pending",
-    )
-
-    total_amount = Column(
-        Float,
-        default=0,
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
+    id = Column(Integer, primary_key=True)
+    order_number = Column(String, unique=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"))
+    status = Column(String, default="Pending")
+    total_amount = Column(Float, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     customer = relationship(
         "Customer",
-        back_populates="orders",
+        back_populates="orders"
     )
 
     items = relationship(
         "SalesOrderItem",
         back_populates="order",
-        cascade="all, delete-orphan",
+        cascade="all, delete-orphan"
     )
 
 
 class SalesOrderItem(Base):
     __tablename__ = "sales_order_items"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
-    order_id = Column(
-        Integer,
-        ForeignKey("sales_orders.id"),
-    )
-
+    id = Column(Integer, primary_key=True)
+    order_id = Column(Integer, ForeignKey("sales_orders.id"))
     product_name = Column(String)
-
-    quantity = Column(
-        Float,
-        default=0,
-    )
-
-    unit_price = Column(
-        Float,
-        default=0,
-    )
-
-    total = Column(
-        Float,
-        default=0,
-    )
+    quantity = Column(Float)
+    unit_price = Column(Float)
+    total = Column(Float)
 
     order = relationship(
         "SalesOrder",
-        back_populates="items",
+        back_populates="items"
     )
 
 
 # ==================================================
-# PROCUREMENT
+# PROCUREMENT - SUPPLIERS
 # ==================================================
 
 class Supplier(Base):
     __tablename__ = "suppliers"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
-    name = Column(
-        String,
-        nullable=False,
-    )
-
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
     phone = Column(String)
     email = Column(String)
     address = Column(String)
-
     supplier_type = Column(
         String,
-        default="Agricultural Supplier",
+        default="Agricultural Supplier"
     )
-
     location = Column(String)
     country = Column(String)
     contact_person = Column(String)
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
-
-    # ----------------------------------------------
-    # RELATIONSHIPS
-    # ----------------------------------------------
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     purchase_orders = relationship(
         "PurchaseOrder",
-        back_populates="supplier",
+        back_populates="supplier"
     )
 
     purchases = relationship(
         "Purchase",
-        back_populates="supplier",
+        back_populates="supplier"
     )
 
+
+# ==================================================
+# PROCUREMENT - PURCHASE ORDERS
+# ==================================================
 
 class PurchaseOrder(Base):
     __tablename__ = "purchase_orders"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
-    po_number = Column(
-        String,
-        unique=True,
-    )
-
-    supplier_id = Column(
-        Integer,
-        ForeignKey("suppliers.id"),
-    )
-
-    status = Column(
-        String,
-        default="Draft",
-    )
-
-    total_amount = Column(
-        Float,
-        default=0,
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
+    id = Column(Integer, primary_key=True)
+    po_number = Column(String, unique=True)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id"))
+    status = Column(String, default="Draft")
+    total_amount = Column(Float, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     supplier = relationship(
         "Supplier",
-        back_populates="purchase_orders",
+        back_populates="purchase_orders"
     )
 
     items = relationship(
         "PurchaseOrderItem",
         back_populates="purchase_order",
-        cascade="all, delete-orphan",
+        cascade="all, delete-orphan"
     )
 
     purchases = relationship(
         "Purchase",
-        back_populates="purchase_order",
+        back_populates="purchase_order"
     )
 
 
 class PurchaseOrderItem(Base):
     __tablename__ = "purchase_order_items"
 
-    id = Column(
+    id = Column(Integer, primary_key=True)
+    purchase_order_id = Column(
         Integer,
-        primary_key=True,
+        ForeignKey("purchase_orders.id")
+    )
+    product_name = Column(String)
+    quantity = Column(Float)
+    unit_price = Column(Float)
+    total = Column(Float)
+
+    purchase_order = relationship(
+        "PurchaseOrder",
+        back_populates="items"
+    )
+
+
+# ==================================================
+# PROCUREMENT - PURCHASE / RECEIVING
+# ==================================================
+
+class Purchase(Base):
+    """
+    Represents an actual purchase received from a supplier.
+
+    Purchase Order:
+        What we ordered.
+
+    Purchase:
+        What we actually received/purchased.
+    """
+
+    __tablename__ = "purchases"
+
+    id = Column(Integer, primary_key=True)
+
+    purchase_number = Column(
+        String,
+        unique=True,
+        nullable=False
     )
 
     purchase_order_id = Column(
         Integer,
         ForeignKey("purchase_orders.id"),
-    )
-
-    product_name = Column(String)
-
-    quantity = Column(
-        Float,
-        default=0,
-    )
-
-    unit_price = Column(
-        Float,
-        default=0,
-    )
-
-    total = Column(
-        Float,
-        default=0,
-    )
-
-    purchase_order = relationship(
-        "PurchaseOrder",
-        back_populates="items",
-    )
-
-
-# ==================================================
-# ACTUAL PURCHASES / GOODS RECEIVED
-# ==================================================
-
-class Purchase(Base):
-    __tablename__ = "purchases"
-
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True,
-    )
-
-    purchase_number = Column(
-        String,
-        unique=True,
-        nullable=False,
+        nullable=True
     )
 
     supplier_id = Column(
         Integer,
         ForeignKey("suppliers.id"),
-        nullable=False,
-    )
-
-    purchase_order_id = Column(
-        Integer,
-        ForeignKey("purchase_orders.id"),
-        nullable=True,
-    )
-
-    product_name = Column(
-        String,
-        nullable=False,
-    )
-
-    quantity = Column(
-        Float,
-        default=0,
-    )
-
-    unit_price = Column(
-        Float,
-        default=0,
-    )
-
-    total_amount = Column(
-        Float,
-        default=0,
+        nullable=False
     )
 
     status = Column(
         String,
-        default="Received",
+        default="Received"
     )
 
-    purchase_date = Column(
-        DateTime,
-        default=datetime.utcnow,
+    total_amount = Column(
+        Float,
+        default=0
     )
+
+    received_date = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+    warehouse = Column(String)
+
+    notes = Column(Text)
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
-    )
-
-    supplier = relationship(
-        "Supplier",
-        back_populates="purchases",
+        default=datetime.utcnow
     )
 
     purchase_order = relationship(
         "PurchaseOrder",
-        back_populates="purchases",
+        back_populates="purchases"
+    )
+
+    supplier = relationship(
+        "Supplier",
+        back_populates="purchases"
+    )
+
+    items = relationship(
+        "PurchaseItem",
+        back_populates="purchase",
+        cascade="all, delete-orphan"
+    )
+
+
+class PurchaseItem(Base):
+    __tablename__ = "purchase_items"
+
+    id = Column(Integer, primary_key=True)
+
+    purchase_id = Column(
+        Integer,
+        ForeignKey("purchases.id"),
+        nullable=False
+    )
+
+    product_name = Column(
+        String,
+        nullable=False
+    )
+
+    quantity = Column(
+        Float,
+        default=0
+    )
+
+    unit_price = Column(
+        Float,
+        default=0
+    )
+
+    total = Column(
+        Float,
+        default=0
+    )
+
+    purchase = relationship(
+        "Purchase",
+        back_populates="items"
     )
 
 
@@ -501,185 +357,72 @@ class Purchase(Base):
 class Warehouse(Base):
     __tablename__ = "warehouses"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
-    name = Column(
-        String,
-        nullable=False,
-    )
-
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
     location = Column(String)
-
-    capacity = Column(
-        Float,
-        default=0,
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
+    capacity = Column(Float)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class Product(Base):
     __tablename__ = "products"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
-    name = Column(
-        String,
-        nullable=False,
-    )
-
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
     category = Column(String)
-
-    unit = Column(
-        String,
-        default="Kg",
-    )
-
-    quantity = Column(
-        Float,
-        default=0,
-    )
-
-    cost_price = Column(
-        Float,
-        default=0,
-    )
-
-    selling_price = Column(
-        Float,
-        default=0,
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
+    unit = Column(String, default="Kg")
+    quantity = Column(Float, default=0)
+    cost_price = Column(Float, default=0)
+    selling_price = Column(Float, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class StockMovement(Base):
     __tablename__ = "stock_movements"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
+    id = Column(Integer, primary_key=True)
     product_id = Column(
         Integer,
-        ForeignKey("products.id"),
+        ForeignKey("products.id")
     )
-
     movement_type = Column(String)
-
-    quantity = Column(
-        Float,
-        default=0,
-    )
-
+    quantity = Column(Float)
     reference = Column(String)
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
-
-    product = relationship("Product")
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # ==================================================
-# PRODUCTION: MILLING
+# PRODUCTION - MILLING
 # ==================================================
 
 class MillingBatch(Base):
     __tablename__ = "milling_batches"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
-    batch_number = Column(
-        String,
-        unique=True,
-    )
-
+    id = Column(Integer, primary_key=True)
+    batch_number = Column(String, unique=True)
     raw_material = Column(String)
-
-    input_quantity = Column(
-        Float,
-        default=0,
-    )
-
-    output_quantity = Column(
-        Float,
-        default=0,
-    )
-
-    wastage = Column(
-        Float,
-        default=0,
-    )
-
-    status = Column(
-        String,
-        default="Processing",
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
+    input_quantity = Column(Float)
+    output_quantity = Column(Float)
+    wastage = Column(Float)
+    status = Column(String, default="Processing")
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # ==================================================
-# PRODUCTION: PACKAGING
+# PRODUCTION - PACKAGING
 # ==================================================
 
 class PackagingBatch(Base):
     __tablename__ = "packaging_batches"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
-    batch_number = Column(
-        String,
-        unique=True,
-    )
-
+    id = Column(Integer, primary_key=True)
+    batch_number = Column(String, unique=True)
     product_name = Column(String)
-
-    input_quantity = Column(
-        Float,
-        default=0,
-    )
-
-    packed_quantity = Column(
-        Float,
-        default=0,
-    )
-
+    input_quantity = Column(Float)
+    packed_quantity = Column(Float)
     package_size = Column(String)
-
-    status = Column(
-        String,
-        default="Processing",
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
+    status = Column(String, default="Processing")
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # ==================================================
@@ -689,40 +432,18 @@ class PackagingBatch(Base):
 class Delivery(Base):
     __tablename__ = "deliveries"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
-    delivery_number = Column(
-        String,
-        unique=True,
-    )
-
+    id = Column(Integer, primary_key=True)
+    delivery_number = Column(String, unique=True)
     order_id = Column(
         Integer,
-        ForeignKey("sales_orders.id"),
+        ForeignKey("sales_orders.id")
     )
-
     destination = Column(String)
-
     driver = Column(String)
-
     vehicle = Column(String)
-
-    status = Column(
-        String,
-        default="Pending",
-    )
-
+    status = Column(String, default="Pending")
     delivered_date = Column(DateTime)
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
-
-    order = relationship("SalesOrder")
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # ==================================================
@@ -732,43 +453,19 @@ class Delivery(Base):
 class Invoice(Base):
     __tablename__ = "invoices"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
-    invoice_number = Column(
-        String,
-        unique=True,
-    )
-
+    id = Column(Integer, primary_key=True)
+    invoice_number = Column(String, unique=True)
     customer_id = Column(
         Integer,
-        ForeignKey("customers.id"),
+        ForeignKey("customers.id")
     )
-
     order_id = Column(
         Integer,
-        ForeignKey("sales_orders.id"),
+        ForeignKey("sales_orders.id")
     )
-
-    amount = Column(
-        Float,
-        default=0,
-    )
-
-    status = Column(
-        String,
-        default="Unpaid",
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
-
-    customer = relationship("Customer")
-    order = relationship("SalesOrder")
+    amount = Column(Float, default=0)
+    status = Column(String, default="Unpaid")
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # ==================================================
@@ -778,36 +475,16 @@ class Invoice(Base):
 class Payment(Base):
     __tablename__ = "payments"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
+    id = Column(Integer, primary_key=True)
     invoice_id = Column(
         Integer,
-        ForeignKey("invoices.id"),
+        ForeignKey("invoices.id")
     )
-
-    amount = Column(
-        Float,
-        default=0,
-    )
-
+    amount = Column(Float, default=0)
     payment_method = Column(String)
-
     reference = Column(String)
-
-    status = Column(
-        String,
-        default="Completed",
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
-
-    invoice = relationship("Invoice")
+    status = Column(String, default="Completed")
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # ==================================================
@@ -817,28 +494,13 @@ class Payment(Base):
 class FinanceTransaction(Base):
     __tablename__ = "finance_transactions"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
+    id = Column(Integer, primary_key=True)
     transaction_type = Column(String)
-
     category = Column(String)
-
     description = Column(Text)
-
-    amount = Column(
-        Float,
-        default=0,
-    )
-
+    amount = Column(Float)
     reference = Column(String)
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # ==================================================
@@ -848,22 +510,10 @@ class FinanceTransaction(Base):
 class SystemSetting(Base):
     __tablename__ = "system_settings"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
-    key = Column(
-        String,
-        unique=True,
-    )
-
+    id = Column(Integer, primary_key=True)
+    key = Column(String, unique=True)
     value = Column(String)
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # ==================================================
@@ -873,39 +523,37 @@ class SystemSetting(Base):
 class StockReservation(Base):
     __tablename__ = "stock_reservations"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
+    id = Column(Integer, primary_key=True)
 
     sales_order_id = Column(
         Integer,
-        ForeignKey("sales_orders.id"),
+        ForeignKey("sales_orders.id")
     )
 
     product_id = Column(
         Integer,
-        ForeignKey("products.id"),
+        ForeignKey("products.id")
     )
 
-    quantity = Column(
-        Float,
-        default=0,
-    )
+    quantity = Column(Float)
 
     status = Column(
         String,
-        default="Reserved",
+        default="Reserved"
     )
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=datetime.utcnow
     )
 
-    sales_order = relationship("SalesOrder")
+    sales_order = relationship(
+        "SalesOrder"
+    )
 
-    product = relationship("Product")
+    product = relationship(
+        "Product"
+    )
 
 
 # ==================================================
@@ -915,45 +563,17 @@ class StockReservation(Base):
 class Employee(Base):
     __tablename__ = "employees"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
-    employee_code = Column(
-        String,
-        unique=True,
-    )
-
-    full_name = Column(
-        String,
-        nullable=False,
-    )
-
+    id = Column(Integer, primary_key=True)
+    employee_code = Column(String, unique=True)
+    full_name = Column(String, nullable=False)
     department = Column(String)
-
     position = Column(String)
-
     phone = Column(String)
-
     email = Column(String)
-
     hire_date = Column(DateTime)
-
-    salary = Column(
-        Float,
-        default=0,
-    )
-
-    status = Column(
-        String,
-        default="Active",
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
+    salary = Column(Float, default=0)
+    status = Column(String, default="Active")
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # ==================================================
@@ -963,72 +583,47 @@ class Employee(Base):
 class Vehicle(Base):
     __tablename__ = "vehicles"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
-
-    vehicle_number = Column(
-        String,
-        unique=True,
-    )
-
+    id = Column(Integer, primary_key=True)
+    vehicle_number = Column(String, unique=True)
     vehicle_type = Column(String)
-
     make = Column(String)
-
     model = Column(String)
-
-    capacity = Column(
-        Float,
-        default=0,
-    )
-
+    capacity = Column(Float)
     status = Column(
         String,
-        default="Available",
+        default="Available"
     )
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-    )
-
-
-# ==================================================
-# VEHICLE MAINTENANCE
-# ==================================================
 
 class MaintenanceRecord(Base):
     __tablename__ = "maintenance_records"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
+    id = Column(Integer, primary_key=True)
 
     vehicle_id = Column(
         Integer,
-        ForeignKey("vehicles.id"),
+        ForeignKey("vehicles.id")
     )
 
     description = Column(Text)
 
     cost = Column(
         Float,
-        default=0,
+        default=0
     )
 
     maintenance_date = Column(DateTime)
-
     next_due_date = Column(DateTime)
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=datetime.utcnow
     )
 
-    vehicle = relationship("Vehicle")
+    vehicle = relationship(
+        "Vehicle"
+    )
 
 
 # ==================================================
@@ -1038,32 +633,25 @@ class MaintenanceRecord(Base):
 class Equipment(Base):
     __tablename__ = "equipment"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-    )
+    id = Column(Integer, primary_key=True)
 
     name = Column(
         String,
-        nullable=False,
+        nullable=False
     )
 
     equipment_type = Column(String)
-
     serial_number = Column(String)
-
     purchase_date = Column(DateTime)
-
     last_maintenance = Column(DateTime)
-
     next_maintenance = Column(DateTime)
 
     status = Column(
         String,
-        default="Operational",
+        default="Operational"
     )
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=datetime.utcnow
     )
