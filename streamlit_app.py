@@ -12,8 +12,10 @@ streamlit_app.py
     ├── Database initialization
     ├── ERP sidebar navigation
     ├── Dynamic module header
-    ├── Module router
-    └── Module error isolation
+    ├── Module registry
+    ├── Safe module imports
+    ├── Safe module rendering
+    └── Module diagnostics
 
 modules/
     ├── dashboard/
@@ -32,6 +34,7 @@ The pages/ directory is NOT required.
 # STANDARD LIBRARY
 # ============================================================
 
+import html
 import logging
 from typing import Callable, Optional
 
@@ -80,7 +83,7 @@ st.set_page_config(
 
 
 # ============================================================
-# GLOBAL ERP STYLE
+# GLOBAL ERP UI
 # ============================================================
 
 st.markdown(
@@ -302,15 +305,11 @@ st.markdown(
 
 
     /* ======================================================
-       FOOTER
+       SUBNAVIGATION
        ====================================================== */
 
-    .esan-footer {
-        text-align: center;
-        color: #9ca3af;
-        font-size: 0.7rem;
-        margin-top: 30px;
-        padding-bottom: 10px;
+    .esan-subnav {
+        margin-bottom: 18px;
     }
 
 
@@ -319,7 +318,7 @@ st.markdown(
        ====================================================== */
 
     .esan-login-card {
-        max-width: 480px;
+        max-width: 520px;
         margin: 70px auto 20px auto;
         text-align: center;
     }
@@ -333,17 +332,33 @@ st.markdown(
         color: #263238;
         margin: 10px 0 3px 0;
         font-size: 2.1rem;
+        font-weight: 750;
     }
 
     .esan-login-company {
         color: #4a5568;
         margin: 0;
+        font-size: 1.1rem;
+        font-weight: 600;
     }
 
     .esan-login-description {
         color: #718096;
         font-size: 0.9rem;
         margin-top: 7px;
+    }
+
+
+    /* ======================================================
+       FOOTER
+       ====================================================== */
+
+    .esan-footer {
+        text-align: center;
+        color: #9ca3af;
+        font-size: 0.7rem;
+        margin-top: 30px;
+        padding-bottom: 10px;
     }
 
     </style>
@@ -367,6 +382,7 @@ DEFAULT_SESSION = {
 }
 
 for key, value in DEFAULT_SESSION.items():
+
     if key not in st.session_state:
         st.session_state[key] = value
 
@@ -386,8 +402,15 @@ def safe_import(
     module_path: str,
     function_name: str,
 ) -> Optional[Callable]:
+    """
+    Safely import a module function.
+
+    A broken optional module must not prevent
+    the rest of Esan ERP from starting.
+    """
 
     try:
+
         module = __import__(
             module_path,
             fromlist=[function_name],
@@ -403,10 +426,12 @@ def safe_import(
 
             error = (
                 f"{module_path}: "
-                f"function '{function_name}' not found"
+                f"function '{function_name}' "
+                f"not found"
             )
 
             module_errors.append(error)
+
             logger.warning(error)
 
             return None
@@ -415,7 +440,10 @@ def safe_import(
 
     except Exception as exc:
 
-        error = f"{module_path}: {exc}"
+        error = (
+            f"{module_path}: "
+            f"{type(exc).__name__}: {exc}"
+        )
 
         module_errors.append(error)
 
@@ -428,37 +456,70 @@ def safe_import(
 
 
 # ============================================================
-# OPTIONAL ADMIN SERVICE
+# ADMIN CREATION
 # ============================================================
 
 try:
 
     from services.user_service import create_admin
 
-except ImportError:
+except Exception as exc:
 
-    def create_admin(db):
+    logger.warning(
+        "Could not import services.user_service: %s",
+        exc,
+    )
 
-        admin = (
+    create_admin = None
+
+
+def create_fallback_admin(db):
+    """
+    Create the default administrator without assuming
+    optional User model fields.
+
+    This prevents errors such as:
+        TypeError: 'full_name' is an invalid keyword argument
+    """
+
+    try:
+
+        existing_admin = (
             db.query(User)
-            .filter(
-                User.username == "admin"
-            )
+            .filter(User.username == "admin")
             .first()
         )
 
-        if admin:
-            return
+        if existing_admin:
+
+            return existing_admin
 
         from auth import hash_password
 
-        admin = User(
-            username="admin",
-            password_hash=hash_password("admin123"),
-            role="Administrator",
-            full_name="System Administrator",
-            email="admin@nileharvest.com",
+        # Build only fields that actually exist
+        # in the current User model.
+        user_columns = set(
+            User.__table__.columns.keys()
         )
+
+        admin_data = {
+            "username": "admin",
+            "password_hash": hash_password("admin123"),
+            "role": "Administrator",
+        }
+
+        optional_values = {
+            "full_name": "System Administrator",
+            "email": "admin@nileharvest.com",
+            "active": True,
+        }
+
+        for field, value in optional_values.items():
+
+            if field in user_columns:
+                admin_data[field] = value
+
+        admin = User(**admin_data)
 
         db.add(admin)
         db.commit()
@@ -466,6 +527,18 @@ except ImportError:
         logger.info(
             "Default administrator created."
         )
+
+        return admin
+
+    except Exception:
+
+        db.rollback()
+
+        logger.exception(
+            "Fallback administrator creation failed."
+        )
+
+        raise
 
 
 # ============================================================
@@ -476,13 +549,18 @@ try:
 
     from seed.seed_data import load_seed_data
 
-except ImportError:
+except Exception as exc:
+
+    logger.warning(
+        "Seed module unavailable: %s",
+        exc,
+    )
 
     load_seed_data = None
 
 
 # ============================================================
-# MODULE IMPORTS
+# MODULE REGISTRY
 # ============================================================
 
 # ------------------------------------------------------------
@@ -611,7 +689,7 @@ reports_dashboard = safe_import(
 
 
 # ============================================================
-# MODULE REGISTRY
+# ERP MODULE CONFIGURATION
 # ============================================================
 
 MODULES = {
@@ -695,6 +773,10 @@ MODULES = {
 
 @st.cache_resource
 def initialize_database():
+    """
+    Initialize database tables and ensure that an
+    administrator account exists.
+    """
 
     try:
 
@@ -722,6 +804,7 @@ def initialize_database():
                 ),
             )
 
+        # Create only missing tables.
         Base.metadata.create_all(
             bind=engine
         )
@@ -730,7 +813,29 @@ def initialize_database():
 
         try:
 
-            create_admin(db)
+            if create_admin:
+
+                try:
+
+                    create_admin(db)
+
+                except TypeError as exc:
+
+                    # Protect against an old user_service
+                    # having an incompatible User model.
+                    logger.warning(
+                        "Repository create_admin failed "
+                        "with TypeError: %s",
+                        exc,
+                    )
+
+                    db.rollback()
+
+                    create_fallback_admin(db)
+
+            else:
+
+                create_fallback_admin(db)
 
         finally:
 
@@ -741,13 +846,15 @@ def initialize_database():
     except Exception as exc:
 
         logger.exception(
-            "Database initialization failed"
+            "Database initialization failed."
         )
 
         return False, str(exc)
 
 
-# Run database initialization
+# ============================================================
+# START DATABASE
+# ============================================================
 
 db_ok, db_error = initialize_database()
 
@@ -773,7 +880,10 @@ if not db_ok:
 # SEED DATA
 # ============================================================
 
-if load_seed_data and not st.session_state.seed_loaded:
+if (
+    load_seed_data
+    and not st.session_state.seed_loaded
+):
 
     try:
 
@@ -787,6 +897,7 @@ if load_seed_data and not st.session_state.seed_loaded:
 
     except Exception as exc:
 
+        # Do not stop the ERP if seed data fails.
         st.session_state.seed_loaded = True
 
         logger.warning(
@@ -803,6 +914,12 @@ def login(
     username: str,
     password: str,
 ) -> bool:
+    """
+    Authenticate an ERP user.
+    """
+
+    if not username or not password:
+        return False
 
     db = SessionLocal()
 
@@ -825,14 +942,18 @@ def login(
         ):
             return False
 
-        # Respect User.active where available.
+        # Respect active status when present.
         if hasattr(user, "active"):
 
             if user.active is False:
                 return False
 
         st.session_state.logged_in = True
-        st.session_state.username = user.username
+
+        st.session_state.username = (
+            user.username
+        )
+
         st.session_state.full_name = (
             getattr(
                 user,
@@ -841,8 +962,14 @@ def login(
             )
             or user.username
         )
+
         st.session_state.role = (
-            user.role or "user"
+            getattr(
+                user,
+                "role",
+                None,
+            )
+            or "user"
         )
 
         logger.info(
@@ -987,10 +1114,12 @@ if not st.session_state.logged_in:
 def navigate(page: str):
 
     if page not in MODULES:
+
         logger.warning(
             "Unknown navigation page: %s",
             page,
         )
+
         return
 
     st.session_state.current_page = page
@@ -1017,6 +1146,14 @@ with st.sidebar:
     # BRAND
     # --------------------------------------------------------
 
+    company_safe = html.escape(
+        str(COMPANY_NAME)
+    )
+
+    version_safe = html.escape(
+        str(VERSION)
+    )
+
     st.markdown(
         f"""
         <div class="esan-brand">
@@ -1030,11 +1167,11 @@ with st.sidebar:
             </div>
 
             <div class="esan-company">
-                {COMPANY_NAME}
+                {company_safe}
             </div>
 
             <div class="esan-version">
-                Version {VERSION}
+                Version {version_safe}
             </div>
 
         </div>
@@ -1052,7 +1189,12 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    if st.session_state.current_page == "🏠 Overview":
+    overview_page = "🏠 Overview"
+
+    if (
+        st.session_state.current_page
+        == overview_page
+    ):
 
         st.markdown(
             '<div class="esan-active-module">'
@@ -1069,7 +1211,7 @@ with st.sidebar:
             use_container_width=True,
         ):
 
-            navigate("🏠 Overview")
+            navigate(overview_page)
             st.rerun()
 
 
@@ -1103,11 +1245,14 @@ with st.sidebar:
 
     for page, key in operation_pages:
 
-        if st.session_state.current_page == page:
+        if (
+            st.session_state.current_page
+            == page
+        ):
 
             st.markdown(
                 f'<div class="esan-active-module">'
-                f'{page}'
+                f'{html.escape(page)}'
                 f'</div>',
                 unsafe_allow_html=True,
             )
@@ -1133,9 +1278,12 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    page = "🚚 Sales & Distribution"
+    sales_page = "🚚 Sales & Distribution"
 
-    if st.session_state.current_page == page:
+    if (
+        st.session_state.current_page
+        == sales_page
+    ):
 
         st.markdown(
             '<div class="esan-active-module">'
@@ -1147,12 +1295,12 @@ with st.sidebar:
     else:
 
         if st.button(
-            page,
+            sales_page,
             key="sidebar_sales",
             use_container_width=True,
         ):
 
-            navigate(page)
+            navigate(sales_page)
             st.rerun()
 
 
@@ -1165,9 +1313,12 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    page = "💰 Finance"
+    finance_page = "💰 Finance"
 
-    if st.session_state.current_page == page:
+    if (
+        st.session_state.current_page
+        == finance_page
+    ):
 
         st.markdown(
             '<div class="esan-active-module">'
@@ -1179,12 +1330,12 @@ with st.sidebar:
     else:
 
         if st.button(
-            page,
+            finance_page,
             key="sidebar_finance",
             use_container_width=True,
         ):
 
-            navigate(page)
+            navigate(finance_page)
             st.rerun()
 
 
@@ -1197,9 +1348,12 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    page = "📊 Reports"
+    reports_page = "📊 Reports"
 
-    if st.session_state.current_page == page:
+    if (
+        st.session_state.current_page
+        == reports_page
+    ):
 
         st.markdown(
             '<div class="esan-active-module">'
@@ -1211,12 +1365,12 @@ with st.sidebar:
     else:
 
         if st.button(
-            page,
+            reports_page,
             key="sidebar_reports",
             use_container_width=True,
         ):
 
-            navigate(page)
+            navigate(reports_page)
             st.rerun()
 
 
@@ -1224,7 +1378,12 @@ with st.sidebar:
     # ADMINISTRATION
     # --------------------------------------------------------
 
-    if st.session_state.role == "Administrator":
+    if (
+        str(
+            st.session_state.role
+        ).lower()
+        == "administrator"
+    ):
 
         st.markdown(
             '<div class="nav-section">'
@@ -1242,16 +1401,31 @@ with st.sidebar:
     # USER PANEL
     # --------------------------------------------------------
 
+    user_name = html.escape(
+        str(
+            st.session_state.full_name
+            or st.session_state.username
+            or "User"
+        )
+    )
+
+    user_role = html.escape(
+        str(
+            st.session_state.role
+            or "user"
+        )
+    )
+
     st.markdown(
         f"""
         <div class="esan-user">
 
             <div class="esan-user-name">
-                👤 {st.session_state.full_name}
+                👤 {user_name}
             </div>
 
             <div class="esan-user-role">
-                {st.session_state.role}
+                {user_role}
             </div>
 
         </div>
@@ -1274,7 +1448,9 @@ with st.sidebar:
 # CURRENT MODULE
 # ============================================================
 
-current_page = st.session_state.current_page
+current_page = (
+    st.session_state.current_page
+)
 
 current_module = MODULES.get(
     current_page
@@ -1287,6 +1463,12 @@ current_module = MODULES.get(
 
 if current_module:
 
+    module_title = html.escape(
+        str(
+            current_module["title"]
+        )
+    )
+
     st.markdown(
         f"""
         <div class="esan-header">
@@ -1298,7 +1480,7 @@ if current_module:
                 </div>
 
                 <div class="esan-header-subtitle">
-                    {COMPANY_NAME}
+                    {company_safe}
                     &nbsp;|&nbsp;
                     Enterprise Milling & Packaging
                     Management System
@@ -1307,7 +1489,7 @@ if current_module:
             </div>
 
             <div class="esan-header-module">
-                {current_module["title"]}
+                {module_title}
             </div>
 
         </div>
@@ -1322,15 +1504,20 @@ if current_module:
 
 if current_module:
 
+    module_title = html.escape(
+        str(
+            current_module["title"]
+        )
+    )
+
     st.markdown(
         f"""
         <div class="module-title">
-            {current_module["title"]}
+            {module_title}
         </div>
 
         <div class="module-subtitle">
-            {current_module["title"]}
-            module
+            {module_title} module
         </div>
         """,
         unsafe_allow_html=True,
@@ -1345,8 +1532,10 @@ children = None
 
 if current_module:
 
-    children = current_module.get(
-        "children"
+    children = (
+        current_module.get(
+            "children"
+        )
     )
 
 
@@ -1360,18 +1549,24 @@ if children:
         st.session_state.current_subpage
     )
 
-    if current_subpage not in subpages:
+    if (
+        current_subpage
+        not in subpages
+    ):
 
-        current_subpage = subpages[0]
+        current_subpage = (
+            subpages[0]
+        )
 
         st.session_state.current_subpage = (
             current_subpage
         )
 
 
-    # Avoid creating too many narrow columns.
-    # Streamlit can handle these comfortably for
-    # the current Sales module, Procurement and Warehouse.
+    st.markdown(
+        '<div class="esan-subnav">',
+        unsafe_allow_html=True,
+    )
 
     columns = st.columns(
         len(subpages)
@@ -1388,12 +1583,16 @@ if children:
                 == subpage
             )
 
-            if st.button(
+            button_label = (
                 f"✓ {subpage}"
                 if is_active
-                else subpage,
+                else subpage
+            )
+
+            if st.button(
+                button_label,
                 key=(
-                    f"subpage_"
+                    "subpage_"
                     f"{current_page}_"
                     f"{subpage}"
                 ),
@@ -1411,6 +1610,11 @@ if children:
 
                 st.rerun()
 
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
 
 # ============================================================
 # MODULE RENDERER
@@ -1420,6 +1624,12 @@ def render_module(
     function: Optional[Callable],
     name: str,
 ):
+    """
+    Render an ERP module safely.
+
+    A failure inside one module is contained so
+    the main ERP shell remains available.
+    """
 
     if function is None:
 
@@ -1450,7 +1660,7 @@ def render_module(
         ):
 
             st.code(
-                str(exc)
+                f"{type(exc).__name__}: {exc}"
             )
 
 
@@ -1464,6 +1674,14 @@ if current_module is None:
         f"Module '{current_page}' "
         "was not found."
     )
+
+    if st.button(
+        "Return to Overview",
+        key="return_overview",
+    ):
+
+        navigate("🏠 Overview")
+        st.rerun()
 
 else:
 
@@ -1526,11 +1744,11 @@ st.markdown(
     f"""
     <div class="esan-footer">
 
-        © {COMPANY_NAME}
+        © {company_safe}
         &nbsp;|&nbsp;
         Esan ERP Enterprise Platform
         &nbsp;|&nbsp;
-        Version {VERSION}
+        Version {version_safe}
 
     </div>
     """,
