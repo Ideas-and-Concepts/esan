@@ -3,19 +3,19 @@ Esan ERP Controller
 Nile Harvest Foods Ltd.
 Enterprise Milling & Packaging Management System
 
-Version 1.4.0 Alpha
+Version 1.4.0 Alpha – Full Repository Integration
 
 Architecture
 ------------
 streamlit_app.py
     ├── Authentication
     ├── Database initialization
-    ├── Sidebar navigation
+    ├── Login window
+    ├── ERP sidebar navigation
     ├── Module router
-    └── Safe module loading
+    └── Module error isolation
 
-The Streamlit pages/ directory is NOT required.
-All ERP screens are loaded from modules/.
+The pages/ directory is NOT required.
 """
 
 # ============================================================
@@ -23,7 +23,6 @@ All ERP screens are loaded from modules/.
 # ============================================================
 
 import logging
-from typing import Callable, Optional
 
 
 # ============================================================
@@ -82,21 +81,67 @@ st.markdown(
        ====================================================== */
 
     #MainMenu {
-        visibility: hidden;
+        display: none;
     }
 
     header {
-        visibility: hidden;
+        display: none;
     }
 
     footer {
-        visibility: hidden;
+        display: none;
     }
 
     .block-container {
-        padding-top: 1.2rem;
+        padding-top: 1.5rem;
         padding-bottom: 2rem;
         max-width: 1600px;
+    }
+
+
+    /* ======================================================
+       LOGIN WINDOW
+       ====================================================== */
+
+    .esan-login-card {
+        text-align: center;
+        padding-top: 55px;
+        padding-bottom: 25px;
+    }
+
+    .esan-login-logo {
+        font-size: 4.8rem;
+        line-height: 1;
+        margin-bottom: 12px;
+    }
+
+    .esan-login-title {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: #263238;
+        line-height: 1.1;
+    }
+
+    .esan-login-company {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #4a5568;
+        margin-top: 8px;
+    }
+
+    .esan-login-description {
+        font-size: 0.85rem;
+        color: #718096;
+        margin-top: 7px;
+    }
+
+    .esan-login-box {
+        background: white;
+        border: 1px solid #e2e8e4;
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+        margin-top: 10px;
     }
 
 
@@ -104,15 +149,12 @@ st.markdown(
        SIDEBAR
        ====================================================== */
 
-    section[data-testid="stSidebar"] {
-        background: transparent;
-        border: none;
+    div[data-testid="stSidebar"] {
+        border-right: 1px solid #dfe5e1;
     }
 
     section[data-testid="stSidebar"] > div {
         background: #f8faf9;
-        border-right: 1px solid #dfe5e1;
-        box-shadow: 5px 0 20px rgba(0, 0, 0, 0.05);
     }
 
 
@@ -120,53 +162,47 @@ st.markdown(
        SIDEBAR BRAND
        ====================================================== */
 
-    .esan-brand {
+    .esan-sidebar-brand {
         text-align: center;
-        padding: 10px 5px 18px 5px;
+        padding: 10px 5px 15px 5px;
     }
 
-    .esan-logo {
+    .esan-sidebar-logo {
         font-size: 2.3rem;
         line-height: 1;
     }
 
-    .esan-title {
+    .esan-sidebar-title {
         font-size: 1.35rem;
-        font-weight: 750;
+        font-weight: 800;
         color: #263238;
         margin-top: 6px;
     }
 
-    .esan-company {
-        font-size: 0.72rem;
+    .esan-sidebar-company {
+        font-size: 0.7rem;
         color: #718096;
         margin-top: 3px;
     }
 
-    .esan-version {
-        display: inline-block;
-        margin-top: 8px;
-        padding: 3px 9px;
-        border-radius: 20px;
-        background: #e8f5e9;
-        color: #2e7d32;
-        font-size: 0.65rem;
-        font-weight: 700;
-    }
-
 
     /* ======================================================
-       NAVIGATION
+       SIDEBAR SECTION LABELS
        ====================================================== */
 
     .nav-section {
-        margin: 17px 5px 6px 5px;
+        margin: 16px 5px 6px 5px;
         color: #7b817d;
-        font-size: 0.67rem;
+        font-size: 0.68rem;
         font-weight: 750;
         text-transform: uppercase;
         letter-spacing: 0.08em;
     }
+
+
+    /* ======================================================
+       SIDEBAR BUTTONS
+       ====================================================== */
 
     section[data-testid="stSidebar"] .stButton > button {
         width: 100%;
@@ -178,7 +214,6 @@ st.markdown(
         padding: 9px 12px;
         margin: 2px 0;
         font-size: 0.88rem;
-        transition: all 0.15s ease;
     }
 
     section[data-testid="stSidebar"] .stButton > button:hover {
@@ -187,23 +222,12 @@ st.markdown(
         color: #1b5e20;
     }
 
-    .esan-active-module {
-        background: #e8f5e9;
-        border: 1px solid #c8e6c9;
-        border-radius: 9px;
-        color: #1b5e20;
-        font-weight: 700;
-        padding: 9px 12px;
-        margin: 2px 0;
-        font-size: 0.88rem;
-    }
-
 
     /* ======================================================
        USER PANEL
        ====================================================== */
 
-    .esan-user {
+    .esan-user-panel {
         background: white;
         border: 1px solid #e2e8e4;
         border-radius: 10px;
@@ -264,60 +288,6 @@ st.markdown(
 
 
     /* ======================================================
-       MODULE TITLE
-       ====================================================== */
-
-    .module-title {
-        color: #263238;
-        font-size: 1.35rem;
-        font-weight: 750;
-        margin-bottom: 2px;
-    }
-
-    .module-subtitle {
-        color: #718096;
-        font-size: 0.78rem;
-        margin-bottom: 15px;
-    }
-
-
-    /* ======================================================
-       LOGIN
-       ====================================================== */
-
-    .esan-login-card {
-        max-width: 520px;
-        margin: 70px auto 20px auto;
-        text-align: center;
-    }
-
-    .esan-login-logo {
-        font-size: 4rem;
-        line-height: 1;
-    }
-
-    .esan-login-title {
-        color: #263238;
-        margin: 10px 0 3px 0;
-        font-size: 2.1rem;
-        font-weight: 750;
-    }
-
-    .esan-login-company {
-        color: #4a5568;
-        margin: 0;
-        font-size: 1.15rem;
-        font-weight: 600;
-    }
-
-    .esan-login-description {
-        color: #718096;
-        font-size: 0.9rem;
-        margin-top: 7px;
-    }
-
-
-    /* ======================================================
        FOOTER
        ====================================================== */
 
@@ -336,7 +306,7 @@ st.markdown(
 
 
 # ============================================================
-# SESSION STATE
+# SESSION MANAGEMENT
 # ============================================================
 
 DEFAULT_SESSION = {
@@ -346,7 +316,6 @@ DEFAULT_SESSION = {
     "role": None,
     "current_page": "🏠 Overview",
     "current_subpage": "Dashboard",
-    "seed_loaded": False,
 }
 
 for key, value in DEFAULT_SESSION.items():
@@ -356,24 +325,17 @@ for key, value in DEFAULT_SESSION.items():
 
 
 # ============================================================
-# MODULE DIAGNOSTICS
-#
-# IMPORTANT:
-# We do not display these as errors to the user.
-# They are logged and only shown to Administrator users.
+# MODULE ERROR REGISTRY
 # ============================================================
 
-module_diagnostics = []
+module_errors = []
 
 
 # ============================================================
-# SAFE MODULE IMPORT
+# SAFE IMPORT SYSTEM
 # ============================================================
 
-def safe_import(
-    module_path: str,
-    function_name: str,
-) -> Optional[Callable]:
+def safe_import(module_path, function_name):
 
     try:
 
@@ -390,15 +352,14 @@ def safe_import(
 
         if function is None:
 
-            message = (
+            error = (
                 f"{module_path}: "
-                f"function '{function_name}' "
-                f"was not found"
+                f"missing function '{function_name}'"
             )
 
-            module_diagnostics.append(message)
+            module_errors.append(error)
 
-            logger.warning(message)
+            logger.warning(error)
 
             return None
 
@@ -406,23 +367,17 @@ def safe_import(
 
     except Exception as exc:
 
-        message = (
-            f"{module_path}: "
-            f"{type(exc).__name__}: {exc}"
-        )
+        error = f"{module_path}: {exc}"
 
-        module_diagnostics.append(message)
+        module_errors.append(error)
 
-        logger.exception(
-            "Optional module failed to load: %s",
-            message,
-        )
+        logger.error(error)
 
         return None
 
 
 # ============================================================
-# ADMIN SERVICE
+# ADMIN CREATION
 # ============================================================
 
 try:
@@ -442,27 +397,44 @@ except ImportError:
         )
 
         if admin:
-            return admin
+            return
 
         from auth import hash_password
 
-        admin = User(
-            username="admin",
-            password_hash=hash_password(
+        # Build the administrator using fields
+        # available in the current User model.
+
+        admin_data = {
+            "username": "admin",
+            "password_hash": hash_password(
                 "admin123"
             ),
-            role="Administrator",
-        )
+            "role": "Administrator",
+        }
+
+        # Optional model fields
+
+        if hasattr(User, "full_name"):
+            admin_data["full_name"] = (
+                "System Administrator"
+            )
+
+        if hasattr(User, "email"):
+            admin_data["email"] = (
+                "admin@nileharvest.com"
+            )
+
+        if hasattr(User, "active"):
+            admin_data["active"] = True
+
+        admin = User(**admin_data)
 
         db.add(admin)
         db.commit()
-        db.refresh(admin)
 
         logger.info(
             "Default administrator created."
         )
-
-        return admin
 
 
 # ============================================================
@@ -480,10 +452,7 @@ except ImportError:
 
 # ============================================================
 # MODULE REGISTRY
-#
-# These paths match the current repository structure.
 # ============================================================
-
 
 # ------------------------------------------------------------
 # Dashboard
@@ -497,10 +466,6 @@ dashboard_home = safe_import(
 
 # ------------------------------------------------------------
 # Procurement
-#
-# Repository uses:
-# purchase_orders.py
-# NOT purchases.py
 # ------------------------------------------------------------
 
 procurement_dashboard = safe_import(
@@ -513,9 +478,9 @@ procurement_suppliers = safe_import(
     "suppliers_page",
 )
 
-procurement_purchase_orders = safe_import(
-    "modules.procurement.purchase_orders",
-    "purchase_orders_page",
+procurement_purchases = safe_import(
+    "modules.procurement.purchases",
+    "purchases_page",
 )
 
 
@@ -555,12 +520,7 @@ packaging_dashboard = safe_import(
 
 
 # ------------------------------------------------------------
-# Sales
-#
-# Repository uses:
-# delivery.py
-# invoicing.py
-# payments.py
+# Sales & Distribution
 # ------------------------------------------------------------
 
 sales_dashboard = safe_import(
@@ -583,199 +543,20 @@ sales_orders = safe_import(
     "sales_orders_page",
 )
 
-sales_delivery = safe_import(
-    "modules.sales.delivery",
-    "delivery_page",
+sales_deliveries = safe_import(
+    "modules.sales.deliveries",
+    "deliveries_page",
+)
+
+sales_invoices = safe_import(
+    "modules.sales.invoices",
+    "invoices_page",
 )
 
 sales_payments = safe_import(
     "modules.sales.payments",
     "payments_page",
 )
-
-
-# ============================================================
-# INVOICE PAGE
-#
-# The current repository's invoicing.py contains
-# create_invoice(order_id), rather than a Streamlit page.
-#
-# Therefore we do NOT falsely import "invoices_page".
-# ============================================================
-
-def sales_invoice_page():
-
-    st.subheader("🧾 Invoice Management")
-
-    try:
-
-        from database import SessionLocal
-        from models import Invoice, SalesOrder
-
-        db = SessionLocal()
-
-        try:
-
-            orders = (
-                db.query(SalesOrder)
-                .order_by(
-                    SalesOrder.created_at.desc()
-                )
-                .all()
-            )
-
-            invoices = (
-                db.query(Invoice)
-                .order_by(
-                    Invoice.created_at.desc()
-                )
-                .all()
-            )
-
-            tab1, tab2 = st.tabs(
-                [
-                    "Create Invoice",
-                    "Invoices",
-                ]
-            )
-
-            with tab1:
-
-                if not orders:
-
-                    st.info(
-                        "No sales orders are available."
-                    )
-
-                else:
-
-                    order_map = {
-                        (
-                            f"{order.order_number} "
-                            f"| {order.status} "
-                            f"| {order.total_amount:,.2f}"
-                        ): order.id
-                        for order in orders
-                    }
-
-                    selected = st.selectbox(
-                        "Sales Order",
-                        list(order_map.keys()),
-                    )
-
-                    if st.button(
-                        "Create Invoice",
-                        type="primary",
-                        key="create_invoice_button",
-                    ):
-
-                        try:
-
-                            from modules.sales.invoicing import (
-                                create_invoice,
-                            )
-
-                            invoice = create_invoice(
-                                order_map[selected]
-                            )
-
-                            st.success(
-                                "Invoice created successfully."
-                            )
-
-                            st.rerun()
-
-                        except Exception as exc:
-
-                            st.error(
-                                f"Invoice creation failed: {exc}"
-                            )
-
-            with tab2:
-
-                if not invoices:
-
-                    st.info(
-                        "No invoices found."
-                    )
-
-                else:
-
-                    data = []
-
-                    for invoice in invoices:
-
-                        data.append(
-                            {
-                                "Invoice":
-                                    getattr(
-                                        invoice,
-                                        "invoice_number",
-                                        "N/A",
-                                    ),
-
-                                "Customer":
-                                    getattr(
-                                        invoice,
-                                        "customer_id",
-                                        "N/A",
-                                    ),
-
-                                "Amount":
-                                    getattr(
-                                        invoice,
-                                        "amount",
-                                        0,
-                                    ),
-
-                                "Status":
-                                    getattr(
-                                        invoice,
-                                        "status",
-                                        "N/A",
-                                    ),
-
-                                "Date":
-                                    (
-                                        invoice.created_at.strftime(
-                                            "%Y-%m-%d"
-                                        )
-                                        if getattr(
-                                            invoice,
-                                            "created_at",
-                                            None,
-                                        )
-                                        else "N/A"
-                                    ),
-                            }
-                        )
-
-                    import pandas as pd
-
-                    st.dataframe(
-                        pd.DataFrame(data),
-                        use_container_width=True,
-                    )
-
-        finally:
-
-            db.close()
-
-    except Exception as exc:
-
-        logger.exception(
-            "Invoice module error"
-        )
-
-        st.error(
-            "Invoice module could not be loaded."
-        )
-
-        with st.expander(
-            "Technical details"
-        ):
-
-            st.code(str(exc))
 
 
 # ------------------------------------------------------------
@@ -799,89 +580,9 @@ reports_dashboard = safe_import(
 
 
 # ============================================================
-# MODULE REGISTRY
-# ============================================================
-
-MODULES = {
-
-    "🏠 Overview": {
-        "title": "Overview",
-        "section": "MAIN",
-        "function": dashboard_home,
-        "children": None,
-    },
-
-    "🌾 Procurement": {
-        "title": "Procurement",
-        "section": "OPERATIONS",
-        "function": procurement_dashboard,
-        "children": {
-            "Dashboard": procurement_dashboard,
-            "Suppliers": procurement_suppliers,
-            "Purchase Orders": procurement_purchase_orders,
-        },
-    },
-
-    "📦 Warehouse": {
-        "title": "Warehouse",
-        "section": "OPERATIONS",
-        "function": warehouse_dashboard,
-        "children": {
-            "Dashboard": warehouse_dashboard,
-            "Inventory": warehouse_inventory,
-        },
-    },
-
-    "🏭 Milling": {
-        "title": "Milling",
-        "section": "OPERATIONS",
-        "function": milling_dashboard,
-        "children": None,
-    },
-
-    "📦 Packaging": {
-        "title": "Packaging",
-        "section": "OPERATIONS",
-        "function": packaging_dashboard,
-        "children": None,
-    },
-
-    "🚚 Sales & Distribution": {
-        "title": "Sales & Distribution",
-        "section": "COMMERCIAL",
-        "function": sales_dashboard,
-        "children": {
-            "Dashboard": sales_dashboard,
-            "Customers": sales_customers,
-            "Quotations": sales_quotations,
-            "Sales Orders": sales_orders,
-            "Deliveries": sales_delivery,
-            "Invoices": sales_invoice_page,
-            "Payments": sales_payments,
-        },
-    },
-
-    "💰 Finance": {
-        "title": "Finance",
-        "section": "FINANCE",
-        "function": finance_dashboard,
-        "children": None,
-    },
-
-    "📊 Reports": {
-        "title": "Reports",
-        "section": "REPORTING",
-        "function": reports_dashboard,
-        "children": None,
-    },
-}
-
-
-# ============================================================
 # DATABASE INITIALIZATION
 # ============================================================
 
-@st.cache_resource
 def initialize_database():
 
     try:
@@ -904,7 +605,7 @@ def initialize_database():
         if missing_tables:
 
             logger.info(
-                "Missing ERP tables detected: %s",
+                "Creating missing tables: %s",
                 ", ".join(
                     sorted(missing_tables)
                 ),
@@ -924,7 +625,7 @@ def initialize_database():
 
             db.close()
 
-        return True, None
+        return True
 
     except Exception as exc:
 
@@ -932,70 +633,34 @@ def initialize_database():
             "Database initialization failed"
         )
 
-        return False, str(exc)
-
-
-# ============================================================
-# INITIALIZE DATABASE
-# ============================================================
-
-db_ok, db_error = initialize_database()
-
-
-if not db_ok:
-
-    st.error(
-        "❌ Esan ERP could not initialize the database."
-    )
-
-    with st.expander(
-        "Technical details"
-    ):
-
-        st.code(
-            db_error or "Unknown database error"
+        st.error(
+            "❌ Database initialization failed."
         )
 
+        with st.expander(
+            "Technical details"
+        ):
+
+            st.code(
+                str(exc)
+            )
+
+        return False
+
+
+# Run database initialization
+
+database_ready = initialize_database()
+
+if not database_ready:
     st.stop()
 
 
 # ============================================================
-# SEED DATA
+# LOGIN FUNCTION
 # ============================================================
 
-if (
-    load_seed_data
-    and not st.session_state.seed_loaded
-):
-
-    try:
-
-        load_seed_data()
-
-        st.session_state.seed_loaded = True
-
-        logger.info(
-            "Seed data loaded successfully."
-        )
-
-    except Exception as exc:
-
-        st.session_state.seed_loaded = True
-
-        logger.warning(
-            "Seed data failed: %s",
-            exc,
-        )
-
-
-# ============================================================
-# AUTHENTICATION
-# ============================================================
-
-def login(
-    username: str,
-    password: str,
-) -> bool:
+def login(username, password):
 
     db = SessionLocal()
 
@@ -1010,21 +675,19 @@ def login(
         )
 
         if not user:
-
             return False
 
         if not verify_password(
             password,
             user.password_hash,
         ):
-
             return False
 
-        # Respect active flag if model has it.
+        # Respect active status if available
+
         if hasattr(user, "active"):
 
             if user.active is False:
-
                 return False
 
         st.session_state.logged_in = True
@@ -1043,7 +706,11 @@ def login(
         )
 
         st.session_state.role = (
-            user.role
+            getattr(
+                user,
+                "role",
+                None,
+            )
             or "user"
         )
 
@@ -1069,35 +736,14 @@ def login(
 
 
 # ============================================================
-# LOGOUT
-# ============================================================
-
-def logout():
-
-    logger.info(
-        "User '%s' logged out.",
-        st.session_state.username,
-    )
-
-    st.session_state.logged_in = False
-    st.session_state.username = None
-    st.session_state.full_name = None
-    st.session_state.role = None
-    st.session_state.current_page = (
-        "🏠 Overview"
-    )
-    st.session_state.current_subpage = (
-        "Dashboard"
-    )
-
-    st.rerun()
-
-
-# ============================================================
 # LOGIN SCREEN
 # ============================================================
 
 if not st.session_state.logged_in:
+
+    # --------------------------------------------------------
+    # BRANDING
+    # --------------------------------------------------------
 
     st.markdown(
         """
@@ -1125,11 +771,21 @@ if not st.session_state.logged_in:
         unsafe_allow_html=True,
     )
 
+
+    # --------------------------------------------------------
+    # LOGIN FORM
+    # --------------------------------------------------------
+
     left, center, right = st.columns(
         [1, 1.4, 1]
     )
 
     with center:
+
+        st.markdown(
+            '<div class="esan-login-box">',
+            unsafe_allow_html=True,
+        )
 
         st.markdown(
             "### 🔐 Sign in"
@@ -1149,14 +805,28 @@ if not st.session_state.logged_in:
         )
 
         if st.button(
-            "Login",
-            type="primary",
+            "🔐 Login",
             use_container_width=True,
+            type="primary",
             key="login_button",
         ):
 
-            if login(
-                username.strip(),
+            clean_username = username.strip()
+
+            if not clean_username:
+
+                st.warning(
+                    "Please enter your username."
+                )
+
+            elif not password:
+
+                st.warning(
+                    "Please enter your password."
+                )
+
+            elif login(
+                clean_username,
                 password,
             ):
 
@@ -1172,47 +842,31 @@ if not st.session_state.logged_in:
                     "Invalid username or password."
                 )
 
-        st.caption(
-            "Default administrator: "
-            "admin / admin123"
+        st.markdown(
+            """
+            <div style="
+                text-align:center;
+                margin-top:15px;
+                color:#718096;
+                font-size:0.75rem;
+            ">
+                Default administrator:
+                <strong>admin / admin123</strong>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            "</div>",
+            unsafe_allow_html=True,
         )
 
     st.stop()
 
 
 # ============================================================
-# NAVIGATION
-# ============================================================
-
-def navigate(page: str):
-
-    if page not in MODULES:
-
-        logger.warning(
-            "Unknown navigation page: %s",
-            page,
-        )
-
-        return
-
-    st.session_state.current_page = page
-
-    st.session_state.current_subpage = (
-        "Dashboard"
-    )
-
-
-def navigate_subpage(
-    subpage: str,
-):
-
-    st.session_state.current_subpage = (
-        subpage
-    )
-
-
-# ============================================================
-# SIDEBAR
+# SIDEBAR NAVIGATION
 # ============================================================
 
 with st.sidebar:
@@ -1223,22 +877,18 @@ with st.sidebar:
 
     st.markdown(
         f"""
-        <div class="esan-brand">
+        <div class="esan-sidebar-brand">
 
-            <div class="esan-logo">
+            <div class="esan-sidebar-logo">
                 🌾
             </div>
 
-            <div class="esan-title">
+            <div class="esan-sidebar-title">
                 Esan ERP
             </div>
 
-            <div class="esan-company">
+            <div class="esan-sidebar-company">
                 {COMPANY_NAME}
-            </div>
-
-            <div class="esan-version">
-                Version {VERSION}
             </div>
 
         </div>
@@ -1246,37 +896,42 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # NAVIGATION HELPER
+    # --------------------------------------------------------
+
+    def nav_button(label):
+
+        if st.button(
+            label,
+            use_container_width=True,
+        ):
+
+            st.session_state.current_page = (
+                label
+            )
+
+            st.session_state.current_subpage = (
+                "Dashboard"
+            )
+
+            st.rerun()
+
 
     # --------------------------------------------------------
     # MAIN
     # --------------------------------------------------------
 
     st.markdown(
-        '<div class="nav-section">Main</div>',
-        unsafe_allow_html=True,
+        "**MAIN**"
     )
 
-    current = st.session_state.current_page
-
-    if current == "🏠 Overview":
-
-        st.markdown(
-            '<div class="esan-active-module">'
-            '🏠 &nbsp; Overview'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-    else:
-
-        if st.button(
-            "🏠  Overview",
-            key="sidebar_overview",
-            use_container_width=True,
-        ):
-
-            navigate("🏠 Overview")
-            st.rerun()
+    nav_button(
+        "🏠 Overview"
+    )
 
 
     # --------------------------------------------------------
@@ -1284,52 +939,24 @@ with st.sidebar:
     # --------------------------------------------------------
 
     st.markdown(
-        '<div class="nav-section">Operations</div>',
-        unsafe_allow_html=True,
+        "**OPERATIONS**"
     )
 
-    operation_pages = [
-        (
-            "🌾 Procurement",
-            "sidebar_procurement",
-        ),
-        (
-            "📦 Warehouse",
-            "sidebar_warehouse",
-        ),
-        (
-            "🏭 Milling",
-            "sidebar_milling",
-        ),
-        (
-            "📦 Packaging",
-            "sidebar_packaging",
-        ),
-    ]
+    nav_button(
+        "🌾 Procurement"
+    )
 
-    for page, key in operation_pages:
+    nav_button(
+        "📦 Warehouse"
+    )
 
-        if current == page:
+    nav_button(
+        "🏭 Milling"
+    )
 
-            st.markdown(
-                f"""
-                <div class="esan-active-module">
-                    {page}
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-        else:
-
-            if st.button(
-                page,
-                key=key,
-                use_container_width=True,
-            ):
-
-                navigate(page)
-                st.rerun()
+    nav_button(
+        "📦 Packaging"
+    )
 
 
     # --------------------------------------------------------
@@ -1337,31 +964,12 @@ with st.sidebar:
     # --------------------------------------------------------
 
     st.markdown(
-        '<div class="nav-section">Commercial</div>',
-        unsafe_allow_html=True,
+        "**COMMERCIAL**"
     )
 
-    page = "🚚 Sales & Distribution"
-
-    if current == page:
-
-        st.markdown(
-            '<div class="esan-active-module">'
-            '🚚 &nbsp; Sales & Distribution'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-    else:
-
-        if st.button(
-            page,
-            key="sidebar_sales",
-            use_container_width=True,
-        ):
-
-            navigate(page)
-            st.rerun()
+    nav_button(
+        "🚚 Sales & Distribution"
+    )
 
 
     # --------------------------------------------------------
@@ -1369,31 +977,12 @@ with st.sidebar:
     # --------------------------------------------------------
 
     st.markdown(
-        '<div class="nav-section">Finance</div>',
-        unsafe_allow_html=True,
+        "**FINANCE**"
     )
 
-    page = "💰 Finance"
-
-    if current == page:
-
-        st.markdown(
-            '<div class="esan-active-module">'
-            '💰 &nbsp; Finance'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-    else:
-
-        if st.button(
-            page,
-            key="sidebar_finance",
-            use_container_width=True,
-        ):
-
-            navigate(page)
-            st.rerun()
+    nav_button(
+        "💰 Finance"
+    )
 
 
     # --------------------------------------------------------
@@ -1401,58 +990,23 @@ with st.sidebar:
     # --------------------------------------------------------
 
     st.markdown(
-        '<div class="nav-section">Reporting</div>',
-        unsafe_allow_html=True,
+        "**REPORTING**"
     )
 
-    page = "📊 Reports"
-
-    if current == page:
-
-        st.markdown(
-            '<div class="esan-active-module">'
-            '📊 &nbsp; Reports'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-    else:
-
-        if st.button(
-            page,
-            key="sidebar_reports",
-            use_container_width=True,
-        ):
-
-            navigate(page)
-            st.rerun()
-
-
-    # --------------------------------------------------------
-    # ADMINISTRATION
-    # --------------------------------------------------------
-
-    if st.session_state.role == "Administrator":
-
-        st.markdown(
-            '<div class="nav-section">'
-            'Administration'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        st.caption(
-            "🔐 Administrator access"
-        )
+    nav_button(
+        "📊 Reports"
+    )
 
 
     # --------------------------------------------------------
     # USER PANEL
     # --------------------------------------------------------
 
+    st.divider()
+
     st.markdown(
         f"""
-        <div class="esan-user">
+        <div class="esan-user-panel">
 
             <div class="esan-user-name">
                 👤 {st.session_state.full_name}
@@ -1470,262 +1024,329 @@ with st.sidebar:
     st.write("")
 
     if st.button(
-        "🚪  Logout",
-        key="sidebar_logout",
+        "🚪 Logout",
         use_container_width=True,
+        key="logout_button",
     ):
 
-        logout()
+        st.session_state.logged_in = False
+        st.session_state.username = None
+        st.session_state.full_name = None
+        st.session_state.role = None
+        st.session_state.current_page = (
+            "🏠 Overview"
+        )
+        st.session_state.current_subpage = (
+            "Dashboard"
+        )
+
+        st.rerun()
 
 
 # ============================================================
-# CURRENT MODULE
+# CURRENT PAGE
 # ============================================================
 
-current_page = (
-    st.session_state.current_page
-)
-
-current_module = MODULES.get(
-    current_page
-)
+menu = st.session_state.current_page
 
 
 # ============================================================
 # ERP HEADER
 # ============================================================
 
-if current_module:
+page_titles = {
+    "🏠 Overview": "Overview",
+    "🌾 Procurement": "Procurement",
+    "📦 Warehouse": "Warehouse",
+    "🏭 Milling": "Milling",
+    "📦 Packaging": "Packaging",
+    "🚚 Sales & Distribution": "Sales & Distribution",
+    "💰 Finance": "Finance",
+    "📊 Reports": "Reports",
+}
 
-    st.markdown(
-        f"""
-        <div class="esan-header">
+current_title = page_titles.get(
+    menu,
+    "Overview"
+)
 
-            <div>
+st.markdown(
+    f"""
+    <div class="esan-header">
 
-                <div class="esan-header-title">
-                    🌾 Esan ERP
-                </div>
+        <div>
 
-                <div class="esan-header-subtitle">
-                    {COMPANY_NAME}
-                    &nbsp;|&nbsp;
-                    Enterprise Milling & Packaging
-                    Management System
-                </div>
-
+            <div class="esan-header-title">
+                🌾 Esan ERP
             </div>
 
-            <div class="esan-header-module">
-                {current_module["title"]}
+            <div class="esan-header-subtitle">
+                {COMPANY_NAME}
+                &nbsp;|&nbsp;
+                Enterprise Milling & Packaging
+                Management System
             </div>
 
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
-
-# ============================================================
-# MODULE TITLE
-# ============================================================
-
-if current_module:
-
-    st.markdown(
-        f"""
-        <div class="module-title">
-            {current_module["title"]}
+        <div class="esan-header-module">
+            {current_title}
         </div>
 
-        <div class="module-subtitle">
-            {current_module["title"]} module
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-# ============================================================
-# SUB-NAVIGATION
-# ============================================================
-
-children = None
-
-if current_module:
-
-    children = current_module.get(
-        "children"
-    )
-
-
-if children:
-
-    subpages = list(
-        children.keys()
-    )
-
-    current_subpage = (
-        st.session_state.current_subpage
-    )
-
-    if current_subpage not in subpages:
-
-        current_subpage = subpages[0]
-
-        st.session_state.current_subpage = (
-            current_subpage
-        )
-
-    columns = st.columns(
-        len(subpages)
-    )
-
-    for index, subpage in enumerate(
-        subpages
-    ):
-
-        with columns[index]:
-
-            is_active = (
-                st.session_state.current_subpage
-                == subpage
-            )
-
-            if st.button(
-                (
-                    f"✓ {subpage}"
-                    if is_active
-                    else subpage
-                ),
-                key=(
-                    f"subpage_"
-                    f"{current_page}_"
-                    f"{subpage}"
-                ),
-                use_container_width=True,
-                type=(
-                    "primary"
-                    if is_active
-                    else "secondary"
-                ),
-            ):
-
-                navigate_subpage(
-                    subpage
-                )
-
-                st.rerun()
-
-
-# ============================================================
-# MODULE RENDERER
-# ============================================================
-
-def render_module(
-    function: Optional[Callable],
-    name: str,
-):
-
-    if function is None:
-
-        st.warning(
-            f"⚠️ {name} is currently unavailable."
-        )
-
-        return
-
-    try:
-
-        function()
-
-    except Exception as exc:
-
-        logger.exception(
-            "Error rendering module '%s': %s",
-            name,
-            exc,
-        )
-
-        st.error(
-            f"⚠️ {name} encountered an error."
-        )
-
-        with st.expander(
-            "Technical details"
-        ):
-
-            st.code(
-                str(exc)
-            )
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 # ============================================================
 # ERP ROUTER
 # ============================================================
 
-if current_module is None:
+if menu == "🏠 Overview":
 
-    st.error(
-        f"Module '{current_page}' "
-        "was not found."
+    if dashboard_home:
+        dashboard_home()
+    else:
+        st.info(
+            "Overview dashboard not available."
+        )
+
+
+# ============================================================
+# PROCUREMENT
+# ============================================================
+
+elif menu == "🌾 Procurement":
+
+    st.header(
+        "🌾 Procurement"
     )
 
-else:
+    procurement_menu = st.radio(
+        "Procurement Module",
+        [
+            "Dashboard",
+            "Suppliers",
+            "Purchase Orders",
+        ],
+        horizontal=True,
+        key="procurement_menu",
+    )
 
-    if children:
+    if procurement_menu == "Dashboard":
 
-        selected_subpage = (
-            st.session_state.current_subpage
-        )
-
-        selected_function = (
-            children.get(
-                selected_subpage
+        if procurement_dashboard:
+            procurement_dashboard()
+        else:
+            st.warning(
+                "Procurement dashboard unavailable."
             )
+
+    elif procurement_menu == "Suppliers":
+
+        if procurement_suppliers:
+            procurement_suppliers()
+        else:
+            st.warning(
+                "Suppliers page unavailable."
+            )
+
+    elif procurement_menu == "Purchase Orders":
+
+        if procurement_purchases:
+            procurement_purchases()
+        else:
+            st.warning(
+                "Purchase orders page unavailable."
+            )
+
+
+# ============================================================
+# WAREHOUSE
+# ============================================================
+
+elif menu == "📦 Warehouse":
+
+    st.header(
+        "📦 Warehouse"
+    )
+
+    warehouse_menu = st.radio(
+        "Warehouse Module",
+        [
+            "Dashboard",
+            "Inventory",
+        ],
+        horizontal=True,
+        key="warehouse_menu",
+    )
+
+    if warehouse_menu == "Dashboard":
+
+        if warehouse_dashboard:
+            warehouse_dashboard()
+        else:
+            st.warning(
+                "Warehouse dashboard unavailable."
+            )
+
+    elif warehouse_menu == "Inventory":
+
+        if warehouse_inventory:
+            warehouse_inventory()
+        else:
+            st.warning(
+                "Inventory page unavailable."
+            )
+
+
+# ============================================================
+# MILLING
+# ============================================================
+
+elif menu == "🏭 Milling":
+
+    if milling_dashboard:
+        milling_dashboard()
+    else:
+        st.warning(
+            "Milling module unavailable."
         )
 
-        render_module(
-            selected_function,
-            (
-                f"{current_module['title']} / "
-                f"{selected_subpage}"
-            ),
+
+# ============================================================
+# PACKAGING
+# ============================================================
+
+elif menu == "📦 Packaging":
+
+    if packaging_dashboard:
+        packaging_dashboard()
+    else:
+        st.warning(
+            "Packaging module unavailable."
         )
+
+
+# ============================================================
+# SALES & DISTRIBUTION
+# ============================================================
+
+elif menu == "🚚 Sales & Distribution":
+
+    st.header(
+        "🚚 Sales & Distribution"
+    )
+
+    sales_menu = st.radio(
+        "Sales Module",
+        [
+            "Dashboard",
+            "Customers",
+            "Quotations",
+            "Sales Orders",
+            "Deliveries",
+            "Invoices",
+            "Payments",
+        ],
+        horizontal=True,
+        key="sales_menu",
+    )
+
+    sales_pages = {
+        "Dashboard": sales_dashboard,
+        "Customers": sales_customers,
+        "Quotations": sales_quotations,
+        "Sales Orders": sales_orders,
+        "Deliveries": sales_deliveries,
+        "Invoices": sales_invoices,
+        "Payments": sales_payments,
+    }
+
+    page_func = sales_pages.get(
+        sales_menu
+    )
+
+    if page_func:
+
+        try:
+            page_func()
+
+        except Exception as exc:
+
+            logger.exception(
+                "Sales module error: %s",
+                exc,
+            )
+
+            st.error(
+                "An error occurred while loading "
+                f"{sales_menu}."
+            )
+
+            with st.expander(
+                "Technical details"
+            ):
+
+                st.code(
+                    str(exc)
+                )
 
     else:
 
-        render_module(
-            current_module["function"],
-            current_module["title"],
+        st.warning(
+            f"{sales_menu} page unavailable."
         )
 
 
 # ============================================================
-# ADMIN DIAGNOSTICS
-#
-# We deliberately do NOT show "Module Loading
-# Information" to normal users.
+# FINANCE
 # ============================================================
 
-if (
-    module_diagnostics
-    and st.session_state.role == "Administrator"
-):
+elif menu == "💰 Finance":
+
+    if finance_dashboard:
+        finance_dashboard()
+    else:
+        st.warning(
+            "Finance module unavailable."
+        )
+
+
+# ============================================================
+# REPORTS
+# ============================================================
+
+elif menu == "📊 Reports":
+
+    if reports_dashboard:
+        reports_dashboard()
+    else:
+        st.warning(
+            "Reports module unavailable."
+        )
+
+
+# ============================================================
+# MODULE IMPORT WARNINGS
+# ============================================================
+
+if module_errors:
 
     with st.expander(
-        "🔧 Administrator Diagnostics"
+        "⚠️ Module Loading Information"
     ):
 
         st.caption(
-            "Optional module diagnostics. "
-            "These messages do not stop Esan ERP."
+            "The ERP is running, but some optional "
+            "modules could not be loaded."
         )
 
-        for message in module_diagnostics:
+        for error in module_errors:
 
             st.write(
-                f"• {message}"
+                f"• {error}"
             )
 
 
@@ -1733,17 +1354,10 @@ if (
 # FOOTER
 # ============================================================
 
-st.markdown(
-    f"""
-    <div class="esan-footer">
+st.divider()
 
-        © {COMPANY_NAME}
-        &nbsp;|&nbsp;
-        Esan ERP Enterprise Platform
-        &nbsp;|&nbsp;
-        Version {VERSION}
-
-    </div>
-    """,
-    unsafe_allow_html=True,
+st.caption(
+    f"© {COMPANY_NAME} | "
+    f"Esan ERP Enterprise Platform | "
+    f"Version {VERSION}"
 )
