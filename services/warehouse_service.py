@@ -7,25 +7,24 @@ Enterprise Milling & Packaging Management System
 Handles:
 - Products
 - Inventory
+- Stock
 - Stock movements
-- Stock adjustments
 """
 
 from datetime import datetime
 
 from database import SessionLocal
-from models import (
-    Product,
-    StockMovement,
-)
+from models import Product, StockMovement
 
 
-# ============================================================
+# ==================================================
 # PRODUCTS
-# ============================================================
+# ==================================================
 
 def get_all_products():
-    """Return all products."""
+    """
+    Return all products ordered alphabetically.
+    """
 
     db = SessionLocal()
 
@@ -33,9 +32,7 @@ def get_all_products():
 
         return (
             db.query(Product)
-            .order_by(
-                Product.name.asc()
-            )
+            .order_by(Product.name.asc())
             .all()
         )
 
@@ -44,7 +41,9 @@ def get_all_products():
 
 
 def get_product(product_id):
-    """Return a product by ID."""
+    """
+    Return a single product by ID.
+    """
 
     db = SessionLocal()
 
@@ -52,9 +51,7 @@ def get_product(product_id):
 
         return (
             db.query(Product)
-            .filter(
-                Product.id == product_id
-            )
+            .filter(Product.id == product_id)
             .first()
         )
 
@@ -70,48 +67,31 @@ def create_product(
     cost_price=0,
     selling_price=0,
 ):
-    """Create a new product."""
-
-    if not name or not name.strip():
-        raise ValueError(
-            "Product name is required."
-        )
-
-    if quantity < 0:
-        raise ValueError(
-            "Opening quantity cannot be negative."
-        )
-
-    if cost_price < 0:
-        raise ValueError(
-            "Cost price cannot be negative."
-        )
-
-    if selling_price < 0:
-        raise ValueError(
-            "Selling price cannot be negative."
-        )
+    """
+    Create a new product.
+    """
 
     db = SessionLocal()
 
     try:
 
+        if not name or not str(name).strip():
+            raise ValueError(
+                "Product name is required."
+            )
+
         product = Product(
-            name=name.strip(),
+            name=str(name).strip(),
             category=category,
             unit=unit or "Kg",
-            quantity=float(quantity),
-            cost_price=float(cost_price),
-            selling_price=float(
-                selling_price
-            ),
+            quantity=float(quantity or 0),
+            cost_price=float(cost_price or 0),
+            selling_price=float(selling_price or 0),
             created_at=datetime.utcnow(),
         )
 
         db.add(product)
-
         db.commit()
-
         db.refresh(product)
 
         return product
@@ -126,23 +106,18 @@ def create_product(
 
 def update_product(
     product_id,
-    name,
+    name=None,
     category=None,
-    unit="Kg",
-    cost_price=0,
-    selling_price=0,
+    unit=None,
+    quantity=None,
+    cost_price=None,
+    selling_price=None,
 ):
     """
-    Update product information.
+    Update an existing product.
 
-    Stock quantity is deliberately not changed here.
-    Stock changes should go through adjust_stock().
+    Only values supplied to the function are changed.
     """
-
-    if not name or not name.strip():
-        raise ValueError(
-            "Product name is required."
-        )
 
     db = SessionLocal()
 
@@ -150,27 +125,64 @@ def update_product(
 
         product = (
             db.query(Product)
-            .filter(
-                Product.id == product_id
-            )
+            .filter(Product.id == product_id)
             .first()
         )
 
         if not product:
             return None
 
-        product.name = name.strip()
-        product.category = category
-        product.unit = unit or "Kg"
-        product.cost_price = float(
-            cost_price
-        )
-        product.selling_price = float(
-            selling_price
-        )
+        if name is not None:
+
+            name = str(name).strip()
+
+            if not name:
+                raise ValueError(
+                    "Product name cannot be empty."
+                )
+
+            product.name = name
+
+        if category is not None:
+            product.category = category
+
+        if unit is not None:
+            product.unit = unit
+
+        if quantity is not None:
+
+            quantity = float(quantity)
+
+            if quantity < 0:
+                raise ValueError(
+                    "Stock quantity cannot be negative."
+                )
+
+            product.quantity = quantity
+
+        if cost_price is not None:
+
+            cost_price = float(cost_price)
+
+            if cost_price < 0:
+                raise ValueError(
+                    "Cost price cannot be negative."
+                )
+
+            product.cost_price = cost_price
+
+        if selling_price is not None:
+
+            selling_price = float(selling_price)
+
+            if selling_price < 0:
+                raise ValueError(
+                    "Selling price cannot be negative."
+                )
+
+            product.selling_price = selling_price
 
         db.commit()
-
         db.refresh(product)
 
         return product
@@ -184,7 +196,9 @@ def update_product(
 
 
 def delete_product(product_id):
-    """Delete a product."""
+    """
+    Delete a product.
+    """
 
     db = SessionLocal()
 
@@ -192,28 +206,14 @@ def delete_product(product_id):
 
         product = (
             db.query(Product)
-            .filter(
-                Product.id == product_id
-            )
+            .filter(Product.id == product_id)
             .first()
         )
 
         if not product:
             return False
 
-        # Prevent deleting a product with
-        # stock remaining.
-        if (
-            product.quantity is not None
-            and product.quantity > 0
-        ):
-            raise ValueError(
-                "Cannot delete a product "
-                "that still has stock."
-            )
-
         db.delete(product)
-
         db.commit()
 
         return True
@@ -226,9 +226,44 @@ def delete_product(product_id):
         db.close()
 
 
-# ============================================================
-# STOCK MANAGEMENT
-# ============================================================
+# ==================================================
+# INVENTORY
+# ==================================================
+
+def get_inventory():
+    """
+    Return all products currently held in inventory.
+    """
+
+    return get_all_products()
+
+
+def get_total_stock():
+    """
+    Return total stock quantity across all products.
+    """
+
+    db = SessionLocal()
+
+    try:
+
+        total = (
+            db.query(Product.quantity)
+            .all()
+        )
+
+        return sum(
+            float(row[0] or 0)
+            for row in total
+        )
+
+    finally:
+        db.close()
+
+
+# ==================================================
+# STOCK ADJUSTMENT
+# ==================================================
 
 def adjust_stock(
     product_id,
@@ -237,32 +272,11 @@ def adjust_stock(
     reference=None,
 ):
     """
-    Adjust product stock.
+    Adjust product stock and create a stock movement.
 
-    movement_type:
-        IN
-        OUT
+    Positive quantity increases stock.
+    Negative quantity decreases stock.
     """
-
-    quantity = float(quantity)
-
-    if quantity <= 0:
-        raise ValueError(
-            "Stock adjustment quantity "
-            "must be greater than zero."
-        )
-
-    movement_type = (
-        movement_type.upper().strip()
-    )
-
-    if movement_type not in [
-        "IN",
-        "OUT",
-    ]:
-        raise ValueError(
-            "Movement type must be IN or OUT."
-        )
 
     db = SessionLocal()
 
@@ -270,9 +284,7 @@ def adjust_stock(
 
         product = (
             db.query(Product)
-            .filter(
-                Product.id == product_id
-            )
+            .filter(Product.id == product_id)
             .first()
         )
 
@@ -281,36 +293,19 @@ def adjust_stock(
                 "Product not found."
             )
 
-        current_quantity = float(
-            product.quantity or 0
+        quantity = float(quantity)
+
+        new_quantity = (
+            float(product.quantity or 0)
+            + quantity
         )
 
-        if movement_type == "IN":
-
-            new_quantity = (
-                current_quantity +
-                quantity
+        if new_quantity < 0:
+            raise ValueError(
+                "Insufficient stock."
             )
 
-        else:
-
-            new_quantity = (
-                current_quantity -
-                quantity
-            )
-
-            if new_quantity < 0:
-
-                raise ValueError(
-                    "Insufficient stock. "
-                    f"Available: "
-                    f"{current_quantity:,.2f} "
-                    f"{product.unit}"
-                )
-
-        product.quantity = (
-            new_quantity
-        )
+        product.quantity = new_quantity
 
         movement = StockMovement(
             product_id=product.id,
@@ -321,9 +316,7 @@ def adjust_stock(
         )
 
         db.add(movement)
-
         db.commit()
-
         db.refresh(product)
 
         return product
@@ -336,10 +329,63 @@ def adjust_stock(
         db.close()
 
 
-def get_stock_movements(
-    product_id=None
+def add_stock(
+    product_id,
+    quantity,
+    reference=None,
 ):
-    """Return stock movements."""
+    """
+    Add stock to a product.
+    """
+
+    if float(quantity) <= 0:
+        raise ValueError(
+            "Quantity must be greater than zero."
+        )
+
+    return adjust_stock(
+        product_id=product_id,
+        quantity=float(quantity),
+        movement_type="IN",
+        reference=reference,
+    )
+
+
+def remove_stock(
+    product_id,
+    quantity,
+    reference=None,
+):
+    """
+    Remove stock from a product.
+    """
+
+    if float(quantity) <= 0:
+        raise ValueError(
+            "Quantity must be greater than zero."
+        )
+
+    return adjust_stock(
+        product_id=product_id,
+        quantity=-float(quantity),
+        movement_type="OUT",
+        reference=reference,
+    )
+
+
+# ==================================================
+# STOCK MOVEMENTS
+# ==================================================
+
+def get_stock_movements(
+    product_id=None,
+):
+    """
+    Return stock movements.
+
+    If product_id is supplied, only movements for that
+    product are returned.
+    """
 
     db = SessionLocal()
 
@@ -347,44 +393,18 @@ def get_stock_movements(
 
         query = (
             db.query(StockMovement)
+            .order_by(
+                StockMovement.created_at.desc()
+            )
         )
 
         if product_id is not None:
-
             query = query.filter(
                 StockMovement.product_id
                 == product_id
             )
 
-        return (
-            query
-            .order_by(
-                StockMovement.created_at.desc()
-            )
-            .all()
-        )
-
-    finally:
-        db.close()
-
-
-def get_total_stock():
-    """Return total stock quantity."""
-
-    db = SessionLocal()
-
-    try:
-
-        total = (
-            db.query(
-                Product.quantity
-            ).all()
-        )
-
-        return sum(
-            float(row[0] or 0)
-            for row in total
-        )
+        return query.all()
 
     finally:
         db.close()
