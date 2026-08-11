@@ -47,9 +47,18 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    #MainMenu { display: none; }
-    footer { display: none; }
-    header { display: none; }
+
+    #MainMenu {
+        display: none;
+    }
+
+    footer {
+        display: none;
+    }
+
+    header {
+        display: none;
+    }
 
     .block-container {
         padding-top: 1.5rem;
@@ -58,6 +67,212 @@ st.markdown(
     div[data-testid="stSidebar"] {
         border-right: 1px solid #ddd;
     }
+
+    /* ==========================================
+       ESAN LOGIN DESIGN
+       ========================================== */
+
+    .esan-login-page {
+        min-height: 78vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 30px 20px;
+    }
+
+    .esan-login-container {
+        width: 430px;
+        max-width: 100%;
+        text-align: center;
+    }
+
+    /* ==========================================
+       ESAN LOGO MARK
+       ========================================== */
+
+    .esan-logo-mark {
+        width: 108px;
+        height: 108px;
+        margin: 0 auto 20px auto;
+
+        background:
+            linear-gradient(
+                145deg,
+                #238653 0%,
+                #17613d 55%,
+                #0d452b 100%
+            );
+
+        border-radius: 30px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        position: relative;
+
+        box-shadow:
+            0 18px 45px rgba(20, 90, 55, 0.25);
+    }
+
+    /*
+       Outer ring
+    */
+
+    .esan-logo-ring {
+        position: absolute;
+
+        width: 72px;
+        height: 72px;
+
+        border: 2px solid rgba(255,255,255,0.9);
+
+        border-radius: 50%;
+    }
+
+    /*
+       Abstract E symbol
+    */
+
+    .esan-logo-symbol {
+        position: relative;
+
+        width: 50px;
+        height: 50px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        z-index: 2;
+    }
+
+    .esan-logo-symbol::before,
+    .esan-logo-symbol::after {
+        content: "";
+
+        position: absolute;
+
+        background: white;
+
+        border-radius: 4px;
+    }
+
+    .esan-logo-symbol::before {
+        width: 9px;
+        height: 42px;
+
+        left: 7px;
+        top: 4px;
+    }
+
+    .esan-logo-symbol::after {
+        width: 34px;
+        height: 9px;
+
+        left: 7px;
+        top: 4px;
+
+        box-shadow:
+            0 16px 0 white,
+            0 33px 0 white;
+    }
+
+    /*
+       Small agricultural accent
+    */
+
+    .esan-logo-leaf {
+        position: absolute;
+
+        width: 15px;
+        height: 27px;
+
+        right: 13px;
+        bottom: 15px;
+
+        background: #d8eec2;
+
+        border-radius: 100% 0 100% 0;
+
+        transform: rotate(25deg);
+    }
+
+    /* ==========================================
+       ESAN WORDMARK
+       ========================================== */
+
+    .esan-wordmark {
+        font-family:
+            Arial,
+            Helvetica,
+            sans-serif;
+
+        font-size: 42px;
+
+        font-weight: 800;
+
+        letter-spacing: 4px;
+
+        color: #174f35;
+
+        margin-bottom: 4px;
+    }
+
+    .esan-login-tagline {
+        font-family:
+            Arial,
+            Helvetica,
+            sans-serif;
+
+        font-size: 11px;
+
+        font-weight: 600;
+
+        letter-spacing: 3px;
+
+        color: #7a7a7a;
+
+        margin-bottom: 35px;
+    }
+
+    /* ==========================================
+       LOGIN INPUT AREA
+       ========================================== */
+
+    div[data-testid="stTextInput"] label {
+        font-weight: 600;
+    }
+
+    div[data-testid="stTextInput"] input {
+        border-radius: 10px;
+        padding: 12px;
+    }
+
+    /* ==========================================
+       LOGIN BUTTON
+       ========================================== */
+
+    div[data-testid="stButton"] > button {
+        border-radius: 10px;
+        min-height: 46px;
+        font-weight: 700;
+    }
+
+    /* ==========================================
+       LOGIN FOOTER
+       ========================================== */
+
+    .esan-login-footer {
+        margin-top: 35px;
+
+        color: #999;
+
+        font-size: 11px;
+
+        letter-spacing: 0.5px;
+    }
+
     </style>
     """,
     unsafe_allow_html=True,
@@ -80,13 +295,18 @@ def safe_import(module_path, function_name):
     """
 
     try:
+
         module = __import__(
             module_path,
             fromlist=[function_name],
         )
 
         if hasattr(module, function_name):
-            return getattr(module, function_name)
+
+            return getattr(
+                module,
+                function_name,
+            )
 
         error = (
             f"{module_path}: missing function "
@@ -94,6 +314,7 @@ def safe_import(module_path, function_name):
         )
 
         module_errors.append(error)
+
         logging.error(error)
 
         return None
@@ -106,6 +327,7 @@ def safe_import(module_path, function_name):
         )
 
         module_errors.append(error)
+
         logging.exception(
             f"Failed loading {module_path}"
         )
@@ -127,7 +349,9 @@ except ImportError:
 
         admin = (
             db.query(User)
-            .filter(User.username == "admin")
+            .filter(
+                User.username == "admin"
+            )
             .first()
         )
 
@@ -139,7 +363,9 @@ except ImportError:
                 username="admin",
                 full_name="System Administrator",
                 email="admin@nileharvest.com",
-                password_hash=hash_password("admin123"),
+                password_hash=hash_password(
+                    "admin123"
+                ),
                 role="Administrator",
                 active=True,
             )
@@ -312,6 +538,7 @@ def _fallback_page(title):
 
 
 # Procurement fallbacks
+
 procurement_suppliers = (
     procurement_suppliers
     or _fallback_page("Suppliers")
@@ -328,7 +555,8 @@ procurement_purchase_orders = (
 )
 
 
-# Warehouse fallbacks
+# Warehouse fallback
+
 warehouse_inventory = (
     warehouse_inventory
     or _fallback_page("Inventory")
@@ -389,7 +617,7 @@ def initialize_database():
                     e,
                 )
 
-    except Exception as e:
+    except Exception:
 
         logging.exception(
             "Database initialization failed"
@@ -411,9 +639,14 @@ initialize_database()
 if "logged_in" not in st.session_state:
 
     st.session_state.logged_in = False
+
     st.session_state.username = None
+
     st.session_state.role = None
-    st.session_state.current_page = "🏠 Overview"
+
+    st.session_state.current_page = (
+        "🏠 Overview"
+    )
 
 
 # ==================================================
@@ -444,8 +677,14 @@ def login(username, password):
         ):
 
             st.session_state.logged_in = True
-            st.session_state.username = user.username
-            st.session_state.role = user.role
+
+            st.session_state.username = (
+                user.username
+            )
+
+            st.session_state.role = (
+                user.role
+            )
 
             return True
 
@@ -462,18 +701,45 @@ def login(username, password):
 
 if not st.session_state.logged_in:
 
+    # ----------------------------------------------
+    # ESAN BRANDING
+    # ----------------------------------------------
+
     st.markdown(
         """
-        <div style="text-align:center">
-        <h1>🌾 Esan ERP</h1>
-        <h3>Nile Harvest Foods Ltd.</h3>
-        <p>
-        Enterprise Milling & Packaging Management System
-        </p>
+        <div class="esan-login-page">
+
+            <div class="esan-login-container">
+
+                <div class="esan-logo-mark">
+
+                    <div class="esan-logo-ring"></div>
+
+                    <div class="esan-logo-symbol"></div>
+
+                    <div class="esan-logo-leaf"></div>
+
+                </div>
+
+                <div class="esan-wordmark">
+                    Esan
+                </div>
+
+                <div class="esan-login-tagline">
+                    ENTERPRISE MANAGEMENT SYSTEM
+                </div>
+
+            </div>
+
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+
+    # ----------------------------------------------
+    # LOGIN FORM
+    # ----------------------------------------------
 
     col1, col2, col3 = st.columns(
         [1, 2, 1]
@@ -482,17 +748,20 @@ if not st.session_state.logged_in:
     with col2:
 
         username = st.text_input(
-            "Username"
+            "Username",
+            placeholder="Enter your username",
         )
 
         password = st.text_input(
             "Password",
             type="password",
+            placeholder="Enter your password",
         )
 
         if st.button(
             "Login",
             use_container_width=True,
+            type="primary",
         ):
 
             if login(
@@ -512,10 +781,30 @@ if not st.session_state.logged_in:
                     "Invalid username or password"
                 )
 
+
         st.info(
             "Default administrator: "
             "admin / admin123"
         )
+
+
+    # ----------------------------------------------
+    # LOGIN FOOTER
+    # ----------------------------------------------
+
+    st.markdown(
+        """
+        <div class="esan-login-footer"
+             style="text-align:center">
+
+            Nile Harvest Foods Ltd.
+            <br>
+            Esan ERP Enterprise Platform
+
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     st.stop()
 
@@ -548,6 +837,7 @@ with st.sidebar:
 
     st.divider()
 
+
     def nav_button(label):
 
         if st.button(
@@ -555,24 +845,46 @@ with st.sidebar:
             use_container_width=True,
         ):
 
-            st.session_state.current_page = label
+            st.session_state.current_page = (
+                label
+            )
 
 
     # MAIN
-    nav_button("🏠 Overview")
+
+    nav_button(
+        "🏠 Overview"
+    )
 
 
     # OPERATIONS
-    st.markdown("**OPERATIONS**")
 
-    nav_button("🌾 Procurement")
-    nav_button("📦 Warehouse")
-    nav_button("🏭 Milling")
-    nav_button("📦 Packaging")
+    st.markdown(
+        "**OPERATIONS**"
+    )
+
+    nav_button(
+        "🌾 Procurement"
+    )
+
+    nav_button(
+        "📦 Warehouse"
+    )
+
+    nav_button(
+        "🏭 Milling"
+    )
+
+    nav_button(
+        "📦 Packaging"
+    )
 
 
     # COMMERCIAL
-    st.markdown("**COMMERCIAL**")
+
+    st.markdown(
+        "**COMMERCIAL**"
+    )
 
     nav_button(
         "🚚 Sales & Distribution"
@@ -580,21 +892,32 @@ with st.sidebar:
 
 
     # FINANCE
-    st.markdown("**FINANCE**")
 
-    nav_button("💰 Finance")
+    st.markdown(
+        "**FINANCE**"
+    )
+
+    nav_button(
+        "💰 Finance"
+    )
 
 
     # REPORTING
-    st.markdown("**REPORTING**")
 
-    nav_button("📊 Reports")
+    st.markdown(
+        "**REPORTING**"
+    )
+
+    nav_button(
+        "📊 Reports"
+    )
 
 
     st.divider()
 
 
     # USER PANEL
+
     st.markdown(
         "### 👤 User Panel"
     )
@@ -614,8 +937,11 @@ with st.sidebar:
     ):
 
         st.session_state.logged_in = False
+
         st.session_state.username = None
+
         st.session_state.role = None
+
         st.session_state.current_page = (
             "🏠 Overview"
         )
@@ -653,7 +979,9 @@ if menu == "🏠 Overview":
 
 elif menu == "🌾 Procurement":
 
-    st.header("🌾 Procurement")
+    st.header(
+        "🌾 Procurement"
+    )
 
     procurement_menu = st.radio(
         "Procurement Module",
@@ -665,6 +993,7 @@ elif menu == "🌾 Procurement":
         ],
         horizontal=True,
     )
+
 
     if procurement_menu == "Dashboard":
 
@@ -700,7 +1029,9 @@ elif menu == "🌾 Procurement":
 
 elif menu == "📦 Warehouse":
 
-    st.header("📦 Warehouse")
+    st.header(
+        "📦 Warehouse"
+    )
 
     warehouse_menu = st.radio(
         "Warehouse Module",
@@ -710,6 +1041,7 @@ elif menu == "📦 Warehouse":
         ],
         horizontal=True,
     )
+
 
     if warehouse_menu == "Dashboard":
 
@@ -787,6 +1119,7 @@ elif menu == "🚚 Sales & Distribution":
         horizontal=True,
     )
 
+
     sales_pages = {
 
         "Dashboard":
@@ -809,11 +1142,14 @@ elif menu == "🚚 Sales & Distribution":
 
         "Payments":
             sales_payments,
+
     }
+
 
     page_func = sales_pages.get(
         sales_menu
     )
+
 
     if page_func:
 
