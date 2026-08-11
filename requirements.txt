@@ -1,4 +1,7 @@
-fastapi
-uvicorn
+streamlit
 sqlalchemy
-psycopg2-binary
+pandas
+plotly
+passlib
+bcrypt
+python-dotenv
