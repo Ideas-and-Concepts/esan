@@ -1,339 +1,370 @@
 """
 Esan ERP Warehouse Service
-Nile Harvest Foods Ltd.
 
-Warehouse and Inventory Management Services
+Nile Harvest Foods Ltd.
+Enterprise Milling & Packaging Management System
+
+Functions:
+- Products
+- Inventory
+- Stock movements
+- Add products
+- Edit products
+- Delete products
+- Stock adjustments
 """
 
 from datetime import datetime
 
-from sqlalchemy.orm import Session
-
 from database import SessionLocal
 from models import Product, StockMovement
 
-==================================================
 
-PRODUCTS
-
-==================================================
+# ==================================================
+# PRODUCTS
+# ==================================================
 
 def get_all_products():
-"""Return all products ordered alphabetically."""
 
-db = SessionLocal()
+    db = SessionLocal()
 
-try:
-    return (
-        db.query(Product)
-        .order_by(Product.name.asc())
-        .all()
-    )
+    try:
 
-finally:
-    db.close()
+        return (
+            db.query(Product)
+            .order_by(Product.name)
+            .all()
+        )
+
+    finally:
+
+        db.close()
+
 
 def get_product(product_id):
-"""Return a single product by ID."""
 
-db = SessionLocal()
+    db = SessionLocal()
 
-try:
-    return (
-        db.query(Product)
-        .filter(Product.id == product_id)
-        .first()
-    )
+    try:
 
-finally:
-    db.close()
+        return (
+            db.query(Product)
+            .filter(Product.id == product_id)
+            .first()
+        )
+
+    finally:
+
+        db.close()
+
 
 def create_product(
-name,
-category=None,
-unit="Kg",
-quantity=0,
-cost_price=0,
-selling_price=0,
+    name,
+    category=None,
+    unit="Kg",
+    quantity=0,
+    cost_price=0,
+    selling_price=0,
 ):
-"""Create a new inventory product."""
 
-db = SessionLocal()
+    db = SessionLocal()
 
-try:
-    product = Product(
-        name=name.strip(),
-        category=category,
-        unit=unit,
-        quantity=float(quantity or 0),
-        cost_price=float(cost_price or 0),
-        selling_price=float(selling_price or 0),
-        created_at=datetime.utcnow(),
-    )
+    try:
 
-    db.add(product)
-    db.commit()
-    db.refresh(product)
+        product = Product(
+            name=name,
+            category=category,
+            unit=unit,
+            quantity=quantity,
+            cost_price=cost_price,
+            selling_price=selling_price,
+            created_at=datetime.utcnow(),
+        )
 
-    return product
+        db.add(product)
+        db.commit()
+        db.refresh(product)
 
-except Exception:
-    db.rollback()
-    raise
+        return product
 
-finally:
-    db.close()
+    except Exception:
+
+        db.rollback()
+        raise
+
+    finally:
+
+        db.close()
+
 
 def update_product(
-product_id,
-name=None,
-category=None,
-unit=None,
-quantity=None,
-cost_price=None,
-selling_price=None,
+    product_id,
+    name=None,
+    category=None,
+    unit=None,
+    quantity=None,
+    cost_price=None,
+    selling_price=None,
 ):
-"""
-Update an existing product.
 
-Only supplied values are changed.
-"""
+    db = SessionLocal()
 
-db = SessionLocal()
+    try:
 
-try:
-    product = (
-        db.query(Product)
-        .filter(Product.id == product_id)
-        .first()
-    )
+        product = (
+            db.query(Product)
+            .filter(Product.id == product_id)
+            .first()
+        )
 
-    if not product:
-        return None
+        if not product:
 
-    if name is not None:
-        product.name = name.strip()
+            return None
 
-    if category is not None:
-        product.category = category
+        if name is not None:
+            product.name = name
 
-    if unit is not None:
-        product.unit = unit
+        if category is not None:
+            product.category = category
 
-    if quantity is not None:
-        product.quantity = float(quantity)
+        if unit is not None:
+            product.unit = unit
 
-    if cost_price is not None:
-        product.cost_price = float(cost_price)
+        if quantity is not None:
+            product.quantity = quantity
 
-    if selling_price is not None:
-        product.selling_price = float(selling_price)
+        if cost_price is not None:
+            product.cost_price = cost_price
 
-    db.commit()
-    db.refresh(product)
+        if selling_price is not None:
+            product.selling_price = selling_price
 
-    return product
+        db.commit()
+        db.refresh(product)
 
-except Exception:
-    db.rollback()
-    raise
+        return product
 
-finally:
-    db.close()
+    except Exception:
+
+        db.rollback()
+        raise
+
+    finally:
+
+        db.close()
+
 
 def delete_product(product_id):
-"""Delete a product."""
 
-db = SessionLocal()
+    db = SessionLocal()
 
-try:
-    product = (
-        db.query(Product)
-        .filter(Product.id == product_id)
-        .first()
-    )
+    try:
 
-    if not product:
-        return False
+        product = (
+            db.query(Product)
+            .filter(Product.id == product_id)
+            .first()
+        )
 
-    db.delete(product)
-    db.commit()
+        if not product:
 
-    return True
+            return False
 
-except Exception:
-    db.rollback()
-    raise
+        db.query(StockMovement).filter(
+            StockMovement.product_id == product_id
+        ).delete(
+            synchronize_session=False
+        )
 
-finally:
-    db.close()
+        db.delete(product)
 
-==================================================
+        db.commit()
 
-STOCK MANAGEMENT
+        return True
 
-==================================================
+    except Exception:
+
+        db.rollback()
+        raise
+
+    finally:
+
+        db.close()
+
+
+# ==================================================
+# STOCK
+# ==================================================
 
 def adjust_stock(
-product_id,
-quantity,
-movement_type,
-reference=None,
+    product_id,
+    quantity,
+    movement_type,
+    reference=None,
 ):
-"""
-Add or remove stock.
 
-Positive quantity increases stock.
-Negative quantity decreases stock.
+    db = SessionLocal()
 
-movement_type examples:
-- Purchase
-- Sale
-- Production
-- Adjustment
-- Transfer
-"""
+    try:
 
-db = SessionLocal()
-
-try:
-    product = (
-        db.query(Product)
-        .filter(Product.id == product_id)
-        .first()
-    )
-
-    if not product:
-        return None
-
-    quantity = float(quantity)
-
-    new_quantity = float(product.quantity or 0) + quantity
-
-    if new_quantity < 0:
-        raise ValueError(
-            "Stock quantity cannot be negative."
+        product = (
+            db.query(Product)
+            .filter(Product.id == product_id)
+            .first()
         )
 
-    product.quantity = new_quantity
+        if not product:
 
-    movement = StockMovement(
-        product_id=product.id,
-        movement_type=movement_type,
-        quantity=quantity,
-        reference=reference,
-        created_at=datetime.utcnow(),
-    )
+            raise ValueError(
+                "Product not found."
+            )
 
-    db.add(movement)
+        quantity = float(quantity)
 
-    db.commit()
-    db.refresh(product)
+        if quantity <= 0:
 
-    return product
+            raise ValueError(
+                "Quantity must be greater than zero."
+            )
 
-except Exception:
-    db.rollback()
-    raise
+        movement_type = movement_type.strip().lower()
 
-finally:
-    db.close()
+        if movement_type in (
+            "in",
+            "stock in",
+            "receipt",
+            "received",
+            "purchase",
+        ):
 
-def add_stock(
-product_id,
-quantity,
-reference=None,
-):
-"""Add stock to inventory."""
+            product.quantity += quantity
 
-return adjust_stock(
-    product_id=product_id,
-    quantity=quantity,
-    movement_type="Stock In",
-    reference=reference,
-)
+            movement_label = "IN"
 
-def remove_stock(
-product_id,
-quantity,
-reference=None,
-):
-"""Remove stock from inventory."""
+        elif movement_type in (
+            "out",
+            "stock out",
+            "issue",
+            "issued",
+            "sale",
+        ):
 
-quantity = float(quantity)
+            if product.quantity < quantity:
 
-if quantity < 0:
-    raise ValueError(
-        "Quantity must be positive when removing stock."
-    )
+                raise ValueError(
+                    "Insufficient stock."
+                )
 
-return adjust_stock(
-    product_id=product_id,
-    quantity=-quantity,
-    movement_type="Stock Out",
-    reference=reference,
-)
+            product.quantity -= quantity
 
-==================================================
+            movement_label = "OUT"
 
-STOCK MOVEMENTS
+        else:
 
-==================================================
+            raise ValueError(
+                "Movement type must be IN or OUT."
+            )
 
-def get_stock_movements(product_id=None):
-"""Return stock movements, optionally filtered by product."""
-
-db = SessionLocal()
-
-try:
-    query = db.query(StockMovement)
-
-    if product_id is not None:
-        query = query.filter(
-            StockMovement.product_id == product_id
+        movement = StockMovement(
+            product_id=product.id,
+            movement_type=movement_label,
+            quantity=quantity,
+            reference=reference,
+            created_at=datetime.utcnow(),
         )
 
-    return (
-        query
-        .order_by(StockMovement.created_at.desc())
-        .all()
-    )
+        db.add(movement)
 
-finally:
-    db.close()
+        db.commit()
 
-==================================================
+        db.refresh(product)
 
-INVENTORY SUMMARY
+        return product
 
-==================================================
+    except Exception:
+
+        db.rollback()
+        raise
+
+    finally:
+
+        db.close()
+
+
+def get_stock_movements(
+    product_id=None
+):
+
+    db = SessionLocal()
+
+    try:
+
+        query = db.query(
+            StockMovement
+        )
+
+        if product_id is not None:
+
+            query = query.filter(
+                StockMovement.product_id
+                == product_id
+            )
+
+        return (
+            query
+            .order_by(
+                StockMovement.created_at.desc()
+            )
+            .all()
+        )
+
+    finally:
+
+        db.close()
+
+
+# ==================================================
+# INVENTORY SUMMARY
+# ==================================================
 
 def get_inventory_summary():
-"""Return basic inventory statistics."""
 
-db = SessionLocal()
+    db = SessionLocal()
 
-try:
-    products = db.query(Product).all()
+    try:
 
-    total_products = len(products)
+        products = (
+            db.query(Product)
+            .order_by(Product.name)
+            .all()
+        )
 
-    total_stock = sum(
-        float(product.quantity or 0)
-        for product in products
-    )
+        total_products = len(products)
 
-    total_stock_value = sum(
-        float(product.quantity or 0)
-        * float(product.cost_price or 0)
-        for product in products
-    )
+        total_stock = sum(
+            product.quantity or 0
+            for product in products
+        )
 
-    return {
-        "total_products": total_products,
-        "total_stock": total_stock,
-        "total_stock_value": total_stock_value,
-    }
+        total_cost_value = sum(
+            (product.quantity or 0)
+            * (product.cost_price or 0)
+            for product in products
+        )
 
-finally:
-    db.close()
+        total_sales_value = sum(
+            (product.quantity or 0)
+            * (product.selling_price or 0)
+            for product in products
+        )
+
+        return {
+            "total_products": total_products,
+            "total_stock": total_stock,
+            "total_cost_value": total_cost_value,
+            "total_sales_value": total_sales_value,
+        }
+
+    finally:
+
+        db.close()
