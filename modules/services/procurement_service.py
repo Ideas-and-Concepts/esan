@@ -2,14 +2,18 @@
 Esan ERP Procurement Service
 
 Nile Harvest Foods Ltd.
+Enterprise Milling & Packaging Management System
 
 Handles:
 - Suppliers
 - Purchase Orders
 - Purchase Order Items
+- Purchase Order Status
 """
 
 from datetime import datetime
+
+from sqlalchemy.orm import joinedload
 
 from database import SessionLocal
 from models import (
@@ -33,26 +37,8 @@ def get_all_suppliers():
     try:
         return (
             db.query(Supplier)
-            .order_by(Supplier.name.asc())
+            .order_by(Supplier.name)
             .all()
-        )
-
-    finally:
-        db.close()
-
-
-def get_supplier(supplier_id):
-    """
-    Return one supplier by ID.
-    """
-
-    db = SessionLocal()
-
-    try:
-        return (
-            db.query(Supplier)
-            .filter(Supplier.id == supplier_id)
-            .first()
         )
 
     finally:
@@ -73,17 +59,12 @@ def create_supplier(
     Create a new supplier.
     """
 
-    if not name or not name.strip():
-        raise ValueError(
-            "Supplier name is required."
-        )
-
     db = SessionLocal()
 
     try:
 
         supplier = Supplier(
-            name=name.strip(),
+            name=name,
             phone=phone,
             email=email,
             address=address,
@@ -116,21 +97,30 @@ def create_supplier(
 
 def get_all_purchase_orders():
     """
-    Return all purchase orders,
-    newest first.
+    Return all purchase orders with their suppliers
+    eagerly loaded.
+
+    This prevents SQLAlchemy DetachedInstanceError
+    when the Streamlit page accesses po.supplier after
+    the database session has been closed.
     """
 
     db = SessionLocal()
 
     try:
 
-        return (
+        purchase_orders = (
             db.query(PurchaseOrder)
+            .options(
+                joinedload(PurchaseOrder.supplier)
+            )
             .order_by(
                 PurchaseOrder.created_at.desc()
             )
             .all()
         )
+
+        return purchase_orders
 
     finally:
 
@@ -139,25 +129,36 @@ def get_all_purchase_orders():
 
 def get_purchase_order(po_id):
     """
-    Return a purchase order by ID.
+    Get one purchase order with its supplier and items
+    already loaded.
     """
 
     db = SessionLocal()
 
     try:
 
-        return (
+        purchase_order = (
             db.query(PurchaseOrder)
+            .options(
+                joinedload(PurchaseOrder.supplier),
+                joinedload(PurchaseOrder.items),
+            )
             .filter(
                 PurchaseOrder.id == po_id
             )
             .first()
         )
 
+        return purchase_order
+
     finally:
 
         db.close()
 
+
+# ==================================================
+# CREATE PURCHASE ORDER
+# ==================================================
 
 def create_purchase_order(
     supplier_id,
@@ -165,23 +166,18 @@ def create_purchase_order(
     status="Draft",
 ):
     """
-    Create a purchase order.
+    Create a Purchase Order and its items.
 
-    items_data must be a list of dictionaries:
+    items_data format:
 
     [
         {
-            "product_name": "Maize",
-            "quantity": 1000,
-            "unit_price": 1500
+            "product_name": "Maize Grain",
+            "quantity": 10,
+            "unit_price": 40000
         }
     ]
     """
-
-    if not supplier_id:
-        raise ValueError(
-            "Supplier is required."
-        )
 
     if not items_data:
         raise ValueError(
@@ -193,7 +189,7 @@ def create_purchase_order(
     try:
 
         # ------------------------------------------
-        # VERIFY SUPPLIER
+        # Validate supplier
         # ------------------------------------------
 
         supplier = (
@@ -210,16 +206,12 @@ def create_purchase_order(
             )
 
         # ------------------------------------------
-        # VALIDATE ITEMS
+        # Calculate total
         # ------------------------------------------
 
-        total = 0
+        total = 0.0
 
         for item in items_data:
-
-            product_name = item.get(
-                "product_name"
-            )
 
             quantity = float(
                 item.get("quantity", 0)
@@ -229,32 +221,22 @@ def create_purchase_order(
                 item.get("unit_price", 0)
             )
 
-            if not product_name:
-                raise ValueError(
-                    "Every purchase item must "
-                    "have a product name."
-                )
-
             if quantity <= 0:
                 raise ValueError(
-                    f"Quantity for "
-                    f"'{product_name}' must "
-                    "be greater than zero."
+                    f"Invalid quantity for "
+                    f"{item.get('product_name', 'item')}."
                 )
 
             if unit_price < 0:
                 raise ValueError(
-                    f"Unit price for "
-                    f"'{product_name}' "
-                    "cannot be negative."
+                    f"Invalid unit price for "
+                    f"{item.get('product_name', 'item')}."
                 )
 
-            total += (
-                quantity * unit_price
-            )
+            total += quantity * unit_price
 
         # ------------------------------------------
-        # GENERATE PO NUMBER
+        # Generate PO number
         # ------------------------------------------
 
         count = (
@@ -269,10 +251,10 @@ def create_purchase_order(
         )
 
         # ------------------------------------------
-        # CREATE PURCHASE ORDER
+        # Create Purchase Order
         # ------------------------------------------
 
-        po = PurchaseOrder(
+        purchase_order = PurchaseOrder(
             po_number=po_number,
             supplier_id=supplier_id,
             status=status,
@@ -280,11 +262,13 @@ def create_purchase_order(
             created_at=datetime.utcnow(),
         )
 
-        db.add(po)
+        db.add(purchase_order)
+
+        # Flush so purchase_order.id is available
         db.flush()
 
         # ------------------------------------------
-        # CREATE ITEMS
+        # Create Purchase Order Items
         # ------------------------------------------
 
         for item in items_data:
@@ -301,22 +285,46 @@ def create_purchase_order(
                 quantity * unit_price
             )
 
-            purchase_item = PurchaseOrderItem(
-                purchase_order_id=po.id,
-                product_name=item[
-                    "product_name"
-                ],
+            purchase_order_item = PurchaseOrderItem(
+                purchase_order_id=purchase_order.id,
+                product_name=item["product_name"],
                 quantity=quantity,
                 unit_price=unit_price,
                 total=item_total,
             )
 
-            db.add(purchase_item)
+            db.add(
+                purchase_order_item
+            )
+
+        # ------------------------------------------
+        # Commit
+        # ------------------------------------------
 
         db.commit()
-        db.refresh(po)
 
-        return po
+        # ------------------------------------------
+        # Reload PO with supplier attached
+        # ------------------------------------------
+
+        purchase_order = (
+            db.query(PurchaseOrder)
+            .options(
+                joinedload(
+                    PurchaseOrder.supplier
+                ),
+                joinedload(
+                    PurchaseOrder.items
+                ),
+            )
+            .filter(
+                PurchaseOrder.id
+                == purchase_order.id
+            )
+            .first()
+        )
+
+        return purchase_order
 
     except Exception:
 
@@ -329,7 +337,7 @@ def create_purchase_order(
 
 
 # ==================================================
-# PURCHASE ORDER STATUS
+# UPDATE PURCHASE ORDER STATUS
 # ==================================================
 
 def update_purchase_order_status(
@@ -337,28 +345,30 @@ def update_purchase_order_status(
     new_status,
 ):
     """
-    Update purchase order status.
+    Update the status of a Purchase Order.
     """
 
     allowed_statuses = [
         "Draft",
-        "Pending",
+        "Pending Approval",
         "Approved",
         "Ordered",
+        "Partially Received",
         "Received",
         "Cancelled",
     ]
 
     if new_status not in allowed_statuses:
+
         raise ValueError(
-            "Invalid purchase order status."
+            "Invalid Purchase Order status."
         )
 
     db = SessionLocal()
 
     try:
 
-        po = (
+        purchase_order = (
             db.query(PurchaseOrder)
             .filter(
                 PurchaseOrder.id == po_id
@@ -366,15 +376,31 @@ def update_purchase_order_status(
             .first()
         )
 
-        if not po:
+        if not purchase_order:
             return None
 
-        po.status = new_status
+        purchase_order.status = new_status
 
         db.commit()
-        db.refresh(po)
 
-        return po
+        # Reload relationships before closing
+        purchase_order = (
+            db.query(PurchaseOrder)
+            .options(
+                joinedload(
+                    PurchaseOrder.supplier
+                ),
+                joinedload(
+                    PurchaseOrder.items
+                ),
+            )
+            .filter(
+                PurchaseOrder.id == po_id
+            )
+            .first()
+        )
+
+        return purchase_order
 
     except Exception:
 
