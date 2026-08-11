@@ -1,7 +1,6 @@
 """
-Esan ERP Controller
 Nile Harvest Foods Ltd.
-Enterprise Milling & Packaging Management System
+Enterprise Resource Planning System
 
 Version 1.4.0 Alpha – Full Repository Integration
 """
@@ -34,8 +33,8 @@ logging.basicConfig(
 # ==================================================
 
 st.set_page_config(
-    page_title="Esan ERP",
-    page_icon="🌾",
+    page_title="Nile Harvest ERP",
+    page_icon="🌱",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -71,190 +70,105 @@ st.markdown(
 
 
     /* ==========================================
-       ESAN LOGIN PAGE
+       LOGIN PAGE
        ========================================== */
 
-    .esan-login-page {
+    .login-page {
         min-height: 82vh;
-
         display: flex;
         align-items: center;
         justify-content: center;
-
         padding: 20px;
     }
 
-
-    .esan-login-container {
+    .login-container {
         width: 420px;
         max-width: 100%;
-
         text-align: center;
     }
 
 
     /* ==========================================
-       ESAN LOGO (CSS fallback)
+       NEW LOGO – GROWING SPROUT
        ========================================== */
 
-    .esan-logo {
+    .logo {
         width: 112px;
         height: 112px;
-
         margin: 0 auto 18px auto;
-
         border-radius: 32px;
-
-        background:
-            linear-gradient(
-                145deg,
-                #238653 0%,
-                #17613d 55%,
-                #0c432a 100%
-            );
-
+        background: linear-gradient(145deg, #2e7d32, #1b5e20);
         display: flex;
         align-items: center;
         justify-content: center;
-
         position: relative;
-
-        box-shadow:
-            0 18px 45px
-            rgba(20, 90, 55, 0.25);
+        box-shadow: 0 18px 45px rgba(20, 90, 55, 0.25);
     }
 
-
-    /* ==========================================
-       LOGO RING
-       ========================================== */
-
-    .esan-logo-ring {
+    /* Soil / ground */
+    .logo::before {
+        content: "";
         position: absolute;
+        bottom: 0;
+        width: 100%;
+        height: 28px;
+        background: #4e342e;
+        border-radius: 0 0 28px 28px;
+    }
 
-        width: 76px;
-        height: 76px;
+    /* Stem */
+    .logo-stem {
+        position: absolute;
+        bottom: 28px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 6px;
+        height: 40px;
+        background: #aed581;
+        border-radius: 3px 3px 0 0;
+    }
 
-        border: 2px solid
-            rgba(255, 255, 255, 0.9);
-
+    /* Leaves */
+    .logo-leaf {
+        position: absolute;
+        bottom: 52px;
+        width: 18px;
+        height: 18px;
+        background: #81c784;
         border-radius: 50%;
     }
 
-
-    /* ==========================================
-       ABSTRACT E
-       ========================================== */
-
-    .esan-logo-e {
-        position: relative;
-
-        width: 48px;
-        height: 48px;
-
-        z-index: 2;
+    .logo-leaf.left {
+        left: 24px;
+        transform: rotate(-30deg);
     }
 
-
-    .esan-logo-e::before {
-        content: "";
-
-        position: absolute;
-
-        left: 5px;
-        top: 3px;
-
-        width: 8px;
-        height: 42px;
-
-        background: white;
-
-        border-radius: 4px;
-    }
-
-
-    .esan-logo-e::after {
-        content: "";
-
-        position: absolute;
-
-        left: 5px;
-        top: 3px;
-
-        width: 34px;
-        height: 8px;
-
-        background: white;
-
-        border-radius: 4px;
-
-        box-shadow:
-            0 17px 0 white,
-            0 34px 0 white;
+    .logo-leaf.right {
+        right: 24px;
+        transform: rotate(30deg);
     }
 
 
     /* ==========================================
-       AGRICULTURAL LEAF
+       WORDMARK (no "Esan")
        ========================================== */
 
-    .esan-leaf {
-        position: absolute;
-
-        right: 13px;
-        bottom: 14px;
-
-        width: 17px;
-        height: 29px;
-
-        background: #d9efc8;
-
-        border-radius:
-            100% 0 100% 0;
-
-        transform: rotate(25deg);
-
-        z-index: 3;
-    }
-
-
-    /* ==========================================
-       ESAN WORDMARK
-       ========================================== */
-
-    .esan-wordmark {
-        font-family:
-            Arial,
-            Helvetica,
-            sans-serif;
-
-        font-size: 42px;
-
+    .wordmark {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 36px;
         font-weight: 800;
-
-        letter-spacing: 4px;
-
-        color: #174f35;
-
-        margin-bottom: 5px;
+        letter-spacing: 3px;
+        color: #1b5e20;
+        margin-bottom: 6px;
     }
 
-
-    .esan-tagline {
-        font-family:
-            Arial,
-            Helvetica,
-            sans-serif;
-
-        font-size: 11px;
-
+    .tagline {
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 12px;
         font-weight: 600;
-
-        letter-spacing: 3px;
-
+        letter-spacing: 2px;
         color: #777;
-
-        margin-bottom: 35px;
+        margin-bottom: 30px;
     }
 
 
@@ -266,12 +180,9 @@ st.markdown(
         font-weight: 600;
     }
 
-
     div[data-testid="stTextInput"] input {
         border-radius: 10px;
-
         min-height: 45px;
-
         padding-left: 14px;
     }
 
@@ -282,9 +193,7 @@ st.markdown(
 
     div[data-testid="stButton"] > button {
         border-radius: 10px;
-
         min-height: 46px;
-
         font-weight: 700;
     }
 
@@ -293,15 +202,11 @@ st.markdown(
        LOGIN FOOTER
        ========================================== */
 
-    .esan-login-footer {
+    .login-footer {
         text-align: center;
-
         margin-top: 30px;
-
         color: #999;
-
         font-size: 11px;
-
         letter-spacing: 0.5px;
     }
 
@@ -319,51 +224,19 @@ module_errors = []
 
 
 def safe_import(module_path, function_name):
-    """
-    Safely import a module function.
-
-    If the module fails to load, the application continues
-    running and records the error for diagnostics.
-    """
-
+    """Safely import a module function."""
     try:
-
-        module = __import__(
-            module_path,
-            fromlist=[function_name],
-        )
-
+        module = __import__(module_path, fromlist=[function_name])
         if hasattr(module, function_name):
-
-            return getattr(
-                module,
-                function_name,
-            )
-
-        error = (
-            f"{module_path}: missing function "
-            f"'{function_name}'"
-        )
-
+            return getattr(module, function_name)
+        error = f"{module_path}: missing function '{function_name}'"
         module_errors.append(error)
-
         logging.error(error)
-
         return None
-
     except Exception as e:
-
-        error = (
-            f"{module_path}: "
-            f"{type(e).__name__}: {e}"
-        )
-
+        error = f"{module_path}: {type(e).__name__}: {e}"
         module_errors.append(error)
-
-        logging.exception(
-            f"Failed loading {module_path}"
-        )
-
+        logging.exception(f"Failed loading {module_path}")
         return None
 
 
@@ -372,36 +245,21 @@ def safe_import(module_path, function_name):
 # ==================================================
 
 try:
-
     from services.user_service import create_admin
-
 except ImportError:
 
     def create_admin(db):
-
-        admin = (
-            db.query(User)
-            .filter(
-                User.username == "admin"
-            )
-            .first()
-        )
-
+        admin = db.query(User).filter(User.username == "admin").first()
         if not admin:
-
             from auth import hash_password
-
             admin = User(
                 username="admin",
                 full_name="System Administrator",
                 email="admin@nileharvest.com",
-                password_hash=hash_password(
-                    "admin123"
-                ),
+                password_hash=hash_password("admin123"),
                 role="Administrator",
                 active=True,
             )
-
             db.add(admin)
             db.commit()
 
@@ -411,11 +269,8 @@ except ImportError:
 # ==================================================
 
 try:
-
     from seed.seed_data import load_seed_data
-
 except ImportError:
-
     load_seed_data = None
 
 
@@ -423,134 +278,29 @@ except ImportError:
 # MODULE REGISTRY
 # ==================================================
 
-# --------------------------------------------------
-# DASHBOARD
-# --------------------------------------------------
+dashboard_home = safe_import("modules.dashboard.home", "dashboard_home")
 
-dashboard_home = safe_import(
-    "modules.dashboard.home",
-    "dashboard_home",
-)
+procurement_dashboard = safe_import("modules.procurement.dashboard", "procurement_dashboard")
+procurement_suppliers = safe_import("modules.procurement.suppliers", "suppliers_page")
+procurement_purchases = safe_import("modules.procurement.purchases", "purchases_page")
+procurement_purchase_orders = safe_import("modules.procurement.purchase_orders", "purchase_orders_page")
 
+warehouse_dashboard = safe_import("modules.warehouse.dashboard", "warehouse_dashboard")
+warehouse_inventory = safe_import("modules.warehouse.inventory", "inventory_page")
 
-# --------------------------------------------------
-# PROCUREMENT
-# --------------------------------------------------
+milling_dashboard = safe_import("modules.milling.dashboard", "milling_dashboard")
+packaging_dashboard = safe_import("modules.packaging.dashboard", "packaging_dashboard")
 
-procurement_dashboard = safe_import(
-    "modules.procurement.dashboard",
-    "procurement_dashboard",
-)
+sales_dashboard = safe_import("modules.sales.dashboard", "sales_dashboard")
+sales_customers = safe_import("modules.sales.customers", "customers_page")
+sales_quotations = safe_import("modules.sales.quotations", "quotations_page")
+sales_orders = safe_import("modules.sales.orders", "sales_orders_page")
+sales_deliveries = safe_import("modules.sales.deliveries", "deliveries_page")
+sales_invoices = safe_import("modules.sales.invoices", "invoices_page")
+sales_payments = safe_import("modules.sales.payments", "payments_page")
 
-procurement_suppliers = safe_import(
-    "modules.procurement.suppliers",
-    "suppliers_page",
-)
-
-procurement_purchases = safe_import(
-    "modules.procurement.purchases",
-    "purchases_page",
-)
-
-procurement_purchase_orders = safe_import(
-    "modules.procurement.purchase_orders",
-    "purchase_orders_page",
-)
-
-
-# --------------------------------------------------
-# WAREHOUSE
-# --------------------------------------------------
-
-warehouse_dashboard = safe_import(
-    "modules.warehouse.dashboard",
-    "warehouse_dashboard",
-)
-
-warehouse_inventory = safe_import(
-    "modules.warehouse.inventory",
-    "inventory_page",
-)
-
-
-# --------------------------------------------------
-# MILLING
-# --------------------------------------------------
-
-milling_dashboard = safe_import(
-    "modules.milling.dashboard",
-    "milling_dashboard",
-)
-
-
-# --------------------------------------------------
-# PACKAGING
-# --------------------------------------------------
-
-packaging_dashboard = safe_import(
-    "modules.packaging.dashboard",
-    "packaging_dashboard",
-)
-
-
-# --------------------------------------------------
-# SALES & DISTRIBUTION
-# --------------------------------------------------
-
-sales_dashboard = safe_import(
-    "modules.sales.dashboard",
-    "sales_dashboard",
-)
-
-sales_customers = safe_import(
-    "modules.sales.customers",
-    "customers_page",
-)
-
-sales_quotations = safe_import(
-    "modules.sales.quotations",
-    "quotations_page",
-)
-
-sales_orders = safe_import(
-    "modules.sales.orders",
-    "sales_orders_page",
-)
-
-sales_deliveries = safe_import(
-    "modules.sales.deliveries",
-    "deliveries_page",
-)
-
-sales_invoices = safe_import(
-    "modules.sales.invoices",
-    "invoices_page",
-)
-
-sales_payments = safe_import(
-    "modules.sales.payments",
-    "payments_page",
-)
-
-
-# --------------------------------------------------
-# FINANCE
-# --------------------------------------------------
-
-finance_dashboard = safe_import(
-    "modules.finance.dashboard",
-    "finance_dashboard",
-)
-
-
-# --------------------------------------------------
-# REPORTS
-# --------------------------------------------------
-
-reports_dashboard = safe_import(
-    "modules.reports.dashboard",
-    "reports_dashboard",
-)
+finance_dashboard = safe_import("modules.finance.dashboard", "finance_dashboard")
+reports_dashboard = safe_import("modules.reports.dashboard", "reports_dashboard")
 
 
 # ==================================================
@@ -558,41 +308,15 @@ reports_dashboard = safe_import(
 # ==================================================
 
 def _fallback_page(title):
-
     def _render():
-
-        st.info(
-            f"{title} – This section is currently "
-            "being prepared."
-        )
-
+        st.info(f"{title} – This section is currently being prepared.")
     return _render
 
 
-# Procurement fallbacks
-
-procurement_suppliers = (
-    procurement_suppliers
-    or _fallback_page("Suppliers")
-)
-
-procurement_purchases = (
-    procurement_purchases
-    or _fallback_page("Purchases")
-)
-
-procurement_purchase_orders = (
-    procurement_purchase_orders
-    or _fallback_page("Purchase Orders")
-)
-
-
-# Warehouse fallback
-
-warehouse_inventory = (
-    warehouse_inventory
-    or _fallback_page("Inventory")
-)
+procurement_suppliers = procurement_suppliers or _fallback_page("Suppliers")
+procurement_purchases = procurement_purchases or _fallback_page("Purchases")
+procurement_purchase_orders = procurement_purchase_orders or _fallback_page("Purchase Orders")
+warehouse_inventory = warehouse_inventory or _fallback_page("Inventory")
 
 
 # ==================================================
@@ -600,65 +324,28 @@ warehouse_inventory = (
 # ==================================================
 
 def initialize_database():
-
     try:
-
         inspector = inspect(engine)
-
-        existing_tables = (
-            inspector.get_table_names()
-        )
-
-        missing_tables = [
-            table
-            for table in Base.metadata.tables
-            if table not in existing_tables
-        ]
-
+        existing_tables = inspector.get_table_names()
+        missing_tables = [t for t in Base.metadata.tables if t not in existing_tables]
         if missing_tables:
-
-            logging.info(
-                "Creating missing tables: %s",
-                missing_tables,
-            )
-
-        Base.metadata.create_all(
-            bind=engine
-        )
+            logging.info("Creating missing tables: %s", missing_tables)
+        Base.metadata.create_all(bind=engine)
 
         db = SessionLocal()
-
         try:
-
             create_admin(db)
-
         finally:
-
             db.close()
 
         if load_seed_data:
-
             try:
-
                 load_seed_data()
-
             except Exception as e:
-
-                logging.warning(
-                    "Seed data failed: %s",
-                    e,
-                )
-
+                logging.warning("Seed data failed: %s", e)
     except Exception:
-
-        logging.exception(
-            "Database initialization failed"
-        )
-
-        st.error(
-            "Database initialization failed. "
-            "Please check esan_erp.log."
-        )
+        logging.exception("Database initialization failed")
+        st.error("Database initialization failed. Please check esan_erp.log.")
 
 
 initialize_database()
@@ -669,16 +356,10 @@ initialize_database()
 # ==================================================
 
 if "logged_in" not in st.session_state:
-
     st.session_state.logged_in = False
-
     st.session_state.username = None
-
     st.session_state.role = None
-
-    st.session_state.current_page = (
-        "🏠 Overview"
-    )
+    st.session_state.current_page = "🏠 Overview"
 
 
 # ==================================================
@@ -686,79 +367,47 @@ if "logged_in" not in st.session_state:
 # ==================================================
 
 def login(username, password):
-
     db = SessionLocal()
-
     try:
-
-        user = (
-            db.query(User)
-            .filter(
-                User.username == username
-            )
-            .first()
-        )
-
-        if (
-            user
-            and user.active
-            and verify_password(
-                password,
-                user.password_hash,
-            )
-        ):
-
+        user = db.query(User).filter(User.username == username).first()
+        if user and user.active and verify_password(password, user.password_hash):
             st.session_state.logged_in = True
-
-            st.session_state.username = (
-                user.username
-            )
-
-            st.session_state.role = (
-                user.role
-            )
-
+            st.session_state.username = user.username
+            st.session_state.role = user.role
             return True
-
         return False
-
     finally:
-
         db.close()
 
 
 # ==================================================
-# LOGIN SCREEN (with real logo + CSS fallback)
+# LOGIN SCREEN (brand‑free)
 # ==================================================
 
 if not st.session_state.logged_in:
 
-    # --- Logo: try to use an uploaded image, otherwise CSS logo ---
-    logo_path = "assets/logo.png"
-    if os.path.isfile(logo_path):
-        st.image(logo_path, width=130, output_format="auto")
-    else:
-        st.markdown(
-            """
-            <div class="esan-login-page">
-                <div class="esan-login-container">
-                    <div class="esan-logo">
-                        <div class="esan-logo-ring"></div>
-                        <div class="esan-logo-e"></div>
-                        <div class="esan-leaf"></div>
-                    </div>
+    # --- Logo (CSS sprout) ---
+    st.markdown(
+        """
+        <div class="login-page">
+            <div class="login-container">
+                <div class="logo">
+                    <div class="logo-stem"></div>
+                    <div class="logo-leaf left"></div>
+                    <div class="logo-leaf right"></div>
                 </div>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     st.markdown(
         """
-        <div class="esan-wordmark">
-            Esan
+        <div class="wordmark">
+            ERP
         </div>
-        <div class="esan-tagline">
+        <div class="tagline">
             ENTERPRISE MANAGEMENT SYSTEM
         </div>
         """,
@@ -767,27 +416,10 @@ if not st.session_state.logged_in:
 
     # --- Login Form ---
     col1, col2, col3 = st.columns([1, 2, 1])
-
     with col2:
-        username = st.text_input(
-            "Username",
-            placeholder="Enter your username",
-            key="login_username",
-        )
-
-        password = st.text_input(
-            "Password",
-            type="password",
-            placeholder="Enter your password",
-            key="login_password",
-        )
-
-        if st.button(
-            "Login",
-            use_container_width=True,
-            type="primary",
-            key="login_button",
-        ):
+        username = st.text_input("Username", placeholder="Enter your username")
+        password = st.text_input("Password", type="password", placeholder="Enter your password")
+        if st.button("Login", use_container_width=True, type="primary"):
             if login(username, password):
                 st.success("Login successful")
                 st.rerun()
@@ -796,8 +428,8 @@ if not st.session_state.logged_in:
 
     st.markdown(
         """
-        <div class="esan-login-footer">
-            Esan ERP Enterprise Platform
+        <div class="login-footer">
+            Nile Harvest Foods Ltd. | Enterprise Resource Planning
         </div>
         """,
         unsafe_allow_html=True,
@@ -807,142 +439,53 @@ if not st.session_state.logged_in:
 
 
 # ==================================================
-# MAIN HEADER
+# MAIN HEADER (no "Esan")
 # ==================================================
 
-st.title("🌾 Esan ERP")
-
-st.caption(
-    f"{COMPANY_NAME} | Version {VERSION}"
-)
+st.title("🌱 Enterprise Resource Planning")
+st.caption(f"{COMPANY_NAME} | Version {VERSION}")
 
 
 # ==================================================
-# SIDEBAR NAVIGATION
+# SIDEBAR (no "Esan" text)
 # ==================================================
 
 with st.sidebar:
-
-    st.markdown(
-        """
-        <h2 style="text-align:center">
-        🌾 Esan ERP
-        </h2>
-        """,
-        unsafe_allow_html=True,
-    )
-
+    st.markdown("""<h2 style="text-align:center">🌱 ERP</h2>""", unsafe_allow_html=True)
     st.divider()
-
 
     def nav_button(label):
+        if st.button(label, use_container_width=True):
+            st.session_state.current_page = label
 
-        if st.button(
-            label,
-            use_container_width=True,
-        ):
+    nav_button("🏠 Overview")
 
-            st.session_state.current_page = (
-                label
-            )
+    st.markdown("**OPERATIONS**")
+    nav_button("🌾 Procurement")
+    nav_button("📦 Warehouse")
+    nav_button("🏭 Milling")
+    nav_button("📦 Packaging")
 
+    st.markdown("**COMMERCIAL**")
+    nav_button("🚚 Sales & Distribution")
 
-    # MAIN
+    st.markdown("**FINANCE**")
+    nav_button("💰 Finance")
 
-    nav_button(
-        "🏠 Overview"
-    )
-
-
-    # OPERATIONS
-
-    st.markdown(
-        "**OPERATIONS**"
-    )
-
-    nav_button(
-        "🌾 Procurement"
-    )
-
-    nav_button(
-        "📦 Warehouse"
-    )
-
-    nav_button(
-        "🏭 Milling"
-    )
-
-    nav_button(
-        "📦 Packaging"
-    )
-
-
-    # COMMERCIAL
-
-    st.markdown(
-        "**COMMERCIAL**"
-    )
-
-    nav_button(
-        "🚚 Sales & Distribution"
-    )
-
-
-    # FINANCE
-
-    st.markdown(
-        "**FINANCE**"
-    )
-
-    nav_button(
-        "💰 Finance"
-    )
-
-
-    # REPORTING
-
-    st.markdown(
-        "**REPORTING**"
-    )
-
-    nav_button(
-        "📊 Reports"
-    )
-
+    st.markdown("**REPORTING**")
+    nav_button("📊 Reports")
 
     st.divider()
 
+    st.markdown("### 👤 User Panel")
+    st.write(f"User: **{st.session_state.username}**")
+    st.write(f"Role: **{st.session_state.role}**")
 
-    # USER PANEL
-
-    st.markdown(
-        "### 👤 User Panel"
-    )
-
-    st.write(
-        f"User: **{st.session_state.username}**"
-    )
-
-    st.write(
-        f"Role: **{st.session_state.role}**"
-    )
-
-
-    if st.button(
-        "🚪 Logout",
-        use_container_width=True,
-    ):
-
+    if st.button("🚪 Logout", use_container_width=True):
         st.session_state.logged_in = False
-
         st.session_state.username = None
-
         st.session_state.role = None
-
-        st.session_state.current_page = (
-            "🏠 Overview"
-        )
-
+        st.session_state.current_page = "🏠 Overview"
         st.rerun()
 
 
@@ -954,243 +497,82 @@ menu = st.session_state.current_page
 
 
 # ==================================================
-# ERP ROUTER
+# ERP ROUTER (unchanged)
 # ==================================================
 
 if menu == "🏠 Overview":
-
     if dashboard_home:
-
         dashboard_home()
-
     else:
-
-        st.warning(
-            "Overview dashboard could not be loaded."
-        )
-
-
-# ==================================================
-# PROCUREMENT
-# ==================================================
+        st.warning("Overview dashboard could not be loaded.")
 
 elif menu == "🌾 Procurement":
-
-    st.header(
-        "🌾 Procurement"
-    )
-
-    procurement_menu = st.radio(
-        "Procurement Module",
-        [
-            "Dashboard",
-            "Suppliers",
-            "Purchase Orders",
-            "Purchases",
-        ],
-        horizontal=True,
-    )
-
-
+    st.header("🌾 Procurement")
+    procurement_menu = st.radio("Procurement Module", ["Dashboard", "Suppliers", "Purchase Orders", "Purchases"], horizontal=True)
     if procurement_menu == "Dashboard":
-
         if procurement_dashboard:
-
             procurement_dashboard()
-
         else:
-
-            st.warning(
-                "Procurement dashboard unavailable."
-            )
-
-
+            st.warning("Procurement dashboard unavailable.")
     elif procurement_menu == "Suppliers":
-
         procurement_suppliers()
-
-
     elif procurement_menu == "Purchase Orders":
-
         procurement_purchase_orders()
-
-
     elif procurement_menu == "Purchases":
-
         procurement_purchases()
 
-
-# ==================================================
-# WAREHOUSE
-# ==================================================
-
 elif menu == "📦 Warehouse":
-
-    st.header(
-        "📦 Warehouse"
-    )
-
-    warehouse_menu = st.radio(
-        "Warehouse Module",
-        [
-            "Dashboard",
-            "Inventory",
-        ],
-        horizontal=True,
-    )
-
-
+    st.header("📦 Warehouse")
+    warehouse_menu = st.radio("Warehouse Module", ["Dashboard", "Inventory"], horizontal=True)
     if warehouse_menu == "Dashboard":
-
         if warehouse_dashboard:
-
             warehouse_dashboard()
-
         else:
-
-            st.warning(
-                "Warehouse dashboard unavailable."
-            )
-
-
+            st.warning("Warehouse dashboard unavailable.")
     elif warehouse_menu == "Inventory":
-
         warehouse_inventory()
 
-
-# ==================================================
-# MILLING
-# ==================================================
-
 elif menu == "🏭 Milling":
-
     if milling_dashboard:
-
         milling_dashboard()
-
     else:
-
-        st.warning(
-            "Milling module unavailable."
-        )
-
-
-# ==================================================
-# PACKAGING
-# ==================================================
+        st.warning("Milling module unavailable.")
 
 elif menu == "📦 Packaging":
-
     if packaging_dashboard:
-
         packaging_dashboard()
-
     else:
-
-        st.warning(
-            "Packaging module unavailable."
-        )
-
-
-# ==================================================
-# SALES & DISTRIBUTION
-# ==================================================
+        st.warning("Packaging module unavailable.")
 
 elif menu == "🚚 Sales & Distribution":
-
-    st.header(
-        "🚚 Sales & Distribution"
-    )
-
-    sales_menu = st.radio(
-        "Sales Module",
-        [
-            "Dashboard",
-            "Customers",
-            "Quotations",
-            "Sales Orders",
-            "Deliveries",
-            "Invoices",
-            "Payments",
-        ],
-        horizontal=True,
-    )
-
-
+    st.header("🚚 Sales & Distribution")
+    sales_menu = st.radio("Sales Module", ["Dashboard", "Customers", "Quotations", "Sales Orders", "Deliveries", "Invoices", "Payments"], horizontal=True)
     sales_pages = {
-
-        "Dashboard":
-            sales_dashboard,
-
-        "Customers":
-            sales_customers,
-
-        "Quotations":
-            sales_quotations,
-
-        "Sales Orders":
-            sales_orders,
-
-        "Deliveries":
-            sales_deliveries,
-
-        "Invoices":
-            sales_invoices,
-
-        "Payments":
-            sales_payments,
-
+        "Dashboard": sales_dashboard,
+        "Customers": sales_customers,
+        "Quotations": sales_quotations,
+        "Sales Orders": sales_orders,
+        "Deliveries": sales_deliveries,
+        "Invoices": sales_invoices,
+        "Payments": sales_payments,
     }
-
-
-    page_func = sales_pages.get(
-        sales_menu
-    )
-
-
+    page_func = sales_pages.get(sales_menu)
     if page_func:
-
         page_func()
-
     else:
-
-        st.warning(
-            f"{sales_menu} page unavailable."
-        )
-
-
-# ==================================================
-# FINANCE
-# ==================================================
+        st.warning(f"{sales_menu} page unavailable.")
 
 elif menu == "💰 Finance":
-
     if finance_dashboard:
-
         finance_dashboard()
-
     else:
-
-        st.warning(
-            "Finance module unavailable."
-        )
-
-
-# ==================================================
-# REPORTS
-# ==================================================
+        st.warning("Finance module unavailable.")
 
 elif menu == "📊 Reports":
-
     if reports_dashboard:
-
         reports_dashboard()
-
     else:
-
-        st.warning(
-            "Reports module unavailable."
-        )
+        st.warning("Reports module unavailable.")
 
 
 # ==================================================
@@ -1198,20 +580,10 @@ elif menu == "📊 Reports":
 # ==================================================
 
 if module_errors:
-
-    with st.expander(
-        "⚠️ Module Loading Information"
-    ):
-
-        st.warning(
-            "The following modules could not be loaded:"
-        )
-
+    with st.expander("⚠️ Module Loading Information"):
+        st.warning("The following modules could not be loaded:")
         for error in module_errors:
-
-            st.write(
-                f"• {error}"
-            )
+            st.write(f"• {error}")
 
 
 # ==================================================
@@ -1219,8 +591,4 @@ if module_errors:
 # ==================================================
 
 st.divider()
-
-st.caption(
-    "© Nile Harvest Foods Ltd. | "
-    "Esan ERP Enterprise Platform"
-)
+st.caption(f"© {COMPANY_NAME} | Enterprise Resource Planning Platform")
