@@ -7,6 +7,7 @@ Version 1.4.0 Alpha – Full Repository Integration
 """
 
 import logging
+import os
 
 import streamlit as st
 from sqlalchemy import inspect
@@ -93,7 +94,7 @@ st.markdown(
 
 
     /* ==========================================
-       ESAN LOGO
+       ESAN LOGO (CSS fallback)
        ========================================== */
 
     .esan-logo {
@@ -727,57 +728,47 @@ def login(username, password):
 
 
 # ==================================================
-# LOGIN SCREEN
+# LOGIN SCREEN (with real logo + CSS fallback)
 # ==================================================
 
 if not st.session_state.logged_in:
 
-    # ----------------------------------------------
-    # ESAN LOGO
-    # ----------------------------------------------
+    # --- Logo: try to use an uploaded image, otherwise CSS logo ---
+    logo_path = "assets/logo.png"
+    if os.path.isfile(logo_path):
+        st.image(logo_path, width=130, output_format="auto")
+    else:
+        st.markdown(
+            """
+            <div class="esan-login-page">
+                <div class="esan-login-container">
+                    <div class="esan-logo">
+                        <div class="esan-logo-ring"></div>
+                        <div class="esan-logo-e"></div>
+                        <div class="esan-leaf"></div>
+                    </div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     st.markdown(
         """
-        <div class="esan-login-page">
-
-            <div class="esan-login-container">
-
-                <div class="esan-logo">
-
-                    <div class="esan-logo-ring"></div>
-
-                    <div class="esan-logo-e"></div>
-
-                    <div class="esan-leaf"></div>
-
-                </div>
-
-                <div class="esan-wordmark">
-                    Esan
-                </div>
-
-                <div class="esan-tagline">
-                    ENTERPRISE MANAGEMENT SYSTEM
-                </div>
-
-            </div>
-
+        <div class="esan-wordmark">
+            Esan
+        </div>
+        <div class="esan-tagline">
+            ENTERPRISE MANAGEMENT SYSTEM
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-
-    # ----------------------------------------------
-    # LOGIN FORM
-    # ----------------------------------------------
-
-    col1, col2, col3 = st.columns(
-        [1, 2, 1]
-    )
+    # --- Login Form ---
+    col1, col2, col3 = st.columns([1, 2, 1])
 
     with col2:
-
         username = st.text_input(
             "Username",
             placeholder="Enter your username",
@@ -791,35 +782,17 @@ if not st.session_state.logged_in:
             key="login_password",
         )
 
-
         if st.button(
             "Login",
             use_container_width=True,
             type="primary",
             key="login_button",
         ):
-
-            if login(
-                username,
-                password,
-            ):
-
-                st.success(
-                    "Login successful"
-                )
-
+            if login(username, password):
+                st.success("Login successful")
                 st.rerun()
-
             else:
-
-                st.error(
-                    "Invalid username or password"
-                )
-
-
-    # ----------------------------------------------
-    # LOGIN FOOTER
-    # ----------------------------------------------
+                st.error("Invalid username or password")
 
     st.markdown(
         """
