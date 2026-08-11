@@ -68,11 +68,8 @@ module_errors = []
 
 def safe_import(module_path, function_name):
     """
-    Safely import a module function.
-
-    Returns:
-        callable function if available
-        None if import/function fails
+    Safely import an ERP module without crashing
+    the entire application.
     """
 
     try:
@@ -84,23 +81,10 @@ def safe_import(module_path, function_name):
 
         if hasattr(module, function_name):
 
-            function = getattr(
+            return getattr(
                 module,
                 function_name
             )
-
-            if callable(function):
-                return function
-
-            error = (
-                f"{module_path}: "
-                f"{function_name} exists but is not callable"
-            )
-
-            module_errors.append(error)
-            logging.error(error)
-
-            return None
 
         error = (
             f"{module_path}: "
@@ -119,12 +103,9 @@ def safe_import(module_path, function_name):
             f"{type(e).__name__}: {e}"
         )
 
-        module_errors.append(error)
+        logging.error(error)
 
-        logging.error(
-            error,
-            exc_info=True
-        )
+        module_errors.append(error)
 
         return None
 
@@ -161,7 +142,7 @@ except ImportError:
                     "admin123"
                 ),
                 role="Administrator",
-                active=True
+                active=True,
             )
 
             db.add(admin)
@@ -185,6 +166,7 @@ except ImportError:
 # MODULE REGISTRY
 # ==================================================
 
+
 # ==================================================
 # DASHBOARD
 # ==================================================
@@ -196,9 +178,7 @@ dashboard_home = safe_import(
 
 
 # ==================================================
-
-# ==================================================
-# PROCUREMENT MODULES
+# PROCUREMENT
 # ==================================================
 
 procurement_dashboard = safe_import(
@@ -212,14 +192,10 @@ procurement_suppliers = safe_import(
 )
 
 procurement_purchases = safe_import(
-    "modules.procurement.purchases",
-    "purchases_page"
-)
-
-procurement_purchase_orders = safe_import(
     "modules.procurement.purchase_orders",
     "purchase_orders_page"
 )
+
 
 # ==================================================
 # WAREHOUSE
@@ -317,14 +293,10 @@ reports_dashboard = safe_import(
 
 
 # ==================================================
-# OPTIONAL MODULE FALLBACKS
+# FALLBACK PAGE
 # ==================================================
 
 def _fallback_page(title):
-    """
-    Display a friendly placeholder for a module
-    that has not yet been implemented.
-    """
 
     def _render():
 
@@ -336,39 +308,39 @@ def _fallback_page(title):
     return _render
 
 
-# Only use fallbacks for pages that are genuinely
-# optional. We do NOT hide import errors for the
-# main dashboards.
+# ==================================================
+# FALLBACKS
+# ==================================================
 
-if procurement_suppliers is None:
-    procurement_suppliers = _fallback_page(
-        "Suppliers"
-    )
+procurement_suppliers = (
+    procurement_suppliers
+    or _fallback_page("Suppliers")
+)
 
-if procurement_purchases is None:
-    procurement_purchases = _fallback_page(
-        "Purchase Orders"
-    )
+procurement_purchases = (
+    procurement_purchases
+    or _fallback_page("Purchase Orders")
+)
 
-if warehouse_inventory is None:
-    warehouse_inventory = _fallback_page(
-        "Inventory"
-    )
+warehouse_inventory = (
+    warehouse_inventory
+    or _fallback_page("Inventory")
+)
 
-if sales_deliveries is None:
-    sales_deliveries = _fallback_page(
-        "Deliveries"
-    )
+sales_deliveries = (
+    sales_deliveries
+    or _fallback_page("Deliveries")
+)
 
-if sales_invoices is None:
-    sales_invoices = _fallback_page(
-        "Invoices"
-    )
+sales_invoices = (
+    sales_invoices
+    or _fallback_page("Invoices")
+)
 
-if sales_payments is None:
-    sales_payments = _fallback_page(
-        "Payments"
-    )
+sales_payments = (
+    sales_payments
+    or _fallback_page("Payments")
+)
 
 
 # ==================================================
@@ -387,27 +359,25 @@ def initialize_database():
 
         missing_tables = []
 
-        for table_name in Base.metadata.tables:
+        for table in Base.metadata.tables:
 
-            if table_name not in existing_tables:
+            if table not in existing_tables:
 
                 missing_tables.append(
-                    table_name
+                    table
                 )
 
         if missing_tables:
 
-            logging.info(
-                "Missing database tables: %s",
-                missing_tables
+            st.info(
+                "🔄 Creating missing ERP "
+                "database tables..."
             )
 
-        # Create missing tables.
         Base.metadata.create_all(
             bind=engine
         )
 
-        # Create administrator.
         db = SessionLocal()
 
         try:
@@ -418,7 +388,6 @@ def initialize_database():
 
             db.close()
 
-        # Optional seed data.
         if load_seed_data:
 
             try:
@@ -428,26 +397,18 @@ def initialize_database():
             except Exception as e:
 
                 logging.warning(
-                    "Seed data failed: %s",
-                    e
+                    f"Seed failed: {e}"
                 )
 
     except Exception as e:
 
         logging.error(
-            "Database initialization error",
-            exc_info=True
+            f"Database error: {e}"
         )
 
         st.error(
-            "Database initialization failed."
+            "Database initialization failed"
         )
-
-        with st.expander(
-            "Database Technical Information"
-        ):
-
-            st.exception(e)
 
 
 initialize_database()
@@ -498,9 +459,7 @@ def login(username, password):
             st.session_state.username = (
                 user.username
             )
-            st.session_state.role = (
-                user.role
-            )
+            st.session_state.role = user.role
 
             return True
 
@@ -513,7 +472,6 @@ def login(username, password):
 
 # ==================================================
 # LOGIN SCREEN
-# DO NOT CHANGE
 # ==================================================
 
 if not st.session_state.logged_in:
@@ -675,15 +633,11 @@ with st.sidebar:
     )
 
     st.write(
-        f"User: **"
-        f"{st.session_state.username}"
-        f"**"
+        f"User: **{st.session_state.username}**"
     )
 
     st.write(
-        f"Role: **"
-        f"{st.session_state.role}"
-        f"**"
+        f"Role: **{st.session_state.role}**"
     )
 
     if st.button(
@@ -712,6 +666,7 @@ menu = st.session_state.current_page
 # ERP ROUTER
 # ==================================================
 
+
 # ==================================================
 # OVERVIEW
 # ==================================================
@@ -720,26 +675,12 @@ if menu == "🏠 Overview":
 
     if dashboard_home:
 
-        try:
-
-            dashboard_home()
-
-        except Exception as e:
-
-            st.error(
-                "Overview dashboard failed to load."
-            )
-
-            with st.expander(
-                "Technical Information"
-            ):
-
-                st.exception(e)
+        dashboard_home()
 
     else:
 
-        st.warning(
-            "Overview dashboard unavailable."
+        st.info(
+            "Overview dashboard not available"
         )
 
 
@@ -758,74 +699,30 @@ elif menu == "🌾 Procurement":
         [
             "Dashboard",
             "Suppliers",
-            "Purchase Orders"
+            "Purchase Orders",
         ],
-        key="procurement_navigation"
+        key="procurement_navigation",
     )
 
     if procurement_menu == "Dashboard":
 
         if procurement_dashboard:
 
-            try:
-
-                procurement_dashboard()
-
-            except Exception as e:
-
-                st.error(
-                    "Procurement Dashboard failed "
-                    "to load."
-                )
-
-                with st.expander(
-                    "Technical Information"
-                ):
-
-                    st.exception(e)
+            procurement_dashboard()
 
         else:
 
             st.warning(
-                "Procurement Dashboard unavailable."
+                "Procurement dashboard unavailable"
             )
 
     elif procurement_menu == "Suppliers":
 
-        try:
-
-            procurement_suppliers()
-
-        except Exception as e:
-
-            st.error(
-                "Suppliers module failed to load."
-            )
-
-            with st.expander(
-                "Technical Information"
-            ):
-
-                st.exception(e)
+        procurement_suppliers()
 
     elif procurement_menu == "Purchase Orders":
 
-        try:
-
-            procurement_purchases()
-
-        except Exception as e:
-
-            st.error(
-                "Purchase Orders module failed "
-                "to load."
-            )
-
-            with st.expander(
-                "Technical Information"
-            ):
-
-                st.exception(e)
+        procurement_purchases()
 
 
 # ==================================================
@@ -842,55 +739,26 @@ elif menu == "📦 Warehouse":
         "Warehouse Module",
         [
             "Dashboard",
-            "Inventory"
+            "Inventory",
         ],
-        key="warehouse_navigation"
+        key="warehouse_navigation",
     )
 
     if warehouse_menu == "Dashboard":
 
         if warehouse_dashboard:
 
-            try:
-
-                warehouse_dashboard()
-
-            except Exception as e:
-
-                st.error(
-                    "Warehouse Dashboard failed "
-                    "to load."
-                )
-
-                with st.expander(
-                    "Technical Information"
-                ):
-
-                    st.exception(e)
+            warehouse_dashboard()
 
         else:
 
             st.warning(
-                "Warehouse Dashboard unavailable."
+                "Warehouse dashboard unavailable"
             )
 
     elif warehouse_menu == "Inventory":
 
-        try:
-
-            warehouse_inventory()
-
-        except Exception as e:
-
-            st.error(
-                "Inventory module failed to load."
-            )
-
-            with st.expander(
-                "Technical Information"
-            ):
-
-                st.exception(e)
+        warehouse_inventory()
 
 
 # ==================================================
@@ -901,26 +769,12 @@ elif menu == "🏭 Milling":
 
     if milling_dashboard:
 
-        try:
-
-            milling_dashboard()
-
-        except Exception as e:
-
-            st.error(
-                "Milling module failed to load."
-            )
-
-            with st.expander(
-                "Technical Information"
-            ):
-
-                st.exception(e)
+        milling_dashboard()
 
     else:
 
         st.warning(
-            "Milling module unavailable."
+            "Milling module unavailable"
         )
 
 
@@ -932,26 +786,12 @@ elif menu == "📦 Packaging":
 
     if packaging_dashboard:
 
-        try:
-
-            packaging_dashboard()
-
-        except Exception as e:
-
-            st.error(
-                "Packaging module failed to load."
-            )
-
-            with st.expander(
-                "Technical Information"
-            ):
-
-                st.exception(e)
+        packaging_dashboard()
 
     else:
 
         st.warning(
-            "Packaging module unavailable."
+            "Packaging module unavailable"
         )
 
 
@@ -974,9 +814,9 @@ elif menu == "🚚 Sales & Distribution":
             "Sales Orders",
             "Deliveries",
             "Invoices",
-            "Payments"
+            "Payments",
         ],
-        key="sales_navigation"
+        key="sales_navigation",
     )
 
     sales_pages = {
@@ -1009,27 +849,13 @@ elif menu == "🚚 Sales & Distribution":
 
     if page_func:
 
-        try:
-
-            page_func()
-
-        except Exception as e:
-
-            st.error(
-                f"{sales_menu} module "
-                "failed to load."
-            )
-
-            with st.expander(
-                "Technical Information"
-            ):
-
-                st.exception(e)
+        page_func()
 
     else:
 
         st.warning(
-            f"{sales_menu} page unavailable."
+            f"{sales_menu} "
+            "page unavailable"
         )
 
 
@@ -1041,26 +867,12 @@ elif menu == "💰 Finance":
 
     if finance_dashboard:
 
-        try:
-
-            finance_dashboard()
-
-        except Exception as e:
-
-            st.error(
-                "Finance module failed to load."
-            )
-
-            with st.expander(
-                "Technical Information"
-            ):
-
-                st.exception(e)
+        finance_dashboard()
 
     else:
 
         st.warning(
-            "Finance module unavailable."
+            "Finance module unavailable"
         )
 
 
@@ -1072,31 +884,17 @@ elif menu == "📊 Reports":
 
     if reports_dashboard:
 
-        try:
-
-            reports_dashboard()
-
-        except Exception as e:
-
-            st.error(
-                "Reports module failed to load."
-            )
-
-            with st.expander(
-                "Technical Information"
-            ):
-
-                st.exception(e)
+        reports_dashboard()
 
     else:
 
         st.warning(
-            "Reports module unavailable."
+            "Reports module unavailable"
         )
 
 
 # ==================================================
-# MODULE IMPORT WARNINGS
+# MODULE IMPORT INFORMATION
 # ==================================================
 
 if module_errors:
@@ -1106,15 +904,15 @@ if module_errors:
     ):
 
         st.warning(
-            "One or more modules could not be "
-            "imported. This does not prevent "
-            "the rest of Esan ERP from running."
+            "Some optional modules could not "
+            "be loaded. The ERP can continue "
+            "running with the available modules."
         )
 
         for error in module_errors:
 
-            st.code(
-                error
+            st.write(
+                f"• {error}"
             )
 
 
