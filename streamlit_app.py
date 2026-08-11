@@ -70,7 +70,7 @@ st.markdown(
 
 
     /* ==========================================
-       LOGIN PAGE
+       LOGIN PAGE – just logo + form
        ========================================== */
 
     .login-page {
@@ -89,7 +89,7 @@ st.markdown(
 
 
     /* ==========================================
-       NEW LOGO – GROWING SPROUT
+       LOGO – GROWING SPROUT (same as before)
        ========================================== */
 
     .logo {
@@ -150,30 +150,12 @@ st.markdown(
 
 
     /* ==========================================
-       WORDMARK (no "Esan")
+       NO WORDMARK, NO TAGLINE
        ========================================== */
-
-    .wordmark {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 36px;
-        font-weight: 800;
-        letter-spacing: 3px;
-        color: #1b5e20;
-        margin-bottom: 6px;
-    }
-
-    .tagline {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 12px;
-        font-weight: 600;
-        letter-spacing: 2px;
-        color: #777;
-        margin-bottom: 30px;
-    }
 
 
     /* ==========================================
-       LOGIN INPUTS
+       LOGIN INPUTS & BUTTON (unchanged)
        ========================================== */
 
     div[data-testid="stTextInput"] label {
@@ -186,28 +168,10 @@ st.markdown(
         padding-left: 14px;
     }
 
-
-    /* ==========================================
-       LOGIN BUTTON
-       ========================================== */
-
     div[data-testid="stButton"] > button {
         border-radius: 10px;
         min-height: 46px;
         font-weight: 700;
-    }
-
-
-    /* ==========================================
-       LOGIN FOOTER
-       ========================================== */
-
-    .login-footer {
-        text-align: center;
-        margin-top: 30px;
-        color: #999;
-        font-size: 11px;
-        letter-spacing: 0.5px;
     }
 
     </style>
@@ -381,12 +345,12 @@ def login(username, password):
 
 
 # ==================================================
-# LOGIN SCREEN (brand‑free)
+# LOGIN SCREEN – only logo + form, no words
 # ==================================================
 
 if not st.session_state.logged_in:
 
-    # --- Logo (CSS sprout) ---
+    # --- CSS logo (sprout) ---
     st.markdown(
         """
         <div class="login-page">
@@ -402,19 +366,9 @@ if not st.session_state.logged_in:
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        """
-        <div class="wordmark">
-            ERP
-        </div>
-        <div class="tagline">
-            ENTERPRISE MANAGEMENT SYSTEM
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    # --- No wordmark, no tagline, no footer text ---
 
-    # --- Login Form ---
+    # Login form
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         username = st.text_input("Username", placeholder="Enter your username")
@@ -426,20 +380,11 @@ if not st.session_state.logged_in:
             else:
                 st.error("Invalid username or password")
 
-    st.markdown(
-        """
-        <div class="login-footer">
-            Nile Harvest Foods Ltd. | Enterprise Resource Planning
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
     st.stop()
 
 
 # ==================================================
-# MAIN HEADER (no "Esan")
+# MAIN HEADER (keep as is)
 # ==================================================
 
 st.title("🌱 Enterprise Resource Planning")
@@ -447,11 +392,24 @@ st.caption(f"{COMPANY_NAME} | Version {VERSION}")
 
 
 # ==================================================
-# SIDEBAR (no "Esan" text)
+# SIDEBAR – only logo, no text heading
 # ==================================================
 
 with st.sidebar:
-    st.markdown("""<h2 style="text-align:center">🌱 ERP</h2>""", unsafe_allow_html=True)
+    # ---- Centered CSS logo, no words ----
+    st.markdown(
+        """
+        <div style="text-align: center; margin-bottom: 1rem;">
+            <div class="logo" style="margin: 0 auto 0 auto;">
+                <div class="logo-stem"></div>
+                <div class="logo-leaf left"></div>
+                <div class="logo-leaf right"></div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.divider()
 
     def nav_button(label):
