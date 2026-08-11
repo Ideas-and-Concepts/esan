@@ -3,7 +3,7 @@ Esan ERP Controller
 Nile Harvest Foods Ltd.
 Enterprise Milling & Packaging Management System
 
-Version 1.4.0 Alpha – Full Module Integration
+Version 1.4.0 Alpha – Full Repository Integration
 """
 
 import streamlit as st
@@ -46,27 +46,11 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-
-    #MainMenu {
-        display:none;
-    }
-
-    footer {
-        display:none;
-    }
-
-    header {
-        display:none;
-    }
-
-    .block-container {
-        padding-top:1.5rem;
-    }
-
-    div[data-testid="stSidebar"] {
-        border-right:1px solid #ddd;
-    }
-
+    #MainMenu { display:none; }
+    footer { display:none; }
+    header { display:none; }
+    .block-container { padding-top:1.5rem; }
+    div[data-testid="stSidebar"] { border-right:1px solid #ddd; }
     </style>
     """,
     unsafe_allow_html=True
@@ -93,7 +77,7 @@ def safe_import(module_path, function_name):
 
 
 # ==================================================
-# ADMIN CREATION
+# ADMIN CREATION (fallback if user_service missing)
 # ==================================================
 
 try:
@@ -113,7 +97,7 @@ except ImportError:
 
 
 # ==================================================
-# SEED DATA
+# SEED DATA (optional)
 # ==================================================
 
 try:
@@ -123,43 +107,39 @@ except ImportError:
 
 
 # ==================================================
-# MODULE REGISTRY – every module from the repository
+# MODULE REGISTRY – matches your repository structure
 # ==================================================
 
 # --- Dashboard ---
 dashboard_home = safe_import("modules.dashboard.home", "dashboard_home")
 
-# --- Operations ---
+# --- Procurement ---
 procurement_dashboard = safe_import("modules.procurement.dashboard", "procurement_dashboard")
-warehouse_dashboard   = safe_import("modules.warehouse.dashboard",   "warehouse_dashboard")
-milling_dashboard     = safe_import("modules.milling.dashboard",    "milling_dashboard")
-packaging_dashboard   = safe_import("modules.packaging.dashboard",  "packaging_dashboard")
+procurement_suppliers = safe_import("modules.procurement.suppliers", "suppliers_page")
+procurement_purchases = safe_import("modules.procurement.purchases", "purchases_page")
 
-# --- Sales & Distribution ---
+# --- Warehouse ---
+warehouse_dashboard = safe_import("modules.warehouse.dashboard", "warehouse_dashboard")
+warehouse_inventory = safe_import("modules.warehouse.inventory", "inventory_page")
+
+# --- Milling & Packaging ---
+milling_dashboard   = safe_import("modules.milling.dashboard",   "milling_dashboard")
+packaging_dashboard = safe_import("modules.packaging.dashboard", "packaging_dashboard")
+
+# --- Sales & Distribution (with sub-pages) ---
 sales_dashboard   = safe_import("modules.sales.dashboard",   "sales_dashboard")
-customers_page    = safe_import("modules.sales.customers",    "customers_page")
-quotations_page   = safe_import("modules.sales.quotations",   "quotations_page")
-sales_orders_page = safe_import("modules.sales.orders",      "sales_orders_page")
-dispatch_page     = safe_import("modules.sales.dispatch",     "dispatch_page")
-delivery_page     = safe_import("modules.sales.delivery",     "delivery_page")
+sales_customers   = safe_import("modules.sales.customers",    "customers_page")
+sales_quotations  = safe_import("modules.sales.quotations",   "quotations_page")
+sales_orders      = safe_import("modules.sales.orders",       "sales_orders_page")
+sales_deliveries  = safe_import("modules.sales.deliveries",   "deliveries_page")
+sales_invoices    = safe_import("modules.sales.invoices",     "invoices_page")
+sales_payments    = safe_import("modules.sales.payments",     "payments_page")
 
 # --- Finance ---
 finance_dashboard = safe_import("modules.finance.dashboard", "finance_dashboard")
-invoices_page     = safe_import("modules.finance.invoices",   "invoices_page")
-payments_page     = safe_import("modules.finance.payments",   "payments_page")
-
-# --- Logistics & HR ---
-logistics_dashboard   = safe_import("modules.logistics.dashboard",   "logistics_dashboard")
-hr_dashboard          = safe_import("modules.hr.dashboard",          "hr_dashboard")
-maintenance_dashboard = safe_import("modules.maintenance.dashboard", "maintenance_dashboard")
-ai_assistant_page     = safe_import("modules.ai_assistant.ai_page",  "ai_assistant_page")
 
 # --- Reports ---
 reports_dashboard = safe_import("modules.reports.dashboard", "reports_dashboard")
-
-# --- Administration ---
-user_management_page = safe_import("modules.administration.user_management", "user_management_page")
-change_password_page = safe_import("modules.administration.change_password", "change_password_page")
 
 
 # ==================================================
@@ -177,7 +157,7 @@ def initialize_database():
                 missing_tables.append(table)
 
         if missing_tables:
-            st.info("🔄 Creating ERP database tables...")
+            st.info("🔄 Creating missing ERP database tables...")
 
         Base.metadata.create_all(bind=engine)
 
@@ -268,7 +248,7 @@ st.caption(f"{COMPANY_NAME} | Version {VERSION}")
 
 
 # ==================================================
-# SIDEBAR NAVIGATION
+# SIDEBAR NAVIGATION (mirrors repository structure)
 # ==================================================
 
 with st.sidebar:
@@ -297,21 +277,9 @@ with st.sidebar:
     st.markdown("**FINANCE**")
     nav_button("💰 Finance")
 
-    # LOGISTICS & HR
-    st.markdown("**LOGISTICS & HR**")
-    nav_button("🚚 Logistics")
-    nav_button("👥 HR & Employees")
-    nav_button("🔧 Maintenance")
-    nav_button("🤖 AI Assistant")
-
     # REPORTING
     st.markdown("**REPORTING**")
     nav_button("📊 Reports")
-
-    # ADMINISTRATION
-    if st.session_state.role == "Administrator":
-        st.markdown("**ADMINISTRATION**")
-        nav_button("🔐 Administration")
 
     st.divider()
 
@@ -343,16 +311,44 @@ if menu == "🏠 Overview":
         st.info("Overview dashboard not available")
 
 elif menu == "🌾 Procurement":
-    if procurement_dashboard:
-        procurement_dashboard()
-    else:
-        st.warning("Procurement module unavailable")
+    st.header("🌾 Procurement")
+    # Allow sub-navigation within Procurement
+    procurement_menu = st.radio(
+        "Procurement Module",
+        ["Dashboard", "Suppliers", "Purchase Orders"]
+    )
+    if procurement_menu == "Dashboard":
+        if procurement_dashboard:
+            procurement_dashboard()
+        else:
+            st.warning("Procurement dashboard unavailable")
+    elif procurement_menu == "Suppliers":
+        if procurement_suppliers:
+            procurement_suppliers()
+        else:
+            st.warning("Suppliers page unavailable")
+    elif procurement_menu == "Purchase Orders":
+        if procurement_purchases:
+            procurement_purchases()
+        else:
+            st.warning("Purchase orders page unavailable")
 
 elif menu == "📦 Warehouse":
-    if warehouse_dashboard:
-        warehouse_dashboard()
-    else:
-        st.warning("Warehouse module unavailable")
+    st.header("📦 Warehouse")
+    warehouse_menu = st.radio(
+        "Warehouse Module",
+        ["Dashboard", "Inventory"]
+    )
+    if warehouse_menu == "Dashboard":
+        if warehouse_dashboard:
+            warehouse_dashboard()
+        else:
+            st.warning("Warehouse dashboard unavailable")
+    elif warehouse_menu == "Inventory":
+        if warehouse_inventory:
+            warehouse_inventory()
+        else:
+            st.warning("Inventory page unavailable")
 
 elif menu == "🏭 Milling":
     if milling_dashboard:
@@ -370,21 +366,20 @@ elif menu == "🚚 Sales & Distribution":
     st.header("🚚 Sales & Distribution")
     sales_menu = st.radio(
         "Sales Module",
-        ["Dashboard", "Customers", "Quotations", "Sales Orders", "Dispatch", "Deliveries", "Invoices", "Payments"]
+        ["Dashboard", "Customers", "Quotations", "Sales Orders", "Deliveries", "Invoices", "Payments"]
     )
     sales_pages = {
-        "Dashboard": sales_dashboard,
-        "Customers": customers_page,
-        "Quotations": quotations_page,
-        "Sales Orders": sales_orders_page,
-        "Dispatch": dispatch_page,
-        "Deliveries": delivery_page,
-        "Invoices": invoices_page,
-        "Payments": payments_page
+        "Dashboard":    sales_dashboard,
+        "Customers":    sales_customers,
+        "Quotations":   sales_quotations,
+        "Sales Orders": sales_orders,
+        "Deliveries":   sales_deliveries,
+        "Invoices":     sales_invoices,
+        "Payments":     sales_payments
     }
-    page = sales_pages.get(sales_menu)
-    if page:
-        page()
+    page_func = sales_pages.get(sales_menu)
+    if page_func:
+        page_func()
     else:
         st.warning(f"{sales_menu} page unavailable")
 
@@ -394,56 +389,15 @@ elif menu == "💰 Finance":
     else:
         st.warning("Finance module unavailable")
 
-elif menu == "🚚 Logistics":
-    if logistics_dashboard:
-        logistics_dashboard()
-    else:
-        st.info("Logistics module will be added")
-
-elif menu == "👥 HR & Employees":
-    if hr_dashboard:
-        hr_dashboard()
-    else:
-        st.info("HR module will be added")
-
-elif menu == "🔧 Maintenance":
-    if maintenance_dashboard:
-        maintenance_dashboard()
-    else:
-        st.info("Maintenance module will be added")
-
-elif menu == "🤖 AI Assistant":
-    if ai_assistant_page:
-        ai_assistant_page()
-    else:
-        st.info("AI Assistant module will be added")
-
 elif menu == "📊 Reports":
     if reports_dashboard:
         reports_dashboard()
     else:
         st.warning("Reports module unavailable")
 
-elif menu == "🔐 Administration":
-    st.header("🔐 Administration")
-    if st.session_state.role != "Administrator":
-        st.error("Access denied")
-    else:
-        admin_menu = st.radio("Administration", ["User Management", "Change Password"])
-        if admin_menu == "User Management":
-            if user_management_page:
-                user_management_page()
-            else:
-                st.info("User management module unavailable")
-        elif admin_menu == "Change Password":
-            if change_password_page:
-                change_password_page()
-            else:
-                st.info("Password module unavailable")
-
 
 # ==================================================
-# MODULE IMPORT WARNINGS
+# MODULE IMPORT WARNINGS (expandable)
 # ==================================================
 
 if module_errors:
