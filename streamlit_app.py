@@ -196,7 +196,9 @@ dashboard_home = safe_import(
 
 
 # ==================================================
-# PROCUREMENT
+
+# ==================================================
+# PROCUREMENT MODULES
 # ==================================================
 
 procurement_dashboard = safe_import(
@@ -209,20 +211,15 @@ procurement_suppliers = safe_import(
     "suppliers_page"
 )
 
-# IMPORTANT:
-# The repository uses purchase_orders.py,
-# not purchases.py.
-
-procurement_purchases = safe_import(
-    "modules.procurement.purchase_orders",
-    "purchase_orders_page"
-)
-
 procurement_purchases = safe_import(
     "modules.procurement.purchases",
     "purchases_page"
 )
 
+procurement_purchase_orders = safe_import(
+    "modules.procurement.purchase_orders",
+    "purchase_orders_page"
+)
 
 # ==================================================
 # WAREHOUSE
