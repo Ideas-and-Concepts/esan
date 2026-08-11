@@ -85,3 +85,20 @@ def get_all_packaging_batches():
         return db.query(PackagingBatch).order_by(PackagingBatch.created_at.desc()).all()
     finally:
         db.close()
+
+
+def update_purchase_order_status(po_id, new_status):
+    """Update the status of a purchase order."""
+    db = SessionLocal()
+    try:
+        po = db.query(PurchaseOrder).filter(PurchaseOrder.id == po_id).first()
+        if po:
+            po.status = new_status
+            db.commit()
+            return po
+        return None
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
