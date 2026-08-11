@@ -1,8 +1,27 @@
-from auth import hash_password
-from models import User
+"""
+Esan ERP User Service
+Nile Harvest Foods Ltd.
+Enterprise Milling & Packaging Management System
+"""
 
+from database import SessionLocal
+from models import User
+from auth import hash_password, verify_password
+
+
+# ============================================================
+# CREATE DEFAULT ADMINISTRATOR
+# ============================================================
 
 def create_admin(db):
+    """
+    Create the default Esan ERP administrator if one
+    does not already exist.
+
+    Default credentials:
+        Username: admin
+        Password: admin123
+    """
 
     admin = (
         db.query(User)
@@ -11,7 +30,7 @@ def create_admin(db):
     )
 
     if admin:
-        return
+        return admin
 
     admin = User(
         username="admin",
@@ -24,22 +43,70 @@ def create_admin(db):
 
     db.add(admin)
     db.commit()
+    db.refresh(admin)
 
-def change_password(username, old_password, new_password):
+    return admin
+
+
+# ============================================================
+# CHANGE PASSWORD
+# ============================================================
+
+def change_password(
+    username: str,
+    old_password: str,
+    new_password: str,
+) -> bool:
     """
-    Allow a user to change their own password by verifying the old one.
-    Returns True if successful, False otherwise.
+    Allow a user to change their own password.
+
+    The old password must be verified before the new
+    password is saved.
+
+    Returns:
+        True  -> password changed successfully
+        False -> operation failed
     """
-    from auth import verify_password, hash_password
+
     db = SessionLocal()
+
     try:
-        user = db.query(User).filter(User.username == username).first()
+        user = (
+            db.query(User)
+            .filter(User.username == username)
+            .first()
+        )
+
+        # User does not exist
         if not user:
             return False
-        if not verify_password(old_password, user.password_hash):
+
+        # Verify current password
+        if not verify_password(
+            old_password,
+            user.password_hash,
+        ):
             return False
-        user.password_hash = hash_password(new_password)
+
+        # Basic validation
+        if not new_password:
+            return False
+
+        if len(new_password) < 6:
+            return False
+
+        # Update password
+        user.password_hash = hash_password(
+            new_password
+        )
+
         db.commit()
+
         return True
+
+    except Exception:
+        db.rollback()
+        return False
+
     finally:
         db.close()
