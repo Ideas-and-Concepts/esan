@@ -6,15 +6,13 @@ Enterprise Milling & Packaging Management System
 
 Functions:
 - Create Purchase Orders
+- View Purchase Orders
+- Edit Purchase Orders
+- Delete Purchase Orders
+- Update Purchase Order Status
 - Select suppliers
 - Add multiple purchase order items
 - Calculate purchase order totals
-- View purchase orders
-- Edit purchase orders
-- Delete purchase orders
-- Update purchase order status
-- View purchase order details
-- Safe SQLAlchemy session handling
 """
 
 import streamlit as st
@@ -24,9 +22,9 @@ from services.procurement_service import (
     get_all_suppliers,
     get_all_purchase_orders,
     create_purchase_order,
-    update_purchase_order_status,
     update_purchase_order,
     delete_purchase_order,
+    update_purchase_order_status,
 )
 
 
@@ -89,14 +87,14 @@ def create_po_form():
         return
 
     supplier_options = {
-        f"{supplier.name} | {supplier.phone or 'No phone'}": supplier.id
+        f"{supplier.name} | {supplier.phone or 'No phone'}":
+        supplier.id
         for supplier in suppliers
     }
 
     selected_supplier = st.selectbox(
         "Supplier",
         options=list(supplier_options.keys()),
-        key="create_po_supplier",
     )
 
     supplier_id = supplier_options[selected_supplier]
@@ -109,10 +107,10 @@ def create_po_form():
         max_value=20,
         value=1,
         step=1,
-        key="create_po_item_count",
     )
 
     items_data = []
+
     total_amount = 0.0
 
     for i in range(int(item_count)):
@@ -122,26 +120,29 @@ def create_po_form():
         col1, col2, col3 = st.columns([3, 1, 1])
 
         with col1:
+
             product_name = st.text_input(
                 "Product / Raw Material",
-                key=f"create_po_product_{i}",
+                key=f"po_product_{i}",
                 placeholder="e.g. Maize Grain",
             )
 
         with col2:
+
             quantity = st.number_input(
                 "Quantity",
                 min_value=0.0,
                 step=0.1,
-                key=f"create_po_quantity_{i}",
+                key=f"po_quantity_{i}",
             )
 
         with col3:
+
             unit_price = st.number_input(
                 "Unit Price",
                 min_value=0.0,
                 step=100.0,
-                key=f"create_po_price_{i}",
+                key=f"po_price_{i}",
             )
 
         item_total = quantity * unit_price
@@ -170,8 +171,7 @@ def create_po_form():
 
         status = st.selectbox(
             "Purchase Order Status",
-            PO_STATUSES[:4],
-            key="create_po_status",
+            PO_STATUSES,
         )
 
     with col2:
@@ -185,74 +185,61 @@ def create_po_form():
         "💾 Create Purchase Order",
         type="primary",
         use_container_width=True,
-        key="create_purchase_order_button",
     )
 
-    if not submitted:
-        return
+    if submitted:
 
-    # ----------------------------------------------
-    # VALIDATION
-    # ----------------------------------------------
-
-    if not items_data:
-
-        st.error(
-            "Please enter at least one product or raw material."
-        )
-
-        return
-
-    for item in items_data:
-
-        if item["quantity"] <= 0:
+        if not items_data:
 
             st.error(
-                f"Quantity for {item['product_name']} "
-                "must be greater than zero."
+                "Please enter at least one product or raw material."
             )
 
             return
 
-        if item["unit_price"] < 0:
+        for item in items_data:
 
-            st.error(
-                f"Unit price for {item['product_name']} "
-                "cannot be negative."
+            if item["quantity"] <= 0:
+
+                st.error(
+                    f"Quantity for "
+                    f"{item['product_name']} "
+                    "must be greater than zero."
+                )
+
+                return
+
+            if item["unit_price"] < 0:
+
+                st.error(
+                    f"Unit price for "
+                    f"{item['product_name']} "
+                    "cannot be negative."
+                )
+
+                return
+
+        try:
+
+            purchase_order = create_purchase_order(
+                supplier_id=supplier_id,
+                items_data=items_data,
+                status=status,
             )
 
-            return
+            st.success(
+                f"Purchase Order "
+                f"{purchase_order['po_number']} "
+                "created successfully."
+            )
 
-    # ----------------------------------------------
-    # CREATE
-    # ----------------------------------------------
+            st.rerun()
 
-    try:
+        except Exception as e:
 
-        purchase_order = create_purchase_order(
-            supplier_id=supplier_id,
-            items_data=items_data,
-            status=status,
-        )
-
-        po_number = getattr(
-            purchase_order,
-            "po_number",
-            "Purchase Order",
-        )
-
-        st.success(
-            f"Purchase Order {po_number} "
-            "created successfully."
-        )
-
-        st.rerun()
-
-    except Exception as e:
-
-        st.error(
-            f"Unable to create Purchase Order: {e}"
-        )
+            st.error(
+                f"Unable to create Purchase Order: {e}"
+            )
 
 
 # ==================================================
@@ -277,33 +264,22 @@ def view_purchase_orders():
 
     for po in purchase_orders:
 
-        # IMPORTANT:
-        # Do NOT access po.supplier here.
-        #
-        # The service layer should provide supplier_name
-        # while the SQLAlchemy session is active.
-
-        supplier_name = getattr(
-            po,
-            "supplier_name",
-            None,
-        )
-
-        if not supplier_name:
-
-            supplier_name = "Unknown Supplier"
-
         data.append(
             {
-                "ID": po.id,
-                "PO Number": po.po_number,
-                "Supplier": supplier_name,
-                "Status": po.status,
-                "Total": f"UGX {po.total_amount or 0:,.2f}",
-                "Created": (
-                    po.created_at.strftime("%Y-%m-%d")
-                    if po.created_at
-                    else ""
+                "ID": po["id"],
+                "PO Number": po["po_number"],
+                "Supplier": po.get(
+                    "supplier_name",
+                    "Unknown Supplier"
+                ),
+                "Status": po["status"],
+                "Total": (
+                    f"UGX "
+                    f"{po['total_amount']:,.2f}"
+                ),
+                "Created": po.get(
+                    "created_date",
+                    ""
                 ),
             }
         )
@@ -315,72 +291,6 @@ def view_purchase_orders():
         use_container_width=True,
         hide_index=True,
     )
-
-    st.divider()
-
-    # ==================================================
-    # VIEW DETAILS
-    # ==================================================
-
-    st.subheader("👁️ Purchase Order Details")
-
-    po_options = {
-        f"{po.po_number} | "
-        f"{getattr(po, 'supplier_name', 'Unknown Supplier')}":
-            po.id
-        for po in purchase_orders
-    }
-
-    selected_po_label = st.selectbox(
-        "Select Purchase Order",
-        options=list(po_options.keys()),
-        key="view_po_selection",
-    )
-
-    selected_po_id = po_options[selected_po_label]
-
-    selected_po = next(
-        (
-            po
-            for po in purchase_orders
-            if po.id == selected_po_id
-        ),
-        None,
-    )
-
-    if selected_po:
-
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            st.metric(
-                "PO Number",
-                selected_po.po_number,
-            )
-
-        with col2:
-            st.metric(
-                "Status",
-                selected_po.status,
-            )
-
-        with col3:
-            st.metric(
-                "Total",
-                f"UGX {selected_po.total_amount or 0:,.2f}",
-            )
-
-        st.write(
-            f"**Supplier:** "
-            f"{getattr(selected_po, 'supplier_name', 'Unknown Supplier')}"
-        )
-
-        st.write(
-            f"**Created:** "
-            f"{selected_po.created_at.strftime('%Y-%m-%d %H:%M') "
-            if selected_po.created_at
-            else 'N/A'}"
-        )
 
 
 # ==================================================
@@ -401,200 +311,348 @@ def manage_purchase_orders():
 
         return
 
-    po_options = {
-        f"{po.po_number} | "
-        f"{getattr(po, 'supplier_name', 'Unknown Supplier')}":
-            po.id
-        for po in purchase_orders
-    }
+    po_options = {}
+
+    for po in purchase_orders:
+
+        supplier_name = po.get(
+            "supplier_name",
+            "Unknown Supplier"
+        )
+
+        label = (
+            f"{po['po_number']} | "
+            f"{supplier_name} | "
+            f"UGX {po['total_amount']:,.2f}"
+        )
+
+        po_options[label] = po
 
     selected_label = st.selectbox(
-        "Purchase Order",
+        "Select Purchase Order",
         list(po_options.keys()),
-        key="manage_po_selection",
     )
 
-    selected_id = po_options[selected_label]
+    selected_po = po_options[selected_label]
 
-    selected_po = next(
-        (
-            po
-            for po in purchase_orders
-            if po.id == selected_id
-        ),
-        None,
-    )
-
-    if not selected_po:
-        st.error("Purchase Order could not be found.")
-        return
+    po_id = selected_po["id"]
 
     st.divider()
 
-    edit_tab, status_tab, delete_tab = st.tabs(
-        [
-            "✏️ Edit",
-            "🔄 Status",
-            "🗑️ Delete",
-        ]
+    # ==================================================
+    # CURRENT DETAILS
+    # ==================================================
+
+    st.markdown("### 📄 Purchase Order Details")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+
+        st.metric(
+            "PO Number",
+            selected_po["po_number"],
+        )
+
+    with col2:
+
+        st.metric(
+            "Supplier",
+            selected_po.get(
+                "supplier_name",
+                "Unknown"
+            ),
+        )
+
+    with col3:
+
+        st.metric(
+            "Current Status",
+            selected_po["status"],
+        )
+
+    st.metric(
+        "Current Total",
+        f"UGX {selected_po['total_amount']:,.2f}",
     )
+
+    st.divider()
 
     # ==================================================
     # EDIT PURCHASE ORDER
     # ==================================================
 
-    with edit_tab:
+    st.markdown("### ✏️ Edit Purchase Order")
 
-        st.markdown("### ✏️ Edit Purchase Order")
+    suppliers = get_all_suppliers()
 
-        suppliers = get_all_suppliers()
+    if not suppliers:
 
-        if not suppliers:
+        st.warning(
+            "No suppliers available."
+        )
 
-            st.warning(
-                "No suppliers are available."
-            )
+        return
 
-        else:
+    supplier_options = {
+        f"{supplier.name} | "
+        f"{supplier.phone or 'No phone'}":
+        supplier.id
+        for supplier in suppliers
+    }
 
-            supplier_options = {
-                f"{supplier.name} | "
-                f"{supplier.phone or 'No phone'}":
-                    supplier.id
-                for supplier in suppliers
+    current_supplier_id = selected_po.get(
+        "supplier_id"
+    )
+
+    supplier_labels = list(
+        supplier_options.keys()
+    )
+
+    current_supplier_label = supplier_labels[0]
+
+    for label, supplier_id in supplier_options.items():
+
+        if supplier_id == current_supplier_id:
+
+            current_supplier_label = label
+
+            break
+
+    edit_supplier_label = st.selectbox(
+        "Supplier",
+        supplier_labels,
+        index=supplier_labels.index(
+            current_supplier_label
+        ),
+        key=f"edit_supplier_{po_id}",
+    )
+
+    edit_supplier_id = supplier_options[
+        edit_supplier_label
+    ]
+
+    st.markdown("#### Purchase Order Items")
+
+    existing_items = selected_po.get(
+        "items",
+        []
+    )
+
+    if not existing_items:
+
+        st.info(
+            "This purchase order has no item details."
+        )
+
+        existing_items = [
+            {
+                "product_name": "",
+                "quantity": 0.0,
+                "unit_price": 0.0,
             }
+        ]
 
-            current_supplier_id = getattr(
-                selected_po,
-                "supplier_id",
-                None,
-            )
+    edited_items = []
 
-            supplier_labels = list(
-                supplier_options.keys()
-            )
+    edit_total = 0.0
 
-            current_supplier_index = 0
+    for index, item in enumerate(existing_items):
 
-            for index, supplier_label in enumerate(
-                supplier_labels
-            ):
+        col1, col2, col3 = st.columns(
+            [3, 1, 1]
+        )
 
-                if supplier_options[supplier_label] == current_supplier_id:
-                    current_supplier_index = index
-                    break
+        with col1:
 
-            selected_supplier = st.selectbox(
-                "Supplier",
-                supplier_labels,
-                index=current_supplier_index,
-                key="edit_po_supplier",
-            )
-
-            new_supplier_id = supplier_options[
-                selected_supplier
-            ]
-
-            new_status = st.selectbox(
-                "Status",
-                PO_STATUSES,
-                index=(
-                    PO_STATUSES.index(selected_po.status)
-                    if selected_po.status in PO_STATUSES
-                    else 0
+            product_name = st.text_input(
+                "Product / Raw Material",
+                value=item.get(
+                    "product_name",
+                    ""
                 ),
-                key="edit_po_status",
+                key=f"edit_product_{po_id}_{index}",
             )
 
-            new_total = st.number_input(
-                "Purchase Order Total",
+        with col2:
+
+            quantity = st.number_input(
+                "Quantity",
                 min_value=0.0,
                 value=float(
-                    selected_po.total_amount or 0
+                    item.get(
+                        "quantity",
+                        0
+                    )
+                ),
+                step=0.1,
+                key=f"edit_quantity_{po_id}_{index}",
+            )
+
+        with col3:
+
+            unit_price = st.number_input(
+                "Unit Price",
+                min_value=0.0,
+                value=float(
+                    item.get(
+                        "unit_price",
+                        0
+                    )
                 ),
                 step=100.0,
-                key="edit_po_total",
+                key=f"edit_price_{po_id}_{index}",
             )
 
-            save_edit = st.button(
-                "💾 Save Changes",
-                type="primary",
-                use_container_width=True,
-                key="save_po_changes",
+        item_total = quantity * unit_price
+
+        edit_total += item_total
+
+        if product_name.strip():
+
+            edited_items.append(
+                {
+                    "product_name":
+                        product_name.strip(),
+
+                    "quantity":
+                        quantity,
+
+                    "unit_price":
+                        unit_price,
+                }
             )
 
-            if save_edit:
+    st.metric(
+        "Updated Total",
+        f"UGX {edit_total:,.2f}",
+    )
 
-                try:
+    edit_status = st.selectbox(
+        "Status",
+        PO_STATUSES,
+        index=(
+            PO_STATUSES.index(
+                selected_po["status"]
+            )
+            if selected_po["status"]
+            in PO_STATUSES
+            else 0
+        ),
+        key=f"edit_status_{po_id}",
+    )
 
-                    updated = update_purchase_order(
-                        purchase_order_id=selected_po.id,
-                        supplier_id=new_supplier_id,
-                        total_amount=new_total,
-                        status=new_status,
-                    )
+    if st.button(
+        "💾 Save Changes",
+        type="primary",
+        use_container_width=True,
+        key=f"save_po_{po_id}",
+    ):
 
-                    if updated:
+        if not edited_items:
 
-                        st.success(
-                            f"{selected_po.po_number} "
-                            "updated successfully."
-                        )
+            st.error(
+                "At least one purchase order item is required."
+            )
 
-                        st.rerun()
+            return
 
-                    else:
+        for item in edited_items:
 
-                        st.error(
-                            "Purchase Order could not be found."
-                        )
+            if item["quantity"] <= 0:
 
-                except Exception as e:
+                st.error(
+                    f"Quantity for "
+                    f"{item['product_name']} "
+                    "must be greater than zero."
+                )
 
-                    st.error(
-                        f"Unable to update Purchase Order: {e}"
-                    )
+                return
+
+        try:
+
+            updated_po = update_purchase_order(
+                po_id=po_id,
+                supplier_id=edit_supplier_id,
+                items_data=edited_items,
+                status=edit_status,
+            )
+
+            if updated_po:
+
+                st.success(
+                    "Purchase Order updated successfully."
+                )
+
+                st.rerun()
+
+            else:
+
+                st.error(
+                    "Purchase Order could not be found."
+                )
+
+        except Exception as e:
+
+            st.error(
+                f"Unable to update Purchase Order: {e}"
+            )
+
+    st.divider()
 
     # ==================================================
-    # STATUS
+    # STATUS MANAGEMENT
     # ==================================================
 
-    with status_tab:
+    st.markdown(
+        "### 🔄 Change Purchase Order Status"
+    )
 
-        st.markdown(
-            "### 🔄 Change Purchase Order Status"
-        )
+    status_col1, status_col2 = st.columns(
+        [2, 1]
+    )
+
+    with status_col1:
 
         new_status = st.selectbox(
             "New Status",
             PO_STATUSES,
             index=(
-                PO_STATUSES.index(selected_po.status)
-                if selected_po.status in PO_STATUSES
+                PO_STATUSES.index(
+                    selected_po["status"]
+                )
+                if selected_po["status"]
+                in PO_STATUSES
                 else 0
             ),
-            key="manage_po_new_status",
+            key=f"status_change_{po_id}",
         )
+
+    with status_col2:
+
+        st.write("")
+        st.write("")
 
         if st.button(
             "🔄 Update Status",
-            type="primary",
             use_container_width=True,
-            key="manage_po_status_button",
+            key=f"update_status_{po_id}",
         ):
 
             try:
 
                 updated_po = update_purchase_order_status(
-                    selected_po.id,
+                    po_id,
                     new_status,
                 )
 
                 if updated_po:
 
                     st.success(
-                        f"{selected_po.po_number} "
-                        f"status changed to {new_status}."
+                        f"Purchase Order "
+                        f"{selected_po['po_number']} "
+                        f"changed to "
+                        f"{new_status}."
                     )
 
                     st.rerun()
@@ -611,44 +669,46 @@ def manage_purchase_orders():
                     f"Unable to update status: {e}"
                 )
 
+    st.divider()
+
     # ==================================================
-    # DELETE
+    # DELETE PURCHASE ORDER
     # ==================================================
 
-    with delete_tab:
+    st.markdown(
+        "### 🗑️ Delete Purchase Order"
+    )
 
-        st.markdown(
-            "### 🗑️ Delete Purchase Order"
-        )
+    st.warning(
+        "Deleting a purchase order is permanent. "
+        "The purchase order and its items will be removed."
+    )
 
-        st.warning(
-            "Deleting a Purchase Order is permanent. "
-            "Its purchase order items will also be removed."
-        )
+    confirm_delete = st.checkbox(
+        "I understand that this action cannot be undone.",
+        key=f"confirm_delete_{po_id}",
+    )
 
-        confirm_delete = st.checkbox(
-            "I understand that this action cannot be undone.",
-            key="confirm_delete_po",
-        )
+    if confirm_delete:
 
         if st.button(
             "🗑️ Delete Purchase Order",
             type="secondary",
             use_container_width=True,
-            disabled=not confirm_delete,
-            key="delete_po_button",
+            key=f"delete_po_{po_id}",
         ):
 
             try:
 
                 deleted = delete_purchase_order(
-                    selected_po.id
+                    po_id
                 )
 
                 if deleted:
 
                     st.success(
-                        f"{selected_po.po_number} "
+                        f"Purchase Order "
+                        f"{selected_po['po_number']} "
                         "deleted successfully."
                     )
 
@@ -672,4 +732,5 @@ def manage_purchase_orders():
 # ==================================================
 
 if __name__ == "__main__":
+
     purchase_orders_page()
