@@ -4,9 +4,7 @@ Payments Module – uses payment_service
 
 import streamlit as st
 import pandas as pd
-from services.payment_service import (
-    record_payment, get_all_payments, get_payments_by_invoice
-)
+from services.payment_service import record_payment, get_all_payments, get_payments_by_invoice
 from services.invoice_service import get_all_invoices, get_invoice_balance
 
 def payments_page():
