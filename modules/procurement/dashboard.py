@@ -1,203 +1,71 @@
 """
 Esan ERP Procurement Dashboard
-
 Nile Harvest Foods Ltd.
-Enterprise Milling & Packaging Management System
 """
 
-import logging
 import streamlit as st
 
-logger = logging.getLogger(name)
+from modules.procurement.suppliers import suppliers_page
 
-==================================================
-
-SAFE MODULE IMPORT
-
-==================================================
-
-def _safe_import(module_path, function_name):
-"""
-Safely import a procurement submodule.
-
-Returns:
-    callable | None
-"""
+# Purchase Orders is loaded safely so that a problem there
+# does not prevent the Procurement Dashboard from opening.
 try:
-    module = __import__(
-        module_path,
-        fromlist=[function_name]
-    )
-
-    function = getattr(module, function_name, None)
-
-    if function is None:
-        logger.warning(
-            "%s does not contain %s",
-            module_path,
-            function_name
-        )
-
-    return function
-
+    from modules.procurement.purchase_orders import purchase_orders_page
 except Exception as e:
-    logger.exception(
-        "Failed to load %s.%s: %s",
-        module_path,
-        function_name,
-        e
-    )
-    return None
+    purchase_orders_page = None
+    st.session_state.setdefault("procurement_purchase_order_error", str(e))
 
-==================================================
-
-LOAD PROCUREMENT SUBMODULES
-
-==================================================
-
-suppliers_page = _safe_import(
-"modules.procurement.suppliers",
-"suppliers_page"
-)
-
-purchase_orders_page = _safe_import(
-"modules.procurement.purchase_orders",
-"purchase_orders_page"
-)
-
-==================================================
-
-FALLBACK PAGE
-
-==================================================
-
-def _module_unavailable(module_name):
-"""
-Display a controlled message when a procurement
-submodule cannot be loaded.
-"""
-
-st.warning(
-    f"⚠️ {module_name} is currently unavailable."
-)
-
-st.caption(
-    "The Procurement module is loaded, but this "
-    "submodule needs to be fixed before it can be used."
-)
-
-==================================================
-
-PROCUREMENT DASHBOARD
-
-==================================================
 
 def procurement_dashboard():
+    """
+    Main Procurement Dashboard.
 
-st.title("🌾 Procurement Management")
+    Contains:
+    - Suppliers
+    - Purchase Orders
+    """
 
-st.caption(
-    "Manage suppliers, agricultural procurement, "
-    "purchase orders and incoming materials."
-)
+    st.title("🌾 Procurement Management")
+    st.caption("Manage agricultural suppliers and purchase orders.")
 
-st.divider()
-
-# ==================================================
-# PROCUREMENT SUMMARY
-# ==================================================
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.metric(
-        "Suppliers",
-        "0"
+    tab1, tab2 = st.tabs(
+        [
+            "👨‍🌾 Suppliers",
+            "📄 Purchase Orders",
+        ]
     )
 
-with col2:
-    st.metric(
-        "Purchase Orders",
-        "0"
-    )
+    # ==================================================
+    # SUPPLIERS
+    # ==================================================
 
-with col3:
-    st.metric(
-        "Pending Orders",
-        "0"
-    )
-
-with col4:
-    st.metric(
-        "Procurement Value",
-        "UGX 0"
-    )
-
-st.divider()
-
-# ==================================================
-# PROCUREMENT TABS
-# ==================================================
-
-tab1, tab2 = st.tabs(
-    [
-        "👨‍🌾 Suppliers",
-        "📄 Purchase Orders"
-    ]
-)
-
-# ==================================================
-# SUPPLIERS
-# ==================================================
-
-with tab1:
-
-    if suppliers_page:
-
+    with tab1:
         try:
             suppliers_page()
-
         except Exception as e:
+            st.error("Unable to load Supplier Management.")
+            st.exception(e)
 
-            logger.exception(
-                "Suppliers module failed: %s",
-                e
+    # ==================================================
+    # PURCHASE ORDERS
+    # ==================================================
+
+    with tab2:
+        if purchase_orders_page:
+            try:
+                purchase_orders_page()
+            except Exception as e:
+                st.error("Unable to load Purchase Orders.")
+                st.exception(e)
+        else:
+            st.warning(
+                "Purchase Orders module is not available yet."
             )
 
-            st.error(
-                "The Suppliers module encountered an error."
+            error = st.session_state.get(
+                "procurement_purchase_order_error"
             )
 
-    else:
-
-        _module_unavailable(
-            "Suppliers"
-        )
-
-# ==================================================
-# PURCHASE ORDERS
-# ==================================================
-
-with tab2:
-
-    if purchase_orders_page:
-
-        try:
-            purchase_orders_page()
-
-        except Exception as e:
-
-            logger.exception(
-                "Purchase Orders module failed: %s",
-                e
-            )
-
-            st.error(
-                "The Purchase Orders module encountered an error."
-            )
-
-    else:
-
-        _module_unavailable(
-            "Purchase Orders"
-        )
+            if error:
+                with st.expander("Technical information"):
+                    st.code(error)
