@@ -1,47 +1,36 @@
 """
-Esan ERP - Purchases & Receiving Module
+Esan ERP Purchases Module
 
 Nile Harvest Foods Ltd.
+Enterprise Milling & Packaging Management System
 
 Functions:
-- Record purchases
-- Receive goods
-- Link purchases to Purchase Orders
-- Add multiple purchase items
-- Edit purchases
+- View purchases
+- Create purchases
+- Update purchase status
 - Delete purchases
-- Change purchase status
-- View purchase history
 """
 
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 
 from services.procurement_service import (
     get_all_suppliers,
-    get_all_purchase_orders,
     get_all_purchases,
     create_purchase,
-    update_purchase,
-    delete_purchase,
     update_purchase_status,
+    delete_purchase,
 )
 
 
-# ==================================================
-# MAIN PAGE
-# ==================================================
-
 def purchases_page():
 
-    st.title("📥 Purchase & Receiving Management")
+    st.title("🛒 Purchase Management")
 
-    tab1, tab2, tab3 = st.tabs(
+    tab1, tab2 = st.tabs(
         [
-            "➕ Record Purchase",
+            "➕ New Purchase",
             "📋 Purchases",
-            "⚙️ Manage",
         ]
     )
 
@@ -51,103 +40,37 @@ def purchases_page():
     with tab2:
         view_purchases()
 
-    with tab3:
-        manage_purchases()
-
-
-# ==================================================
-# CREATE PURCHASE
-# ==================================================
 
 def create_purchase_form():
 
-    st.subheader("Record New Purchase / Goods Received")
+    st.subheader("Create New Purchase")
 
     suppliers = get_all_suppliers()
-    purchase_orders = get_all_purchase_orders()
 
     if not suppliers:
-
         st.warning(
             "No suppliers are registered. "
             "Please add a supplier first."
         )
-
         return
 
     supplier_options = {
         f"{supplier.name} | "
         f"{supplier.phone or 'No phone'}":
-            supplier.id
+        supplier.id
         for supplier in suppliers
     }
 
     selected_supplier = st.selectbox(
         "Supplier",
         list(supplier_options.keys()),
-        key="purchase_supplier",
     )
 
     supplier_id = supplier_options[
         selected_supplier
     ]
 
-    # --------------------------------------------------
-    # PURCHASE ORDER
-    # --------------------------------------------------
-
-    matching_pos = [
-        po
-        for po in purchase_orders
-        if po.supplier_id == supplier_id
-    ]
-
-    po_options = {
-        "No Purchase Order":
-            None
-    }
-
-    for po in matching_pos:
-
-        po_options[
-            f"{po.po_number} | "
-            f"{po.status} | "
-            f"UGX {po.total_amount:,.2f}"
-        ] = po.id
-
-    selected_po = st.selectbox(
-        "Purchase Order",
-        list(po_options.keys()),
-        key="purchase_po",
-    )
-
-    purchase_order_id = po_options[
-        selected_po
-    ]
-
-    st.markdown("### Purchase Details")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-
-        received_date = st.date_input(
-            "Received Date",
-            value=datetime.today().date(),
-        )
-
-    with col2:
-
-        warehouse = st.text_input(
-            "Receiving Warehouse",
-            placeholder="e.g. Main Warehouse",
-        )
-
-    # --------------------------------------------------
-    # ITEMS
-    # --------------------------------------------------
-
-    st.markdown("### 📦 Purchased Items")
+    st.markdown("### Purchase Items")
 
     item_count = st.number_input(
         "Number of Items",
@@ -155,10 +78,9 @@ def create_purchase_form():
         max_value=20,
         value=1,
         step=1,
-        key="purchase_item_count",
     )
 
-    items_data = []
+    items = []
     total_amount = 0.0
 
     for i in range(int(item_count)):
@@ -172,7 +94,6 @@ def create_purchase_form():
         )
 
         with col1:
-
             product_name = st.text_input(
                 "Product / Raw Material",
                 key=f"purchase_product_{i}",
@@ -180,7 +101,6 @@ def create_purchase_form():
             )
 
         with col2:
-
             quantity = st.number_input(
                 "Quantity",
                 min_value=0.0,
@@ -189,7 +109,6 @@ def create_purchase_form():
             )
 
         with col3:
-
             unit_price = st.number_input(
                 "Unit Price",
                 min_value=0.0,
@@ -206,9 +125,11 @@ def create_purchase_form():
             f"**UGX {item_total:,.2f}**"
         )
 
+        total_amount += item_total
+
         if product_name.strip():
 
-            items_data.append(
+            items.append(
                 {
                     "product_name":
                         product_name.strip(),
@@ -219,98 +140,58 @@ def create_purchase_form():
                 }
             )
 
-        total_amount += item_total
-
     st.divider()
 
-    col1, col2 = st.columns(2)
-
-    with col1:
-
-        status = st.selectbox(
-            "Purchase Status",
-            [
-                "Received",
-                "Partially Received",
-                "Pending Inspection",
-                "Accepted",
-                "Rejected",
-                "Cancelled",
-            ],
-            key="purchase_status",
-        )
-
-    with col2:
-
-        st.metric(
-            "Total Purchase",
-            f"UGX {total_amount:,.2f}",
-        )
-
-    notes = st.text_area(
-        "Notes",
-        placeholder=(
-            "Additional receiving or purchase notes..."
-        ),
+    status = st.selectbox(
+        "Purchase Status",
+        [
+            "Draft",
+            "Pending Approval",
+            "Approved",
+            "Ordered",
+            "Received",
+        ],
     )
 
-    submitted = st.button(
-        "💾 Record Purchase",
+    st.metric(
+        "Total Purchase",
+        f"UGX {total_amount:,.2f}",
+    )
+
+    if st.button(
+        "💾 Save Purchase",
         type="primary",
         use_container_width=True,
-    )
+    ):
 
-    if submitted:
-
-        if not items_data:
-
+        if not items:
             st.error(
                 "Please enter at least one product."
             )
-
             return
 
-        for item in items_data:
+        for item in items:
 
             if item["quantity"] <= 0:
-
                 st.error(
                     f"Quantity for "
                     f"{item['product_name']} "
-                    "must be greater than zero."
+                    f"must be greater than zero."
                 )
-
-                return
-
-            if item["unit_price"] < 0:
-
-                st.error(
-                    f"Unit price for "
-                    f"{item['product_name']} "
-                    "cannot be negative."
-                )
-
                 return
 
         try:
 
             purchase = create_purchase(
                 supplier_id=supplier_id,
-                items_data=items_data,
-                purchase_order_id=purchase_order_id,
+                items_data=items,
                 status=status,
-                received_date=datetime.combine(
-                    received_date,
-                    datetime.min.time(),
-                ),
-                warehouse=warehouse,
-                notes=notes,
             )
 
             st.success(
                 f"Purchase "
-                f"{purchase.purchase_number} "
-                "recorded successfully."
+                f"{purchase['po_number']} "
+                f"created successfully."
             )
 
             st.rerun()
@@ -318,17 +199,13 @@ def create_purchase_form():
         except Exception as e:
 
             st.error(
-                f"Unable to record purchase: {e}"
+                f"Unable to create purchase: {e}"
             )
 
 
-# ==================================================
-# VIEW PURCHASES
-# ==================================================
-
 def view_purchases():
 
-    st.subheader("📋 Purchase History")
+    st.subheader("Purchase Records")
 
     purchases = get_all_purchases()
 
@@ -337,55 +214,35 @@ def view_purchases():
         st.info(
             "No purchases have been recorded yet."
         )
-
         return
 
     data = []
 
     for purchase in purchases:
 
-        supplier_name = (
-            purchase.supplier.name
-            if purchase.supplier
-            else "Unknown Supplier"
-        )
-
-        po_number = (
-            purchase.purchase_order.po_number
-            if purchase.purchase_order
-            else "Direct Purchase"
-        )
-
         data.append(
             {
                 "ID":
-                    purchase.id,
+                    purchase["id"],
 
-                "Purchase Number":
-                    purchase.purchase_number,
+                "Purchase No.":
+                    purchase["po_number"],
 
                 "Supplier":
-                    supplier_name,
-
-                "Purchase Order":
-                    po_number,
+                    purchase["supplier_name"],
 
                 "Status":
-                    purchase.status,
-
-                "Warehouse":
-                    purchase.warehouse or "",
+                    purchase["status"],
 
                 "Total":
                     f"UGX "
-                    f"{purchase.total_amount:,.2f}",
+                    f"{purchase['total_amount']:,.2f}",
 
-                "Received":
+                "Created":
                     (
-                        purchase.received_date.strftime(
-                            "%Y-%m-%d"
-                        )
-                        if purchase.received_date
+                        purchase["created_at"]
+                        .strftime("%Y-%m-%d")
+                        if purchase["created_at"]
                         else ""
                     ),
             }
@@ -399,245 +256,110 @@ def view_purchases():
         hide_index=True,
     )
 
-    st.metric(
-        "Total Purchase Value",
-        f"UGX "
-        f"{sum(p.total_amount or 0 for p in purchases):,.2f}",
+    st.divider()
+
+    st.subheader(
+        "🔄 Purchase Management"
     )
 
-
-# ==================================================
-# MANAGE PURCHASES
-# ==================================================
-
-def manage_purchases():
-
-    st.subheader("⚙️ Manage Purchases")
-
-    purchases = get_all_purchases()
-
-    if not purchases:
-
-        st.info(
-            "There are no purchases to manage."
-        )
-
-        return
-
-    purchase_options = {}
-
-    for purchase in purchases:
-
-        supplier_name = (
-            purchase.supplier.name
-            if purchase.supplier
-            else "Unknown Supplier"
-        )
-
-        purchase_options[
-            f"{purchase.purchase_number} | "
-            f"{supplier_name} | "
-            f"UGX {purchase.total_amount:,.2f}"
-        ] = purchase.id
+    purchase_options = {
+        f"{purchase['po_number']} | "
+        f"{purchase['supplier_name']}":
+        purchase["id"]
+        for purchase in purchases
+    }
 
     selected_purchase = st.selectbox(
         "Select Purchase",
         list(purchase_options.keys()),
     )
 
-    purchase_id = purchase_options[
+    selected_id = purchase_options[
         selected_purchase
     ]
 
-    purchase = next(
-        (
-            p for p in purchases
-            if p.id == purchase_id
-        ),
-        None,
-    )
-
-    if not purchase:
-        st.error("Purchase not found.")
-        return
-
-    # ==================================================
-    # PURCHASE INFORMATION
-    # ==================================================
-
-    st.markdown("### Purchase Information")
-
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
 
     with col1:
-        st.metric(
-            "Purchase Number",
-            purchase.purchase_number,
-        )
 
-    with col2:
-        st.metric(
-            "Total",
-            f"UGX "
-            f"{purchase.total_amount:,.2f}",
-        )
-
-    with col3:
-        st.metric(
+        new_status = st.selectbox(
             "Status",
-            purchase.status,
-        )
-
-    # ==================================================
-    # ITEMS
-    # ==================================================
-
-    st.markdown("### Purchased Items")
-
-    items_data = []
-
-    for item in purchase.items:
-
-        items_data.append(
-            {
-                "Product":
-                    item.product_name,
-                "Quantity":
-                    item.quantity,
-                "Unit Price":
-                    f"UGX "
-                    f"{item.unit_price:,.2f}",
-                "Total":
-                    f"UGX "
-                    f"{item.total:,.2f}",
-            }
-        )
-
-    if items_data:
-
-        st.dataframe(
-            pd.DataFrame(items_data),
-            use_container_width=True,
-            hide_index=True,
-        )
-
-    st.divider()
-
-    # ==================================================
-    # STATUS
-    # ==================================================
-
-    st.markdown("### 🔄 Change Status")
-
-    new_status = st.selectbox(
-        "New Status",
-        [
-            "Received",
-            "Partially Received",
-            "Pending Inspection",
-            "Accepted",
-            "Rejected",
-            "Cancelled",
-        ],
-        index=(
             [
-                "Received",
+                "Draft",
+                "Pending Approval",
+                "Approved",
+                "Ordered",
                 "Partially Received",
-                "Pending Inspection",
-                "Accepted",
-                "Rejected",
-                "Cancelled",
-            ].index(purchase.status)
-            if purchase.status in [
                 "Received",
-                "Partially Received",
-                "Pending Inspection",
-                "Accepted",
-                "Rejected",
                 "Cancelled",
-            ]
-            else 0
-        ),
-    )
+            ],
+        )
 
-    if st.button(
-        "🔄 Update Status",
-        use_container_width=True,
-    ):
+        if st.button(
+            "🔄 Update Status",
+            use_container_width=True,
+        ):
 
-        try:
+            try:
 
-            updated = update_purchase_status(
-                purchase.id,
-                new_status,
-            )
-
-            if updated:
-
-                st.success(
-                    f"{updated.purchase_number} "
-                    f"updated to {updated.status}."
+                result = update_purchase_status(
+                    selected_id,
+                    new_status,
                 )
 
-                st.rerun()
+                if result:
 
-        except Exception as e:
+                    st.success(
+                        f"{result['po_number']} "
+                        f"updated to "
+                        f"{result['status']}."
+                    )
 
-            st.error(
-                f"Unable to update status: {e}"
-            )
+                    st.rerun()
 
-    st.divider()
-
-    # ==================================================
-    # DELETE
-    # ==================================================
-
-    st.markdown("### 🗑️ Delete Purchase")
-
-    confirm_delete = st.checkbox(
-        "I understand that deleting this purchase cannot be undone.",
-        key=f"confirm_delete_purchase_{purchase.id}",
-    )
-
-    if st.button(
-        "🗑️ Delete Purchase",
-        type="secondary",
-        disabled=not confirm_delete,
-        use_container_width=True,
-    ):
-
-        try:
-
-            deleted = delete_purchase(
-                purchase.id
-            )
-
-            if deleted:
-
-                st.success(
-                    f"{purchase.purchase_number} "
-                    "deleted successfully."
-                )
-
-                st.rerun()
-
-            else:
+            except Exception as e:
 
                 st.error(
-                    "Purchase could not be found."
+                    f"Unable to update purchase: {e}"
                 )
 
-        except Exception as e:
+    with col2:
 
-            st.error(
-                f"Unable to delete purchase: {e}"
-            )
+        st.warning(
+            "Deleting a purchase cannot be undone."
+        )
 
+        if st.button(
+            "🗑️ Delete Purchase",
+            use_container_width=True,
+        ):
 
-# ==================================================
-# STANDALONE EXECUTION
-# ==================================================
+            try:
+
+                deleted = delete_purchase(
+                    selected_id
+                )
+
+                if deleted:
+
+                    st.success(
+                        "Purchase deleted successfully."
+                    )
+
+                    st.rerun()
+
+                else:
+
+                    st.error(
+                        "Purchase was not found."
+                    )
+
+            except Exception as e:
+
+                st.error(
+                    f"Unable to delete purchase: {e}"
+                )
+
 
 if __name__ == "__main__":
     purchases_page()
