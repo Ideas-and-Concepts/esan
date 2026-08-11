@@ -6,8 +6,9 @@ Enterprise Milling & Packaging Management System
 Version 1.4.0 Alpha – Full Repository Integration
 """
 
-import streamlit as st
 import logging
+
+import streamlit as st
 from sqlalchemy import inspect
 
 from config import COMPANY_NAME, VERSION
@@ -68,8 +69,10 @@ module_errors = []
 
 def safe_import(module_path, function_name):
     """
-    Safely import an ERP module without crashing
-    the entire application.
+    Safely imports a module and returns the requested function.
+
+    This prevents one broken module from crashing the
+    entire Esan ERP application.
     """
 
     try:
@@ -79,22 +82,26 @@ def safe_import(module_path, function_name):
             fromlist=[function_name]
         )
 
-        if hasattr(module, function_name):
-
-            return getattr(
-                module,
-                function_name
-            )
-
-        error = (
-            f"{module_path}: "
-            f"missing function '{function_name}'"
+        function = getattr(
+            module,
+            function_name,
+            None
         )
 
-        module_errors.append(error)
-        logging.error(error)
+        if function is None:
 
-        return None
+            error = (
+                f"{module_path}: "
+                f"function '{function_name}' "
+                f"was not found."
+            )
+
+            module_errors.append(error)
+            logging.error(error)
+
+            return None
+
+        return function
 
     except Exception as e:
 
@@ -103,9 +110,11 @@ def safe_import(module_path, function_name):
             f"{type(e).__name__}: {e}"
         )
 
-        logging.error(error)
-
         module_errors.append(error)
+
+        logging.exception(
+            f"Failed loading {module_path}"
+        )
 
         return None
 
@@ -130,23 +139,24 @@ except ImportError:
             .first()
         )
 
-        if not admin:
+        if admin:
+            return
 
-            from auth import hash_password
+        from auth import hash_password
 
-            admin = User(
-                username="admin",
-                full_name="System Administrator",
-                email="admin@nileharvest.com",
-                password_hash=hash_password(
-                    "admin123"
-                ),
-                role="Administrator",
-                active=True,
-            )
+        admin = User(
+            username="admin",
+            full_name="System Administrator",
+            email="admin@nileharvest.com",
+            password_hash=hash_password(
+                "admin123"
+            ),
+            role="Administrator",
+            active=True,
+        )
 
-            db.add(admin)
-            db.commit()
+        db.add(admin)
+        db.commit()
 
 
 # ==================================================
@@ -166,10 +176,9 @@ except ImportError:
 # MODULE REGISTRY
 # ==================================================
 
-
-# ==================================================
+# --------------------------------------------------
 # DASHBOARD
-# ==================================================
+# --------------------------------------------------
 
 dashboard_home = safe_import(
     "modules.dashboard.home",
@@ -177,9 +186,9 @@ dashboard_home = safe_import(
 )
 
 
-# ==================================================
+# --------------------------------------------------
 # PROCUREMENT
-# ==================================================
+# --------------------------------------------------
 
 procurement_dashboard = safe_import(
     "modules.procurement.dashboard",
@@ -191,15 +200,17 @@ procurement_suppliers = safe_import(
     "suppliers_page"
 )
 
-procurement_purchases = safe_import(
+# IMPORTANT:
+# Use purchase_orders.py, not the old purchases.py
+procurement_purchase_orders = safe_import(
     "modules.procurement.purchase_orders",
     "purchase_orders_page"
 )
 
 
-# ==================================================
+# --------------------------------------------------
 # WAREHOUSE
-# ==================================================
+# --------------------------------------------------
 
 warehouse_dashboard = safe_import(
     "modules.warehouse.dashboard",
@@ -212,9 +223,9 @@ warehouse_inventory = safe_import(
 )
 
 
-# ==================================================
+# --------------------------------------------------
 # MILLING
-# ==================================================
+# --------------------------------------------------
 
 milling_dashboard = safe_import(
     "modules.milling.dashboard",
@@ -222,9 +233,9 @@ milling_dashboard = safe_import(
 )
 
 
-# ==================================================
+# --------------------------------------------------
 # PACKAGING
-# ==================================================
+# --------------------------------------------------
 
 packaging_dashboard = safe_import(
     "modules.packaging.dashboard",
@@ -232,9 +243,9 @@ packaging_dashboard = safe_import(
 )
 
 
-# ==================================================
+# --------------------------------------------------
 # SALES & DISTRIBUTION
-# ==================================================
+# --------------------------------------------------
 
 sales_dashboard = safe_import(
     "modules.sales.dashboard",
@@ -272,9 +283,9 @@ sales_payments = safe_import(
 )
 
 
-# ==================================================
+# --------------------------------------------------
 # FINANCE
-# ==================================================
+# --------------------------------------------------
 
 finance_dashboard = safe_import(
     "modules.finance.dashboard",
@@ -282,9 +293,9 @@ finance_dashboard = safe_import(
 )
 
 
-# ==================================================
+# --------------------------------------------------
 # REPORTS
-# ==================================================
+# --------------------------------------------------
 
 reports_dashboard = safe_import(
     "modules.reports.dashboard",
@@ -302,14 +313,14 @@ def _fallback_page(title):
 
         st.info(
             f"{title} – "
-            "This section will be available soon."
+            "This section is currently unavailable."
         )
 
     return _render
 
 
 # ==================================================
-# FALLBACKS
+# SAFE FALLBACKS
 # ==================================================
 
 procurement_suppliers = (
@@ -317,29 +328,14 @@ procurement_suppliers = (
     or _fallback_page("Suppliers")
 )
 
-procurement_purchases = (
-    procurement_purchases
+procurement_purchase_orders = (
+    procurement_purchase_orders
     or _fallback_page("Purchase Orders")
 )
 
 warehouse_inventory = (
     warehouse_inventory
     or _fallback_page("Inventory")
-)
-
-sales_deliveries = (
-    sales_deliveries
-    or _fallback_page("Deliveries")
-)
-
-sales_invoices = (
-    sales_invoices
-    or _fallback_page("Invoices")
-)
-
-sales_payments = (
-    sales_payments
-    or _fallback_page("Payments")
 )
 
 
@@ -357,15 +353,11 @@ def initialize_database():
             inspector.get_table_names()
         )
 
-        missing_tables = []
-
-        for table in Base.metadata.tables:
-
-            if table not in existing_tables:
-
-                missing_tables.append(
-                    table
-                )
+        missing_tables = [
+            table
+            for table in Base.metadata.tables
+            if table not in existing_tables
+        ]
 
         if missing_tables:
 
@@ -388,6 +380,10 @@ def initialize_database():
 
             db.close()
 
+        # ------------------------------------------
+        # OPTIONAL SEED DATA
+        # ------------------------------------------
+
         if load_seed_data:
 
             try:
@@ -397,18 +393,24 @@ def initialize_database():
             except Exception as e:
 
                 logging.warning(
-                    f"Seed failed: {e}"
+                    f"Seed data failed: {e}"
                 )
 
     except Exception as e:
 
-        logging.error(
-            f"Database error: {e}"
+        logging.exception(
+            "Database initialization failed"
         )
 
         st.error(
-            "Database initialization failed"
+            "Database initialization failed."
         )
+
+        with st.expander(
+            "Database Error Details"
+        ):
+
+            st.exception(e)
 
 
 initialize_database()
@@ -446,13 +448,17 @@ def login(username, password):
             .first()
         )
 
-        if (
-            user
-            and user.active
-            and verify_password(
-                password,
-                user.password_hash
-            )
+        if not user:
+
+            return False
+
+        if not user.active:
+
+            return False
+
+        if verify_password(
+            password,
+            user.password_hash
         ):
 
             st.session_state.logged_in = True
@@ -545,6 +551,7 @@ st.caption(
 
 # ==================================================
 # SIDEBAR NAVIGATION
+#
 # DO NOT CHANGE
 # ==================================================
 
@@ -573,64 +580,37 @@ with st.sidebar:
             )
 
     # MAIN
-    nav_button(
-        "🏠 Overview"
-    )
+    nav_button("🏠 Overview")
 
     # OPERATIONS
-    st.markdown(
-        "**OPERATIONS**"
-    )
+    st.markdown("**OPERATIONS**")
 
-    nav_button(
-        "🌾 Procurement"
-    )
-
-    nav_button(
-        "📦 Warehouse"
-    )
-
-    nav_button(
-        "🏭 Milling"
-    )
-
-    nav_button(
-        "📦 Packaging"
-    )
+    nav_button("🌾 Procurement")
+    nav_button("📦 Warehouse")
+    nav_button("🏭 Milling")
+    nav_button("📦 Packaging")
 
     # COMMERCIAL
-    st.markdown(
-        "**COMMERCIAL**"
-    )
+    st.markdown("**COMMERCIAL**")
 
     nav_button(
         "🚚 Sales & Distribution"
     )
 
     # FINANCE
-    st.markdown(
-        "**FINANCE**"
-    )
+    st.markdown("**FINANCE**")
 
-    nav_button(
-        "💰 Finance"
-    )
+    nav_button("💰 Finance")
 
     # REPORTING
-    st.markdown(
-        "**REPORTING**"
-    )
+    st.markdown("**REPORTING**")
 
-    nav_button(
-        "📊 Reports"
-    )
+    nav_button("📊 Reports")
 
     st.divider()
 
     # USER PANEL
-    st.markdown(
-        "### 👤 User Panel"
-    )
+    st.markdown("### 👤 User Panel")
 
     st.write(
         f"User: **{st.session_state.username}**"
@@ -663,11 +643,6 @@ menu = st.session_state.current_page
 
 
 # ==================================================
-# ERP ROUTER
-# ==================================================
-
-
-# ==================================================
 # OVERVIEW
 # ==================================================
 
@@ -680,7 +655,7 @@ if menu == "🏠 Overview":
     else:
 
         st.info(
-            "Overview dashboard not available"
+            "Overview dashboard not available."
         )
 
 
@@ -690,19 +665,21 @@ if menu == "🏠 Overview":
 
 elif menu == "🌾 Procurement":
 
-    st.header(
-        "🌾 Procurement"
-    )
+    st.header("🌾 Procurement")
 
     procurement_menu = st.radio(
         "Procurement Module",
         [
             "Dashboard",
             "Suppliers",
-            "Purchase Orders",
+            "Purchase Orders"
         ],
-        key="procurement_navigation",
+        key="procurement_menu"
     )
+
+    # ----------------------------------------------
+    # PROCUREMENT DASHBOARD
+    # ----------------------------------------------
 
     if procurement_menu == "Dashboard":
 
@@ -713,16 +690,25 @@ elif menu == "🌾 Procurement":
         else:
 
             st.warning(
-                "Procurement dashboard unavailable"
+                "Procurement Dashboard "
+                "could not be loaded."
             )
+
+    # ----------------------------------------------
+    # SUPPLIERS
+    # ----------------------------------------------
 
     elif procurement_menu == "Suppliers":
 
         procurement_suppliers()
 
+    # ----------------------------------------------
+    # PURCHASE ORDERS
+    # ----------------------------------------------
+
     elif procurement_menu == "Purchase Orders":
 
-        procurement_purchases()
+        procurement_purchase_orders()
 
 
 # ==================================================
@@ -731,18 +717,20 @@ elif menu == "🌾 Procurement":
 
 elif menu == "📦 Warehouse":
 
-    st.header(
-        "📦 Warehouse"
-    )
+    st.header("📦 Warehouse")
 
     warehouse_menu = st.radio(
         "Warehouse Module",
         [
             "Dashboard",
-            "Inventory",
+            "Inventory"
         ],
-        key="warehouse_navigation",
+        key="warehouse_menu"
     )
+
+    # ----------------------------------------------
+    # WAREHOUSE DASHBOARD
+    # ----------------------------------------------
 
     if warehouse_menu == "Dashboard":
 
@@ -753,8 +741,13 @@ elif menu == "📦 Warehouse":
         else:
 
             st.warning(
-                "Warehouse dashboard unavailable"
+                "Warehouse Dashboard "
+                "could not be loaded."
             )
+
+    # ----------------------------------------------
+    # INVENTORY
+    # ----------------------------------------------
 
     elif warehouse_menu == "Inventory":
 
@@ -774,7 +767,7 @@ elif menu == "🏭 Milling":
     else:
 
         st.warning(
-            "Milling module unavailable"
+            "Milling module unavailable."
         )
 
 
@@ -791,7 +784,7 @@ elif menu == "📦 Packaging":
     else:
 
         st.warning(
-            "Packaging module unavailable"
+            "Packaging module unavailable."
         )
 
 
@@ -814,9 +807,9 @@ elif menu == "🚚 Sales & Distribution":
             "Sales Orders",
             "Deliveries",
             "Invoices",
-            "Payments",
+            "Payments"
         ],
-        key="sales_navigation",
+        key="sales_menu"
     )
 
     sales_pages = {
@@ -840,7 +833,7 @@ elif menu == "🚚 Sales & Distribution":
             sales_invoices,
 
         "Payments":
-            sales_payments,
+            sales_payments
     }
 
     page_func = sales_pages.get(
@@ -855,7 +848,7 @@ elif menu == "🚚 Sales & Distribution":
 
         st.warning(
             f"{sales_menu} "
-            "page unavailable"
+            "page unavailable."
         )
 
 
@@ -872,7 +865,7 @@ elif menu == "💰 Finance":
     else:
 
         st.warning(
-            "Finance module unavailable"
+            "Finance module unavailable."
         )
 
 
@@ -889,12 +882,12 @@ elif menu == "📊 Reports":
     else:
 
         st.warning(
-            "Reports module unavailable"
+            "Reports module unavailable."
         )
 
 
 # ==================================================
-# MODULE IMPORT INFORMATION
+# MODULE LOADING INFORMATION
 # ==================================================
 
 if module_errors:
@@ -904,9 +897,8 @@ if module_errors:
     ):
 
         st.warning(
-            "Some optional modules could not "
-            "be loaded. The ERP can continue "
-            "running with the available modules."
+            "The following modules could not "
+            "be loaded:"
         )
 
         for error in module_errors:
