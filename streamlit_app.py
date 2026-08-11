@@ -68,42 +68,49 @@ st.markdown(
         border-right: 1px solid #ddd;
     }
 
+
     /* ==========================================
-       ESAN LOGIN DESIGN
+       ESAN LOGIN PAGE
        ========================================== */
 
     .esan-login-page {
-        min-height: 78vh;
+        min-height: 82vh;
+
         display: flex;
-        justify-content: center;
         align-items: center;
-        padding: 30px 20px;
+        justify-content: center;
+
+        padding: 20px;
     }
 
+
     .esan-login-container {
-        width: 430px;
+        width: 420px;
         max-width: 100%;
+
         text-align: center;
     }
 
+
     /* ==========================================
-       ESAN LOGO MARK
+       ESAN LOGO
        ========================================== */
 
-    .esan-logo-mark {
-        width: 108px;
-        height: 108px;
-        margin: 0 auto 20px auto;
+    .esan-logo {
+        width: 112px;
+        height: 112px;
+
+        margin: 0 auto 18px auto;
+
+        border-radius: 32px;
 
         background:
             linear-gradient(
                 145deg,
                 #238653 0%,
                 #17613d 55%,
-                #0d452b 100%
+                #0c432a 100%
             );
-
-        border-radius: 30px;
 
         display: flex;
         align-items: center;
@@ -112,91 +119,103 @@ st.markdown(
         position: relative;
 
         box-shadow:
-            0 18px 45px rgba(20, 90, 55, 0.25);
+            0 18px 45px
+            rgba(20, 90, 55, 0.25);
     }
 
-    /*
-       Outer ring
-    */
+
+    /* ==========================================
+       LOGO RING
+       ========================================== */
 
     .esan-logo-ring {
         position: absolute;
 
-        width: 72px;
-        height: 72px;
+        width: 76px;
+        height: 76px;
 
-        border: 2px solid rgba(255,255,255,0.9);
+        border: 2px solid
+            rgba(255, 255, 255, 0.9);
 
         border-radius: 50%;
     }
 
-    /*
-       Abstract E symbol
-    */
 
-    .esan-logo-symbol {
+    /* ==========================================
+       ABSTRACT E
+       ========================================== */
+
+    .esan-logo-e {
         position: relative;
 
-        width: 50px;
-        height: 50px;
-
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        width: 48px;
+        height: 48px;
 
         z-index: 2;
     }
 
-    .esan-logo-symbol::before,
-    .esan-logo-symbol::after {
+
+    .esan-logo-e::before {
         content: "";
 
         position: absolute;
+
+        left: 5px;
+        top: 3px;
+
+        width: 8px;
+        height: 42px;
 
         background: white;
 
         border-radius: 4px;
     }
 
-    .esan-logo-symbol::before {
-        width: 9px;
-        height: 42px;
 
-        left: 7px;
-        top: 4px;
-    }
+    .esan-logo-e::after {
+        content: "";
 
-    .esan-logo-symbol::after {
-        width: 34px;
-        height: 9px;
-
-        left: 7px;
-        top: 4px;
-
-        box-shadow:
-            0 16px 0 white,
-            0 33px 0 white;
-    }
-
-    /*
-       Small agricultural accent
-    */
-
-    .esan-logo-leaf {
         position: absolute;
 
-        width: 15px;
-        height: 27px;
+        left: 5px;
+        top: 3px;
+
+        width: 34px;
+        height: 8px;
+
+        background: white;
+
+        border-radius: 4px;
+
+        box-shadow:
+            0 17px 0 white,
+            0 34px 0 white;
+    }
+
+
+    /* ==========================================
+       AGRICULTURAL LEAF
+       ========================================== */
+
+    .esan-leaf {
+        position: absolute;
 
         right: 13px;
-        bottom: 15px;
+        bottom: 14px;
 
-        background: #d8eec2;
+        width: 17px;
+        height: 29px;
 
-        border-radius: 100% 0 100% 0;
+        background: #d9efc8;
+
+        border-radius:
+            100% 0 100% 0;
 
         transform: rotate(25deg);
+
+        z-index: 3;
     }
+
 
     /* ==========================================
        ESAN WORDMARK
@@ -216,10 +235,11 @@ st.markdown(
 
         color: #174f35;
 
-        margin-bottom: 4px;
+        margin-bottom: 5px;
     }
 
-    .esan-login-tagline {
+
+    .esan-tagline {
         font-family:
             Arial,
             Helvetica,
@@ -231,23 +251,29 @@ st.markdown(
 
         letter-spacing: 3px;
 
-        color: #7a7a7a;
+        color: #777;
 
         margin-bottom: 35px;
     }
 
+
     /* ==========================================
-       LOGIN INPUT AREA
+       LOGIN INPUTS
        ========================================== */
 
     div[data-testid="stTextInput"] label {
         font-weight: 600;
     }
 
+
     div[data-testid="stTextInput"] input {
         border-radius: 10px;
-        padding: 12px;
+
+        min-height: 45px;
+
+        padding-left: 14px;
     }
+
 
     /* ==========================================
        LOGIN BUTTON
@@ -255,16 +281,21 @@ st.markdown(
 
     div[data-testid="stButton"] > button {
         border-radius: 10px;
+
         min-height: 46px;
+
         font-weight: 700;
     }
+
 
     /* ==========================================
        LOGIN FOOTER
        ========================================== */
 
     .esan-login-footer {
-        margin-top: 35px;
+        text-align: center;
+
+        margin-top: 30px;
 
         color: #999;
 
@@ -702,7 +733,7 @@ def login(username, password):
 if not st.session_state.logged_in:
 
     # ----------------------------------------------
-    # ESAN BRANDING
+    # ESAN LOGO
     # ----------------------------------------------
 
     st.markdown(
@@ -711,13 +742,13 @@ if not st.session_state.logged_in:
 
             <div class="esan-login-container">
 
-                <div class="esan-logo-mark">
+                <div class="esan-logo">
 
                     <div class="esan-logo-ring"></div>
 
-                    <div class="esan-logo-symbol"></div>
+                    <div class="esan-logo-e"></div>
 
-                    <div class="esan-logo-leaf"></div>
+                    <div class="esan-leaf"></div>
 
                 </div>
 
@@ -725,7 +756,7 @@ if not st.session_state.logged_in:
                     Esan
                 </div>
 
-                <div class="esan-login-tagline">
+                <div class="esan-tagline">
                     ENTERPRISE MANAGEMENT SYSTEM
                 </div>
 
@@ -750,18 +781,22 @@ if not st.session_state.logged_in:
         username = st.text_input(
             "Username",
             placeholder="Enter your username",
+            key="login_username",
         )
 
         password = st.text_input(
             "Password",
             type="password",
             placeholder="Enter your password",
+            key="login_password",
         )
+
 
         if st.button(
             "Login",
             use_container_width=True,
             type="primary",
+            key="login_button",
         ):
 
             if login(
@@ -782,25 +817,14 @@ if not st.session_state.logged_in:
                 )
 
 
-        st.info(
-            "Default administrator: "
-            "admin / admin123"
-        )
-
-
     # ----------------------------------------------
     # LOGIN FOOTER
     # ----------------------------------------------
 
     st.markdown(
         """
-        <div class="esan-login-footer"
-             style="text-align:center">
-
-            Nile Harvest Foods Ltd.
-            <br>
+        <div class="esan-login-footer">
             Esan ERP Enterprise Platform
-
         </div>
         """,
         unsafe_allow_html=True,
