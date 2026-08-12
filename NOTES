@@ -55,3 +55,22 @@ modules/
 
 services/
 └── sales_service.py
+
+
+modules/sales/quotations.py
+          │
+          ▼
+services/sales_service.py
+          │
+          ├── Customers
+          ├── Products
+          ├── Quotations
+          │
+          ▼
+modules/sales/orders.py
+          │
+          ├── New Sales Order
+          ├── From Accepted Quotation
+          ├── Edit Order
+          ├── Status Management
+          └── Delete Order
