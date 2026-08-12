@@ -74,3 +74,49 @@ modules/sales/orders.py
           ├── Edit Order
           ├── Status Management
           └── Delete Order
+
+
+
+Sales & Distribution
+│
+├── Customers
+│   ├── Create
+│   ├── View
+│   ├── Edit
+│   └── Delete
+│
+├── Quotations
+│   ├── Create
+│   ├── View
+│   ├── Edit
+│   ├── Convert to Sales Order
+│   └── Cancel
+│
+├── Sales Orders
+│   ├── Create
+│   ├── View
+│   ├── Edit
+│   ├── Confirm
+│   ├── Reserve Stock
+│   └── Cancel
+│
+├── Deliveries
+│   ├── Create
+│   ├── View
+│   ├── Edit
+│   ├── Post
+│   └── Cancel / Reverse
+│
+├── Invoices
+│   ├── Create
+│   ├── View
+│   ├── Edit
+│   ├── Post
+│   └── Void
+│
+└── Payments
+    ├── Create
+    ├── View
+    ├── Edit
+    ├── Post
+    └── Reverse
