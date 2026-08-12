@@ -19,14 +19,14 @@ Main Modules:
 """
 
 import logging
+import hashlib
+import hmac
 
 import streamlit as st
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 from config import COMPANY_NAME, VERSION
 from database import Base, engine, SessionLocal
-from models import User
-from auth import verify_password
 
 
 # ============================================================
@@ -53,12 +53,251 @@ st.set_page_config(
 
 
 # ============================================================
+# SAFE USER MODEL IMPORT
+# ============================================================
+
+User = None
+USER_MODEL_ERROR = None
+
+try:
+    from models import User
+
+except Exception as exc:
+    USER_MODEL_ERROR = (
+        f"models.User could not be imported: "
+        f"{type(exc).__name__}: {exc}"
+    )
+
+    logging.exception(
+        "Unable to import User model"
+    )
+
+
+# ============================================================
+# SAFE AUTH IMPORT
+# ============================================================
+
+try:
+    from auth import verify_password
+
+except Exception as exc:
+
+    verify_password = None
+
+    logging.exception(
+        "Unable to import verify_password"
+    )
+
+
+try:
+    from auth import hash_password
+
+except Exception as exc:
+
+    hash_password = None
+
+    logging.exception(
+        "Unable to import hash_password"
+    )
+
+
+# ============================================================
+# INLINE ESAN LOGO
+# ============================================================
+
+def esan_logo_svg(size=150):
+    """
+    Returns the Esan / Nile Harvest SVG logo.
+
+    This is deliberately inline SVG so the logo does not depend
+    on CSS pseudo-elements, PIL, image files, or static folders.
+    """
+
+    size = int(size)
+
+    return f"""
+    <div style="
+        width:100%;
+        display:flex;
+        justify-content:center;
+        align-items:center;
+    ">
+        <svg
+            width="{size}"
+            height="{size}"
+            viewBox="0 0 420 420"
+            xmlns="http://www.w3.org/2000/svg"
+            role="img"
+            aria-label="Esan ERP"
+        >
+
+            <!-- Outer rounded square -->
+            <rect
+                x="12"
+                y="12"
+                width="396"
+                height="396"
+                rx="82"
+                fill="#1B5E20"
+            />
+
+            <!-- Main green field -->
+            <rect
+                x="27"
+                y="27"
+                width="366"
+                height="366"
+                rx="68"
+                fill="#2E7D32"
+            />
+
+            <!-- Gold sunrise -->
+            <circle
+                cx="210"
+                cy="145"
+                r="72"
+                fill="#F2BE2D"
+            />
+
+            <!-- Soil -->
+            <path
+                d="
+                    M27 292
+                    Q80 270 135 292
+                    Q190 314 245 292
+                    Q300 270 393 292
+                    L393 325
+                    Q393 393 325 393
+                    L95 393
+                    Q27 393 27 325
+                    Z
+                "
+                fill="#5D4037"
+            />
+
+            <!-- Stem -->
+            <rect
+                x="202"
+                y="145"
+                width="16"
+                height="170"
+                rx="8"
+                fill="#AED581"
+            />
+
+            <!-- Left leaf -->
+            <path
+                d="
+                    M207 220
+                    C165 165 108 148 78 181
+                    C108 229 159 245 207 220
+                    Z
+                "
+                fill="#81C784"
+            />
+
+            <!-- Right leaf -->
+            <path
+                d="
+                    M213 220
+                    C255 165 312 148 342 181
+                    C312 229 261 245 213 220
+                    Z
+                "
+                fill="#81C784"
+            />
+
+            <!-- Leaf veins -->
+            <path
+                d="M205 220 L120 185"
+                stroke="#2E7D32"
+                stroke-width="7"
+                stroke-linecap="round"
+            />
+
+            <path
+                d="M215 220 L300 185"
+                stroke="#2E7D32"
+                stroke-width="7"
+                stroke-linecap="round"
+            />
+
+            <!-- Gold grain -->
+            <ellipse
+                cx="95"
+                cy="315"
+                rx="9"
+                ry="16"
+                fill="#F2BE2D"
+            />
+
+            <ellipse
+                cx="125"
+                cy="300"
+                rx="9"
+                ry="16"
+                fill="#F2BE2D"
+            />
+
+            <ellipse
+                cx="155"
+                cy="318"
+                rx="9"
+                ry="16"
+                fill="#F2BE2D"
+            />
+
+            <ellipse
+                cx="265"
+                cy="318"
+                rx="9"
+                ry="16"
+                fill="#F2BE2D"
+            />
+
+            <ellipse
+                cx="295"
+                cy="300"
+                rx="9"
+                ry="16"
+                fill="#F2BE2D"
+            />
+
+            <ellipse
+                cx="325"
+                cy="315"
+                rx="9"
+                ry="16"
+                fill="#F2BE2D"
+            />
+
+        </svg>
+    </div>
+    """
+
+
+def render_logo(size=150):
+    """
+    Render the logo directly in Streamlit.
+    """
+
+    st.markdown(
+        esan_logo_svg(size),
+        unsafe_allow_html=True,
+    )
+
+
+# ============================================================
 # GLOBAL UI
 # ============================================================
 
 st.markdown(
     """
     <style>
+
+    /* ======================================================
+       HIDE STREAMLIT DEFAULT UI
+       ====================================================== */
 
     #MainMenu {
         display: none;
@@ -72,98 +311,63 @@ st.markdown(
         display: none;
     }
 
+
+    /* ======================================================
+       MAIN CONTENT
+       ====================================================== */
+
     .block-container {
         padding-top: 1.5rem;
         padding-bottom: 2rem;
     }
 
-    div[data-testid="stSidebar"] {
-        border-right: 1px solid #ddd;
-    }
 
     /* ======================================================
-       LOGIN
+       SIDEBAR
        ====================================================== */
 
-    .login-page {
-        min-height: 82vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
+    div[data-testid="stSidebar"] {
+        border-right: 1px solid rgba(128,128,128,0.25);
     }
 
-    .login-container {
-        width: 420px;
-        max-width: 100%;
+    div[data-testid="stSidebar"] > div:first-child {
+        padding-top: 1rem;
+    }
+
+
+    /* ======================================================
+       LOGIN PAGE
+       ====================================================== */
+
+    .esan-login-wrapper {
+        width: 100%;
+        min-height: 30vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
         text-align: center;
     }
 
-    /* ======================================================
-       LOGO
-       ====================================================== */
-
-    .logo {
-        width: 112px;
-        height: 112px;
-        margin: 0 auto 18px auto;
-        border-radius: 32px;
-        background: linear-gradient(
-            145deg,
-            #2e7d32,
-            #1b5e20
-        );
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        position: relative;
-        box-shadow:
-            0 18px 45px
-            rgba(20, 90, 55, 0.25);
+    .esan-login-brand {
+        text-align: center;
+        font-size: 2rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        margin-top: 8px;
+        margin-bottom: 4px;
     }
 
-    .logo::before {
-        content: "";
-        position: absolute;
-        bottom: 0;
-        width: 100%;
-        height: 28px;
-        background: #4e342e;
-        border-radius: 0 0 28px 28px;
+    .esan-login-company {
+        text-align: center;
+        color: #777;
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
     }
 
-    .logo-stem {
-        position: absolute;
-        bottom: 28px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 6px;
-        height: 40px;
-        background: #aed581;
-        border-radius: 3px 3px 0 0;
-    }
-
-    .logo-leaf {
-        position: absolute;
-        bottom: 52px;
-        width: 18px;
-        height: 18px;
-        background: #81c784;
-        border-radius: 50%;
-    }
-
-    .logo-leaf.left {
-        left: 24px;
-        transform: rotate(-30deg);
-    }
-
-    .logo-leaf.right {
-        right: 24px;
-        transform: rotate(30deg);
-    }
 
     /* ======================================================
-       INPUTS
+       LOGIN INPUTS
        ====================================================== */
 
     div[data-testid="stTextInput"] label {
@@ -172,9 +376,14 @@ st.markdown(
 
     div[data-testid="stTextInput"] input {
         border-radius: 10px;
-        min-height: 45px;
+        min-height: 46px;
         padding-left: 14px;
     }
+
+
+    /* ======================================================
+       BUTTONS
+       ====================================================== */
 
     div[data-testid="stButton"] > button {
         border-radius: 10px;
@@ -182,13 +391,20 @@ st.markdown(
         font-weight: 700;
     }
 
+
+    /* ======================================================
+       SIDEBAR BUTTONS
+       ====================================================== */
+
+    div[data-testid="stSidebar"] div[data-testid="stButton"] > button {
+        text-align: left;
+        border-radius: 9px;
+    }
+
+
     /* ======================================================
        SECTION HEADERS
        ====================================================== */
-
-    .erp-section {
-        padding: 0.5rem 0 0.75rem 0;
-    }
 
     .erp-title {
         font-size: 1.8rem;
@@ -207,18 +423,23 @@ st.markdown(
 
 
 # ============================================================
-# SAFE MODULE IMPORT
+# MODULE ERROR REGISTRY
 # ============================================================
 
 module_errors = []
 
 
+if USER_MODEL_ERROR:
+    logging.warning(USER_MODEL_ERROR)
+
+
+# ============================================================
+# SAFE MODULE IMPORT
+# ============================================================
+
 def safe_import(module_path, function_name):
     """
-    Safely import a module function.
-
-    A failed optional module should not prevent
-    the entire ERP application from loading.
+    Safely import an optional ERP module.
     """
 
     try:
@@ -229,6 +450,7 @@ def safe_import(module_path, function_name):
         )
 
         if hasattr(module, function_name):
+
             return getattr(
                 module,
                 function_name,
@@ -240,6 +462,7 @@ def safe_import(module_path, function_name):
         )
 
         module_errors.append(error)
+
         logging.error(error)
 
         return None
@@ -265,39 +488,170 @@ def safe_import(module_path, function_name):
 # ADMIN CREATION
 # ============================================================
 
-try:
+def create_admin_safely():
+    """
+    Creates the default administrator.
 
-    from services.user_service import create_admin
+    First attempts to use the User ORM model.
+    If the model cannot be imported, attempts a raw SQL
+    fallback against the users table.
+    """
 
-except ImportError:
+    db = SessionLocal()
 
-    def create_admin(db):
+    try:
 
-        admin = (
-            db.query(User)
-            .filter(
-                User.username == "admin"
+        # ----------------------------------------------------
+        # ORM METHOD
+        # ----------------------------------------------------
+
+        if User is not None:
+
+            try:
+
+                admin = (
+                    db.query(User)
+                    .filter(
+                        User.username == "admin"
+                    )
+                    .first()
+                )
+
+                if admin is None:
+
+                    if hash_password is None:
+
+                        logging.error(
+                            "hash_password is unavailable."
+                        )
+
+                        return
+
+                    admin = User(
+                        username="admin",
+                        password_hash=hash_password(
+                            "admin123"
+                        ),
+                        role="Administrator",
+                        active=True,
+                    )
+
+                    # Add optional fields only if they
+                    # actually exist on the model.
+
+                    if hasattr(
+                        User,
+                        "full_name",
+                    ):
+
+                        admin.full_name = (
+                            "System Administrator"
+                        )
+
+                    if hasattr(
+                        User,
+                        "email",
+                    ):
+
+                        admin.email = (
+                            "admin@nileharvest.com"
+                        )
+
+                    db.add(admin)
+                    db.commit()
+
+                    logging.info(
+                        "Default admin user created."
+                    )
+
+                return
+
+            except Exception as exc:
+
+                db.rollback()
+
+                logging.exception(
+                    "ORM admin creation failed: %s",
+                    exc,
+                )
+
+        # ----------------------------------------------------
+        # RAW SQL FALLBACK
+        # ----------------------------------------------------
+
+        if hash_password is None:
+
+            logging.error(
+                "Cannot create fallback admin because "
+                "hash_password is unavailable."
             )
-            .first()
+
+            return
+
+        password_hash = hash_password(
+            "admin123"
         )
 
-        if not admin:
+        result = db.execute(
+            text(
+                "SELECT id FROM users "
+                "WHERE username = :username "
+                "LIMIT 1"
+            ),
+            {
+                "username": "admin",
+            },
+        )
 
-            from auth import hash_password
+        existing_admin = result.first()
 
-            admin = User(
-                username="admin",
-                full_name="System Administrator",
-                email="admin@nileharvest.com",
-                password_hash=hash_password(
-                    "admin123"
+        if existing_admin is None:
+
+            db.execute(
+                text(
+                    """
+                    INSERT INTO users
+                    (
+                        username,
+                        password_hash,
+                        role,
+                        active
+                    )
+                    VALUES
+                    (
+                        :username,
+                        :password_hash,
+                        :role,
+                        :active
+                    )
+                    """
                 ),
-                role="Administrator",
-                active=True,
+                {
+                    "username": "admin",
+                    "password_hash": password_hash,
+                    "role": "Administrator",
+                    "active": True,
+                },
             )
 
-            db.add(admin)
             db.commit()
+
+            logging.info(
+                "Fallback admin user created."
+            )
+
+    except Exception as exc:
+
+        db.rollback()
+
+        logging.exception(
+            "Admin initialization failed: %s",
+            exc,
+        )
+
+    finally:
+
+        db.close()
 
 
 # ============================================================
@@ -308,18 +662,18 @@ try:
 
     from seed.seed_data import load_seed_data
 
-except ImportError:
+except Exception:
 
     load_seed_data = None
+
+    logging.warning(
+        "Seed data module unavailable."
+    )
 
 
 # ============================================================
 # MODULE REGISTRY
 # ============================================================
-
-# ------------------------------------------------------------
-# OVERVIEW
-# ------------------------------------------------------------
 
 dashboard_home = safe_import(
     "modules.dashboard.home",
@@ -327,9 +681,9 @@ dashboard_home = safe_import(
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # PROCUREMENT
-# ------------------------------------------------------------
+# ============================================================
 
 procurement_dashboard = safe_import(
     "modules.procurement.dashboard",
@@ -352,9 +706,9 @@ procurement_purchase_orders = safe_import(
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # WAREHOUSE
-# ------------------------------------------------------------
+# ============================================================
 
 warehouse_dashboard = safe_import(
     "modules.warehouse.dashboard",
@@ -367,9 +721,9 @@ warehouse_inventory = safe_import(
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # MILLING
-# ------------------------------------------------------------
+# ============================================================
 
 milling_dashboard = safe_import(
     "modules.milling.dashboard",
@@ -377,9 +731,9 @@ milling_dashboard = safe_import(
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # PACKAGING
-# ------------------------------------------------------------
+# ============================================================
 
 packaging_dashboard = safe_import(
     "modules.packaging.dashboard",
@@ -387,9 +741,9 @@ packaging_dashboard = safe_import(
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # SALES & DISTRIBUTION
-# ------------------------------------------------------------
+# ============================================================
 
 sales_dashboard = safe_import(
     "modules.sales.dashboard",
@@ -427,9 +781,9 @@ sales_payments = safe_import(
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # FINANCE
-# ------------------------------------------------------------
+# ============================================================
 
 finance_dashboard = safe_import(
     "modules.finance.dashboard",
@@ -437,9 +791,9 @@ finance_dashboard = safe_import(
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # REPORTS
-# ------------------------------------------------------------
+# ============================================================
 
 reports_dashboard = safe_import(
     "modules.reports.dashboard",
@@ -447,9 +801,9 @@ reports_dashboard = safe_import(
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # ADMINISTRATION
-# ------------------------------------------------------------
+# ============================================================
 
 administration_dashboard = safe_import(
     "modules.admin.dashboard",
@@ -471,8 +825,8 @@ def fallback_page(title):
 
         st.caption(
             "The module could not be loaded. "
-            "Check the Module Loading Information "
-            "section at the bottom of the application."
+            "Check Module Loading Information "
+            "below."
         )
 
     return render
@@ -512,39 +866,23 @@ def initialize_database():
 
     try:
 
-        inspector = inspect(engine)
-
-        existing_tables = (
-            inspector.get_table_names()
-        )
-
-        missing_tables = [
-            table_name
-            for table_name
-            in Base.metadata.tables
-            if table_name not in existing_tables
-        ]
-
-        if missing_tables:
-
-            logging.info(
-                "Creating missing tables: %s",
-                missing_tables,
-            )
+        # ----------------------------------------------------
+        # Create missing tables
+        # ----------------------------------------------------
 
         Base.metadata.create_all(
             bind=engine
         )
 
-        db = SessionLocal()
+        # ----------------------------------------------------
+        # Ensure admin exists
+        # ----------------------------------------------------
 
-        try:
+        create_admin_safely()
 
-            create_admin(db)
-
-        finally:
-
-            db.close()
+        # ----------------------------------------------------
+        # Seed data
+        # ----------------------------------------------------
 
         if load_seed_data:
 
@@ -562,7 +900,7 @@ def initialize_database():
     except Exception as exc:
 
         logging.exception(
-            "Database initialization failed"
+            "Database initialization failed."
         )
 
         st.error(
@@ -570,7 +908,7 @@ def initialize_database():
         )
 
         st.caption(
-            "Check esan_erp.log for details."
+            f"{type(exc).__name__}: {exc}"
         )
 
 
@@ -584,52 +922,279 @@ initialize_database()
 if "logged_in" not in st.session_state:
 
     st.session_state.logged_in = False
+
+if "username" not in st.session_state:
+
     st.session_state.username = None
+
+if "role" not in st.session_state:
+
     st.session_state.role = None
+
+if "current_page" not in st.session_state:
+
     st.session_state.current_page = (
         "🏠 Overview"
     )
 
 
 # ============================================================
-# LOGIN
+# PASSWORD VERIFICATION FALLBACK
+# ============================================================
+
+def fallback_verify_password(
+    password,
+    stored_password,
+):
+    """
+    Fallback password verification.
+
+    Supports common SHA-256 style hashes.
+    The normal auth.verify_password function
+    remains preferred when available.
+    """
+
+    if not stored_password:
+
+        return False
+
+    try:
+
+        candidate = hashlib.sha256(
+            password.encode("utf-8")
+        ).hexdigest()
+
+        return hmac.compare_digest(
+            candidate,
+            stored_password,
+        )
+
+    except Exception:
+
+        return False
+
+
+# ============================================================
+# LOGIN FUNCTION
 # ============================================================
 
 def login(username, password):
+
+    username = (
+        username or ""
+    ).strip()
+
+    password = password or ""
+
+    if not username or not password:
+
+        return False
 
     db = SessionLocal()
 
     try:
 
-        user = (
-            db.query(User)
-            .filter(
-                User.username == username
-            )
-            .first()
-        )
+        # ----------------------------------------------------
+        # NORMAL ORM LOGIN
+        # ----------------------------------------------------
 
-        if (
-            user
-            and user.active
-            and verify_password(
-                password,
-                user.password_hash,
-            )
-        ):
+        if User is not None:
 
-            st.session_state.logged_in = True
-            st.session_state.username = (
-                user.username
-            )
-            st.session_state.role = user.role
+            try:
 
-            logging.info(
-                "User logged in: %s",
-                user.username,
+                user = (
+                    db.query(User)
+                    .filter(
+                        User.username == username
+                    )
+                    .first()
+                )
+
+                if user:
+
+                    active = getattr(
+                        user,
+                        "active",
+                        True,
+                    )
+
+                    stored_hash = getattr(
+                        user,
+                        "password_hash",
+                        None,
+                    )
+
+                    if (
+                        active
+                        and stored_hash
+                    ):
+
+                        password_ok = False
+
+                        if verify_password:
+
+                            try:
+
+                                password_ok = (
+                                    verify_password(
+                                        password,
+                                        stored_hash,
+                                    )
+                                )
+
+                            except Exception as exc:
+
+                                logging.warning(
+                                    "Normal password "
+                                    "verification failed: %s",
+                                    exc,
+                                )
+
+                        if not password_ok:
+
+                            password_ok = (
+                                fallback_verify_password(
+                                    password,
+                                    stored_hash,
+                                )
+                            )
+
+                        if password_ok:
+
+                            st.session_state.logged_in = True
+
+                            st.session_state.username = (
+                                getattr(
+                                    user,
+                                    "username",
+                                    username,
+                                )
+                            )
+
+                            st.session_state.role = (
+                                getattr(
+                                    user,
+                                    "role",
+                                    "User",
+                                )
+                            )
+
+                            logging.info(
+                                "User logged in: %s",
+                                username,
+                            )
+
+                            return True
+
+            except Exception as exc:
+
+                db.rollback()
+
+                logging.exception(
+                    "ORM login failed: %s",
+                    exc,
+                )
+
+        # ----------------------------------------------------
+        # RAW SQL LOGIN FALLBACK
+        # ----------------------------------------------------
+
+        try:
+
+            result = db.execute(
+                text(
+                    """
+                    SELECT
+                        username,
+                        password_hash,
+                        role,
+                        active
+                    FROM users
+                    WHERE username = :username
+                    LIMIT 1
+                    """
+                ),
+                {
+                    "username": username,
+                },
             )
 
-            return True
+            row = result.mappings().first()
+
+            if row:
+
+                active = row.get(
+                    "active",
+                    True,
+                )
+
+                stored_hash = row.get(
+                    "password_hash"
+                )
+
+                password_ok = False
+
+                if (
+                    active
+                    and stored_hash
+                ):
+
+                    if verify_password:
+
+                        try:
+
+                            password_ok = (
+                                verify_password(
+                                    password,
+                                    stored_hash,
+                                )
+                            )
+
+                        except Exception:
+
+                            password_ok = False
+
+                    if not password_ok:
+
+                        password_ok = (
+                            fallback_verify_password(
+                                password,
+                                stored_hash,
+                            )
+                        )
+
+                if password_ok:
+
+                    st.session_state.logged_in = True
+
+                    st.session_state.username = (
+                        row.get(
+                            "username",
+                            username,
+                        )
+                    )
+
+                    st.session_state.role = (
+                        row.get(
+                            "role",
+                            "User",
+                        )
+                    )
+
+                    logging.info(
+                        "User logged in through "
+                        "SQL fallback: %s",
+                        username,
+                    )
+
+                    return True
+
+        except Exception as exc:
+
+            logging.exception(
+                "SQL fallback login failed: %s",
+                exc,
+            )
 
         logging.warning(
             "Failed login attempt: %s",
@@ -644,33 +1209,42 @@ def login(username, password):
 
 
 # ============================================================
-# LOGIN SCREEN
+# LOGIN PAGE
 # ============================================================
 
 if not st.session_state.logged_in:
 
+    # --------------------------------------------------------
+    # Centered logo
+    # --------------------------------------------------------
+
     st.markdown(
-        """
-        <div class="login-page">
-
-            <div class="login-container">
-
-                <div class="logo">
-
-                    <div class="logo-stem"></div>
-
-                    <div class="logo-leaf left"></div>
-
-                    <div class="logo-leaf right"></div>
-
-                </div>
-
-            </div>
-
-        </div>
-        """,
+        '<div class="esan-login-wrapper">',
         unsafe_allow_html=True,
     )
+
+    render_logo(145)
+
+    st.markdown(
+        '<div class="esan-login-brand">ESAN</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<div class="esan-login-company">'
+        'Nile Harvest Foods Ltd.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # Login form
+    # --------------------------------------------------------
 
     col1, col2, col3 = st.columns(
         [1, 2, 1]
@@ -681,19 +1255,23 @@ if not st.session_state.logged_in:
         username = st.text_input(
             "Username",
             placeholder="Enter your username",
+            key="login_username",
         )
 
         password = st.text_input(
             "Password",
             type="password",
             placeholder="Enter your password",
+            key="login_password",
         )
 
-        if st.button(
+        login_clicked = st.button(
             "Login",
             use_container_width=True,
             type="primary",
-        ):
+        )
+
+        if login_clicked:
 
             if login(
                 username,
@@ -701,7 +1279,7 @@ if not st.session_state.logged_in:
             ):
 
                 st.success(
-                    "Login successful"
+                    "Login successful."
                 )
 
                 st.rerun()
@@ -709,8 +1287,28 @@ if not st.session_state.logged_in:
             else:
 
                 st.error(
-                    "Invalid username or password"
+                    "Invalid username or password."
                 )
+
+    # --------------------------------------------------------
+    # Authentication diagnostic
+    # --------------------------------------------------------
+
+    if USER_MODEL_ERROR:
+
+        with st.expander(
+            "Authentication diagnostics"
+        ):
+
+            st.warning(
+                "The User ORM model could not be "
+                "loaded. Esan is using its database "
+                "authentication fallback."
+            )
+
+            st.caption(
+                USER_MODEL_ERROR
+            )
 
     st.stop()
 
@@ -722,31 +1320,22 @@ if not st.session_state.logged_in:
 with st.sidebar:
 
     # --------------------------------------------------------
-    # LOGO
+    # Centered Esan logo
     # --------------------------------------------------------
+
+    render_logo(95)
 
     st.markdown(
         """
         <div style="
             text-align:center;
-            margin-bottom:1rem;
+            font-size:1.35rem;
+            font-weight:800;
+            letter-spacing:0.08em;
+            margin-top:-5px;
+            margin-bottom:10px;
         ">
-
-            <div class="logo"
-                 style="
-                    margin:0 auto;
-                    width:88px;
-                    height:88px;
-                 ">
-
-                <div class="logo-stem"></div>
-
-                <div class="logo-leaf left"></div>
-
-                <div class="logo-leaf right"></div>
-
-            </div>
-
+            ESAN
         </div>
         """,
         unsafe_allow_html=True,
@@ -773,7 +1362,9 @@ with st.sidebar:
     # OVERVIEW
     # --------------------------------------------------------
 
-    nav_button("🏠 Overview")
+    nav_button(
+        "🏠 Overview"
+    )
 
     # --------------------------------------------------------
     # OPERATIONS
@@ -783,10 +1374,21 @@ with st.sidebar:
         "**OPERATIONS**"
     )
 
-    nav_button("🌾 Procurement")
-    nav_button("📦 Warehouse")
-    nav_button("🏭 Milling")
-    nav_button("📦 Packaging")
+    nav_button(
+        "🌾 Procurement"
+    )
+
+    nav_button(
+        "📦 Warehouse"
+    )
+
+    nav_button(
+        "🏭 Milling"
+    )
+
+    nav_button(
+        "📦 Packaging"
+    )
 
     # --------------------------------------------------------
     # COMMERCIAL
@@ -808,7 +1410,9 @@ with st.sidebar:
         "**FINANCE**"
     )
 
-    nav_button("💰 Finance")
+    nav_button(
+        "💰 Finance"
+    )
 
     # --------------------------------------------------------
     # REPORTING
@@ -818,19 +1422,23 @@ with st.sidebar:
         "**REPORTING**"
     )
 
-    nav_button("📊 Reports")
+    nav_button(
+        "📊 Reports"
+    )
 
     # --------------------------------------------------------
     # ADMINISTRATION
     # --------------------------------------------------------
 
+    administrator_roles = [
+        "Administrator",
+        "Admin",
+        "admin",
+    ]
+
     if (
         st.session_state.role
-        in [
-            "Administrator",
-            "Admin",
-            "admin",
-        ]
+        in administrator_roles
     ):
 
         st.markdown(
@@ -852,14 +1460,16 @@ with st.sidebar:
     )
 
     st.write(
-        f"User: "
-        f"**{st.session_state.username}**"
+        f"User: **{st.session_state.username}**"
     )
 
     st.write(
-        f"Role: "
-        f"**{st.session_state.role}**"
+        f"Role: **{st.session_state.role}**"
     )
+
+    # --------------------------------------------------------
+    # LOGOUT
+    # --------------------------------------------------------
 
     if st.button(
         "🚪 Logout",
@@ -924,13 +1534,17 @@ elif menu == "🌾 Procurement":
             "Purchases",
         ],
         horizontal=True,
+        key="procurement_navigation",
     )
 
     if procurement_menu == "Dashboard":
 
         if procurement_dashboard:
+
             procurement_dashboard()
+
         else:
+
             st.warning(
                 "Procurement dashboard unavailable."
             )
@@ -965,13 +1579,17 @@ elif menu == "📦 Warehouse":
             "Inventory",
         ],
         horizontal=True,
+        key="warehouse_navigation",
     )
 
     if warehouse_menu == "Dashboard":
 
         if warehouse_dashboard:
+
             warehouse_dashboard()
+
         else:
+
             st.warning(
                 "Warehouse dashboard unavailable."
             )
@@ -1042,30 +1660,17 @@ elif menu == "🚚 Sales & Distribution":
             "Payments",
         ],
         horizontal=True,
+        key="sales_navigation",
     )
 
     sales_pages = {
-
-        "Dashboard":
-            sales_dashboard,
-
-        "Customers":
-            sales_customers,
-
-        "Quotations":
-            sales_quotations,
-
-        "Sales Orders":
-            sales_orders,
-
-        "Deliveries":
-            sales_deliveries,
-
-        "Invoices":
-            sales_invoices,
-
-        "Payments":
-            sales_payments,
+        "Dashboard": sales_dashboard,
+        "Customers": sales_customers,
+        "Quotations": sales_quotations,
+        "Sales Orders": sales_orders,
+        "Deliveries": sales_deliveries,
+        "Invoices": sales_invoices,
+        "Payments": sales_payments,
     }
 
     page_func = sales_pages.get(
@@ -1134,11 +1739,7 @@ elif menu == "🔐 Administration":
 
     if (
         st.session_state.role
-        not in [
-            "Administrator",
-            "Admin",
-            "admin",
-        ]
+        not in administrator_roles
     ):
 
         st.error(
