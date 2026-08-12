@@ -1,61 +1,21 @@
 """
 Nile Harvest Foods Ltd.
 Enterprise Resource Planning System
-Version 1.4.0 Alpha – Self-contained resilient startup
+
+Version 1.4.0 Alpha – Full Repository Integration
 """
 
 import logging
-import sys
+import os
 
 import streamlit as st
+from sqlalchemy import inspect
 
-# ==================================================
-# SAFE CORE IMPORTS (fallbacks built-in)
-# ==================================================
+from config import COMPANY_NAME, VERSION
+from database import Base, engine, SessionLocal
+from models import User
+from auth import verify_password
 
-# --- config ---
-try:
-    from config import COMPANY_NAME, VERSION
-except ImportError:
-    COMPANY_NAME = "Nile Harvest Foods Ltd."
-    VERSION = "1.4.0"
-
-# --- database ---
-try:
-    from database import Base, engine, SessionLocal
-except ImportError:
-    Base = None
-    engine = None
-    SessionLocal = None
-
-# --- models ---
-
-    # Minimal User stub for demo mode
-    class User:
-        username = "admin"
-        full_name = "System Administrator"
-        email = "admin@nileharvest.com"
-        password_hash = "hashed"
-        role = "Administrator"
-        active = True
-
-# --- auth ---
-try:
-    from auth import verify_password, hash_password
-except ImportError:
-    def verify_password(plain_password, hashed):
-        # Demo only – accepts admin123
-        return plain_password == "admin123"
-
-    def hash_password(password):
-        # Not used in demo mode
-        return password
-
-# --- sqlalchemy inspect (optional) ---
-try:
-    from sqlalchemy import inspect
-except ImportError:
-    inspect = None
 
 # ==================================================
 # LOGGING
@@ -66,6 +26,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
+
 
 # ==================================================
 # PAGE CONFIGURATION
@@ -78,104 +39,148 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+
 # ==================================================
-# CLEAN ERP UI (CSS)
+# CLEAN ERP UI
 # ==================================================
 
 st.markdown(
     """
-<style>
-#MainMenu { display: none; }
-footer { display: none; }
-header { display: none; }
-.block-container { padding-top: 1.5rem; }
-div[data-testid="stSidebar"] { border-right: 1px solid #ddd; }
+    <style>
 
-/* Login page */
-.login-page {
-    min-height: 82vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-}
-.login-container {
-    width: 420px;
-    max-width: 100%;
-    text-align: center;
-}
+    #MainMenu {
+        display: none;
+    }
 
-/* Logo – sprout */
-.logo {
-    width: 112px;
-    height: 112px;
-    margin: 0 auto 18px auto;
-    border-radius: 32px;
-    background: linear-gradient(145deg, #2e7d32, #1b5e20);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    box-shadow: 0 18px 45px rgba(20, 90, 55, 0.25);
-}
-.logo::before {
-    content: "";
-    position: absolute;
-    bottom: 0;
-    width: 100%;
-    height: 28px;
-    background: #4e342e;
-    border-radius: 0 0 28px 28px;
-}
-.logo-stem {
-    position: absolute;
-    bottom: 28px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 6px;
-    height: 40px;
-    background: #aed581;
-    border-radius: 3px 3px 0 0;
-}
-.logo-leaf {
-    position: absolute;
-    bottom: 52px;
-    width: 18px;
-    height: 18px;
-    background: #81c784;
-    border-radius: 50%;
-}
-.logo-leaf.left {
-    left: 24px;
-    transform: rotate(-30deg);
-}
-.logo-leaf.right {
-    right: 24px;
-    transform: rotate(30deg);
-}
+    footer {
+        display: none;
+    }
 
-/* Inputs & buttons */
-div[data-testid="stTextInput"] label { font-weight: 600; }
-div[data-testid="stTextInput"] input {
-    border-radius: 10px;
-    min-height: 45px;
-    padding-left: 14px;
-}
-div[data-testid="stButton"] > button {
-    border-radius: 10px;
-    min-height: 46px;
-    font-weight: 700;
-}
-</style>
-""",
+    header {
+        display: none;
+    }
+
+    .block-container {
+        padding-top: 1.5rem;
+    }
+
+    div[data-testid="stSidebar"] {
+        border-right: 1px solid #ddd;
+    }
+
+
+    /* ==========================================
+       LOGIN PAGE – just logo + form
+       ========================================== */
+
+    .login-page {
+        min-height: 82vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .login-container {
+        width: 420px;
+        max-width: 100%;
+        text-align: center;
+    }
+
+
+    /* ==========================================
+       LOGO – GROWING SPROUT
+       ========================================== */
+
+    .logo {
+        width: 112px;
+        height: 112px;
+        margin: 0 auto 18px auto;
+        border-radius: 32px;
+        background: linear-gradient(145deg, #2e7d32, #1b5e20);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        box-shadow: 0 18px 45px rgba(20, 90, 55, 0.25);
+    }
+
+    /* Soil / ground */
+    .logo::before {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        width: 100%;
+        height: 28px;
+        background: #4e342e;
+        border-radius: 0 0 28px 28px;
+    }
+
+    /* Stem */
+    .logo-stem {
+        position: absolute;
+        bottom: 28px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 6px;
+        height: 40px;
+        background: #aed581;
+        border-radius: 3px 3px 0 0;
+    }
+
+    /* Leaves */
+    .logo-leaf {
+        position: absolute;
+        bottom: 52px;
+        width: 18px;
+        height: 18px;
+        background: #81c784;
+        border-radius: 50%;
+    }
+
+    .logo-leaf.left {
+        left: 24px;
+        transform: rotate(-30deg);
+    }
+
+    .logo-leaf.right {
+        right: 24px;
+        transform: rotate(30deg);
+    }
+
+
+    /* ==========================================
+       LOGIN INPUTS & BUTTON (unchanged)
+       ========================================== */
+
+    div[data-testid="stTextInput"] label {
+        font-weight: 600;
+    }
+
+    div[data-testid="stTextInput"] input {
+        border-radius: 10px;
+        min-height: 45px;
+        padding-left: 14px;
+    }
+
+    div[data-testid="stButton"] > button {
+        border-radius: 10px;
+        min-height: 46px;
+        font-weight: 700;
+    }
+
+    </style>
+    """,
     unsafe_allow_html=True,
 )
 
+
 # ==================================================
-# SAFE IMPORT SYSTEM FOR APPLICATION MODULES
+# SAFE IMPORT SYSTEM
 # ==================================================
 
 module_errors = []
+
 
 def safe_import(module_path, function_name):
     """Safely import a module function."""
@@ -193,29 +198,30 @@ def safe_import(module_path, function_name):
         logging.exception(f"Failed loading {module_path}")
         return None
 
+
 # ==================================================
-# ADMIN CREATION (skipped if no DB)
+# ADMIN CREATION
 # ==================================================
 
-if SessionLocal is not None:
-    try:
-        from services.user_service import create_admin
-    except ImportError:
-        def create_admin(db):
-            admin = db.query(User).filter(User.username == "admin").first()
-            if not admin:
-                admin = User(
-                    username="admin",
-                    full_name="System Administrator",
-                    email="admin@nileharvest.com",
-                    password_hash=hash_password("admin123"),
-                    role="Administrator",
-                    active=True,
-                )
-                db.add(admin)
-                db.commit()
-else:
-    create_admin = None
+try:
+    from services.user_service import create_admin
+except ImportError:
+
+    def create_admin(db):
+        admin = db.query(User).filter(User.username == "admin").first()
+        if not admin:
+            from auth import hash_password
+            admin = User(
+                username="admin",
+                full_name="System Administrator",
+                email="admin@nileharvest.com",
+                password_hash=hash_password("admin123"),
+                role="Administrator",
+                active=True,
+            )
+            db.add(admin)
+            db.commit()
+
 
 # ==================================================
 # SEED DATA
@@ -226,8 +232,9 @@ try:
 except ImportError:
     load_seed_data = None
 
+
 # ==================================================
-# MODULE REGISTRY (all imports using safe_import)
+# MODULE REGISTRY
 # ==================================================
 
 dashboard_home = safe_import("modules.dashboard.home", "dashboard_home")
@@ -254,8 +261,9 @@ sales_payments = safe_import("modules.sales.payments", "payments_page")
 finance_dashboard = safe_import("modules.finance.dashboard", "finance_dashboard")
 reports_dashboard = safe_import("modules.reports.dashboard", "reports_dashboard")
 
+
 # ==================================================
-# FALLBACK PAGES (for optional modules)
+# FALLBACK PAGE
 # ==================================================
 
 def _fallback_page(title):
@@ -263,32 +271,29 @@ def _fallback_page(title):
         st.info(f"{title} – This section is currently being prepared.")
     return _render
 
+
 procurement_suppliers = procurement_suppliers or _fallback_page("Suppliers")
 procurement_purchases = procurement_purchases or _fallback_page("Purchases")
 procurement_purchase_orders = procurement_purchase_orders or _fallback_page("Purchase Orders")
 warehouse_inventory = warehouse_inventory or _fallback_page("Inventory")
 
+
 # ==================================================
-# DATABASE INITIALIZATION (skip if not available)
+# DATABASE INITIALIZATION
 # ==================================================
 
 def initialize_database():
-    if engine is None or SessionLocal is None:
-        st.warning("Database engine not configured. Running in demo mode.")
-        return
     try:
-        if inspect is not None:
-            inspector = inspect(engine)
-            existing_tables = inspector.get_table_names()
-            missing_tables = [t for t in Base.metadata.tables if t not in existing_tables]
-            if missing_tables:
-                logging.info("Creating missing tables: %s", missing_tables)
-                Base.metadata.create_all(bind=engine)
+        inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+        missing_tables = [t for t in Base.metadata.tables if t not in existing_tables]
+        if missing_tables:
+            logging.info("Creating missing tables: %s", missing_tables)
+        Base.metadata.create_all(bind=engine)
 
         db = SessionLocal()
         try:
-            if create_admin:
-                create_admin(db)
+            create_admin(db)
         finally:
             db.close()
 
@@ -301,7 +306,9 @@ def initialize_database():
         logging.exception("Database initialization failed")
         st.error("Database initialization failed. Please check esan_erp.log.")
 
+
 initialize_database()
+
 
 # ==================================================
 # SESSION MANAGEMENT
@@ -311,40 +318,34 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.username = None
     st.session_state.role = None
-    st.session_state.current_page = "Overview"
+    st.session_state.current_page = "🏠 Overview"
+
 
 # ==================================================
-# LOGIN FUNCTION (works with real DB or demo mode)
+# LOGIN FUNCTION
 # ==================================================
 
 def login(username, password):
-    # If real DB exists, use it; otherwise demo mode
-    if SessionLocal is not None:
-        db = SessionLocal()
-        try:
-            user = db.query(User).filter(User.username == username).first()
-            if user and user.active and verify_password(password, user.password_hash):
-                st.session_state.logged_in = True
-                st.session_state.username = user.username
-                st.session_state.role = user.role
-                return True
-            return False
-        finally:
-            db.close()
-    else:
-        # Demo mode – only admin/admin123 works
-        if username == "admin" and password == "admin123":
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.username == username).first()
+        if user and user.active and verify_password(password, user.password_hash):
             st.session_state.logged_in = True
-            st.session_state.username = "admin"
-            st.session_state.role = "Administrator"
+            st.session_state.username = user.username
+            st.session_state.role = user.role
             return True
         return False
+    finally:
+        db.close()
+
 
 # ==================================================
-# LOGIN SCREEN (only logo + form)
+# LOGIN SCREEN – only logo + form, no words
 # ==================================================
 
 if not st.session_state.logged_in:
+
+    # --- CSS logo (sprout) ---
     st.markdown(
         """
         <div class="login-page">
@@ -360,6 +361,7 @@ if not st.session_state.logged_in:
         unsafe_allow_html=True,
     )
 
+    # Login form
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         username = st.text_input("Username", placeholder="Enter your username")
@@ -373,11 +375,18 @@ if not st.session_state.logged_in:
 
     st.stop()
 
+
 # ==================================================
-# SIDEBAR (logo only, then navigation)
+# MAIN HEADER REMOVED – no logo or text after login
+# ==================================================
+
+
+# ==================================================
+# SIDEBAR – only logo, no text heading
 # ==================================================
 
 with st.sidebar:
+    # ---- Centered CSS logo, no words ----
     st.markdown(
         """
         <div style="text-align: center; margin-bottom: 1rem;">
@@ -397,50 +406,56 @@ with st.sidebar:
         if st.button(label, use_container_width=True):
             st.session_state.current_page = label
 
-    nav_button("Overview")
+    nav_button("🏠 Overview")
 
     st.markdown("**OPERATIONS**")
-    nav_button("Procurement")
-    nav_button("Warehouse")
-    nav_button("Milling")
-    nav_button("Packaging")
+    nav_button("🌾 Procurement")
+    nav_button("📦 Warehouse")
+    nav_button("🏭 Milling")
+    nav_button("📦 Packaging")
 
     st.markdown("**COMMERCIAL**")
-    nav_button("Sales & Distribution")
+    nav_button("🚚 Sales & Distribution")
 
     st.markdown("**FINANCE**")
-    nav_button("Finance")
+    nav_button("💰 Finance")
 
     st.markdown("**REPORTING**")
-    nav_button("Reports")
+    nav_button("📊 Reports")
 
     st.divider()
 
-    st.markdown("### User Panel")
+    st.markdown("### 👤 User Panel")
     st.write(f"User: **{st.session_state.username}**")
     st.write(f"Role: **{st.session_state.role}**")
 
-    if st.button("Logout", use_container_width=True):
+    if st.button("🚪 Logout", use_container_width=True):
         st.session_state.logged_in = False
         st.session_state.username = None
         st.session_state.role = None
-        st.session_state.current_page = "Overview"
+        st.session_state.current_page = "🏠 Overview"
         st.rerun()
 
+
 # ==================================================
-# ROUTING TO MODULES
+# CURRENT PAGE
 # ==================================================
 
 menu = st.session_state.current_page
 
-if menu == "Overview":
+
+# ==================================================
+# ERP ROUTER (unchanged)
+# ==================================================
+
+if menu == "🏠 Overview":
     if dashboard_home:
         dashboard_home()
     else:
         st.warning("Overview dashboard could not be loaded.")
 
-elif menu == "Procurement":
-    st.header("Procurement")
+elif menu == "🌾 Procurement":
+    st.header("🌾 Procurement")
     procurement_menu = st.radio("Procurement Module", ["Dashboard", "Suppliers", "Purchase Orders", "Purchases"], horizontal=True)
     if procurement_menu == "Dashboard":
         if procurement_dashboard:
@@ -454,8 +469,8 @@ elif menu == "Procurement":
     elif procurement_menu == "Purchases":
         procurement_purchases()
 
-elif menu == "Warehouse":
-    st.header("Warehouse")
+elif menu == "📦 Warehouse":
+    st.header("📦 Warehouse")
     warehouse_menu = st.radio("Warehouse Module", ["Dashboard", "Inventory"], horizontal=True)
     if warehouse_menu == "Dashboard":
         if warehouse_dashboard:
@@ -465,20 +480,20 @@ elif menu == "Warehouse":
     elif warehouse_menu == "Inventory":
         warehouse_inventory()
 
-elif menu == "Milling":
+elif menu == "🏭 Milling":
     if milling_dashboard:
         milling_dashboard()
     else:
         st.warning("Milling module unavailable.")
 
-elif menu == "Packaging":
+elif menu == "📦 Packaging":
     if packaging_dashboard:
         packaging_dashboard()
     else:
         st.warning("Packaging module unavailable.")
 
-elif menu == "Sales & Distribution":
-    st.header("Sales & Distribution")
+elif menu == "🚚 Sales & Distribution":
+    st.header("🚚 Sales & Distribution")
     sales_menu = st.radio("Sales Module", ["Dashboard", "Customers", "Quotations", "Sales Orders", "Deliveries", "Invoices", "Payments"], horizontal=True)
     sales_pages = {
         "Dashboard": sales_dashboard,
@@ -495,30 +510,32 @@ elif menu == "Sales & Distribution":
     else:
         st.warning(f"{sales_menu} page unavailable.")
 
-elif menu == "Finance":
+elif menu == "💰 Finance":
     if finance_dashboard:
         finance_dashboard()
     else:
         st.warning("Finance module unavailable.")
 
-elif menu == "Reports":
+elif menu == "📊 Reports":
     if reports_dashboard:
         reports_dashboard()
     else:
         st.warning("Reports module unavailable.")
 
+
 # ==================================================
-# MODULE LOADING INFORMATION (if any errors)
+# MODULE LOADING INFORMATION
 # ==================================================
 
 if module_errors:
-    with st.expander("Module Loading Information"):
+    with st.expander("⚠️ Module Loading Information"):
         st.warning("The following modules could not be loaded:")
         for error in module_errors:
             st.write(f"• {error}")
 
+
 # ==================================================
-# FOOTER
+# FOOTER (optional, you may also remove it if desired)
 # ==================================================
 
 st.divider()
