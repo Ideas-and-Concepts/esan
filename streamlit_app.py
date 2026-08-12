@@ -1,7 +1,7 @@
 """
 Nile Harvest Foods Ltd.
 Enterprise Resource Planning System
-Version 1.4.0 Alpha – Resilient Startup (Handles Missing Modules)
+Version 1.4.0 Alpha – Self-contained resilient startup
 """
 
 import logging
@@ -10,27 +10,29 @@ import sys
 import streamlit as st
 
 # ==================================================
-# ATTEMPT TO IMPORT CORE MODULES (with fallbacks)
+# SAFE CORE IMPORTS (fallbacks built-in)
 # ==================================================
 
+# --- config ---
 try:
     from config import COMPANY_NAME, VERSION
 except ImportError:
     COMPANY_NAME = "Nile Harvest Foods Ltd."
     VERSION = "1.4.0"
 
+# --- database ---
 try:
     from database import Base, engine, SessionLocal
 except ImportError:
-    # Stub to keep the app running – real DB will be missing but app won't crash
     Base = None
     engine = None
     SessionLocal = None
 
+# --- models ---
 try:
     from models import User
 except ImportError:
-    # Minimal User class stub for fallback
+    # Minimal User stub for demo mode
     class User:
         username = "admin"
         full_name = "System Administrator"
@@ -39,14 +41,19 @@ except ImportError:
         role = "Administrator"
         active = True
 
+# --- auth ---
 try:
-    from auth import verify_password
+    from auth import verify_password, hash_password
 except ImportError:
-    # Fallback verification (plain text, for demo only)
     def verify_password(plain_password, hashed):
-        # In a real setup you would compare properly; here just accept "admin123"
+        # Demo only – accepts admin123
         return plain_password == "admin123"
 
+    def hash_password(password):
+        # Not used in demo mode
+        return password
+
+# --- sqlalchemy inspect (optional) ---
 try:
     from sqlalchemy import inspect
 except ImportError:
@@ -189,7 +196,7 @@ def safe_import(module_path, function_name):
         return None
 
 # ==================================================
-# ADMIN CREATION (skip if DB not available)
+# ADMIN CREATION (skipped if no DB)
 # ==================================================
 
 if SessionLocal is not None:
@@ -199,7 +206,6 @@ if SessionLocal is not None:
         def create_admin(db):
             admin = db.query(User).filter(User.username == "admin").first()
             if not admin:
-                from auth import hash_password
                 admin = User(
                     username="admin",
                     full_name="System Administrator",
@@ -270,7 +276,7 @@ warehouse_inventory = warehouse_inventory or _fallback_page("Inventory")
 
 def initialize_database():
     if engine is None or SessionLocal is None:
-        st.warning("Database engine not configured. The application will run in demo mode without persistence.")
+        st.warning("Database engine not configured. Running in demo mode.")
         return
     try:
         if inspect is not None:
@@ -310,11 +316,11 @@ if "logged_in" not in st.session_state:
     st.session_state.current_page = "Overview"
 
 # ==================================================
-# LOGIN FUNCTION (works with fallback User/verify)
+# LOGIN FUNCTION (works with real DB or demo mode)
 # ==================================================
 
 def login(username, password):
-    # If real DB exists, use it; else use fallback admin check
+    # If real DB exists, use it; otherwise demo mode
     if SessionLocal is not None:
         db = SessionLocal()
         try:
