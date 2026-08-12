@@ -1502,4 +1502,179 @@ class Payment(Base):
     invoice = relationship(
         "Invoice",
         back_populates="payments",
+
+# ==========================================================
+# FINANCE / ACCOUNTING MODELS
+# ==========================================================
+
+class Account(Base):
+    """
+    Chart of Accounts.
+    """
+
+    __tablename__ = "accounts"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    code = Column(
+        String(50),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+
+    name = Column(
+        String(150),
+        nullable=False,
+    )
+
+    account_type = Column(
+        String(50),
+        nullable=False,
+    )
+
+    description = Column(
+        Text,
+        nullable=True,
+    )
+
+    active = Column(
+        Boolean,
+        default=True,
+        nullable=False,
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+    )
+
+
+class JournalEntry(Base):
+    """
+    General Ledger journal header.
+    """
+
+    __tablename__ = "journal_entries"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    entry_number = Column(
+        String(50),
+        unique=True,
+        nullable=True,
+        index=True,
+    )
+
+    entry_date = Column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+    )
+
+    description = Column(
+        Text,
+        nullable=False,
+    )
+
+    reference_type = Column(
+        String(50),
+        nullable=True,
+        index=True,
+    )
+
+    reference_id = Column(
+        Integer,
+        nullable=True,
+        index=True,
+    )
+
+    status = Column(
+        String(30),
+        default="Draft",
+        nullable=False,
+        index=True,
+    )
+
+    posted_at = Column(
+        DateTime,
+        nullable=True,
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+    )
+
+    lines = relationship(
+        "JournalEntryLine",
+        back_populates="journal_entry",
+        cascade="all, delete-orphan",
+    )
+
+
+class JournalEntryLine(Base):
+    """
+    Individual debit/credit line in a journal entry.
+    """
+
+    __tablename__ = "journal_entry_lines"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    journal_entry_id = Column(
+        Integer,
+        ForeignKey(
+            "journal_entries.id"
+        ),
+        nullable=False,
+        index=True,
+    )
+
+    account_id = Column(
+        Integer,
+        ForeignKey(
+            "accounts.id"
+        ),
+        nullable=False,
+        index=True,
+    )
+
+    debit = Column(
+        Numeric(18, 2),
+        default=0,
+        nullable=False,
+    )
+
+    credit = Column(
+        Numeric(18, 2),
+        default=0,
+        nullable=False,
+    )
+
+    description = Column(
+        Text,
+        nullable=True,
+    )
+
+    journal_entry = relationship(
+        "JournalEntry",
+        back_populates="lines",
+    )
+
+    account = relationship(
+        "Account",
+    )
     )
