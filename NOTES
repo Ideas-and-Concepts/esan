@@ -154,3 +154,20 @@ Finance
 ├── Journal Entries
 │
 └── General Ledger
+
+
+seed/
+├── seed_data.py
+└── finance_seed.py
+
+services/
+├── finance_service.py
+├── invoice_service.py
+└── payment_service.py
+
+modules/
+├── finance/
+│   └── dashboard.py
+└── sales/
+    ├── invoices.py
+    └── payments.py
