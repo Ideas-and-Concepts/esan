@@ -535,7 +535,7 @@ if module_errors:
 
 
 # ==================================================
-# FOOTER (optional, you may also remove it if desired)
+# FOOTER (optional)
 # ==================================================
 
 st.divider()
