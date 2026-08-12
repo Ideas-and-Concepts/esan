@@ -4,20 +4,44 @@ Enterprise Resource Planning System
 
 Esan ERP
 Version 1.4.0 Alpha
-
-Full Repository Integration
 """
 
 import io
 import logging
-import importlib
+import os
+from datetime import datetime
 
 import streamlit as st
 from sqlalchemy import inspect
 
 from config import COMPANY_NAME, VERSION
 from database import Base, engine, SessionLocal
-from auth import verify_password
+
+# ============================================================
+# OPTIONAL MODEL IMPORT
+# ============================================================
+
+try:
+    from models import User
+except Exception as exc:
+    User = None
+    MODEL_IMPORT_ERROR = str(exc)
+else:
+    MODEL_IMPORT_ERROR = None
+
+
+# ============================================================
+# AUTH IMPORT
+# ============================================================
+
+try:
+    from auth import verify_password, hash_password
+except Exception as exc:
+    verify_password = None
+    hash_password = None
+    AUTH_IMPORT_ERROR = str(exc)
+else:
+    AUTH_IMPORT_ERROR = None
 
 
 # ============================================================
@@ -44,45 +68,13 @@ st.set_page_config(
 
 
 # ============================================================
-# SAFE MODEL LOADING
+# CUSTOM NILE HARVEST LOGO
 # ============================================================
 
-User = None
-MODEL_ERROR = None
-
-try:
-    models_module = importlib.import_module("models")
-
-    User = getattr(
-        models_module,
-        "User",
-        None,
-    )
-
-    if User is None:
-        MODEL_ERROR = (
-            "The models.py file was loaded, "
-            "but it does not contain a User model."
-        )
-
-except Exception as exc:
-    MODEL_ERROR = (
-        f"Unable to load models.py: "
-        f"{type(exc).__name__}: {exc}"
-    )
-
-    logging.exception(
-        "Unable to load models.py"
-    )
-
-
-# ============================================================
-# NEW NILE HARVEST LOGO
-# ============================================================
-
+@st.cache_resource
 def create_logo():
     """
-    Generate the Nile Harvest Foods logo completely in memory.
+    Creates the Nile Harvest Foods corporate logo in memory.
 
     No external image file is required.
     """
@@ -101,23 +93,35 @@ def create_logo():
         draw = ImageDraw.Draw(image)
 
         # ----------------------------------------------------
-        # Outer badge
+        # Corporate colors
+        # ----------------------------------------------------
+
+        dark_green = (24, 92, 52, 255)
+        green = (46, 125, 50, 255)
+        light_green = (129, 199, 132, 255)
+        gold = (232, 181, 45, 255)
+        brown = (92, 64, 45, 255)
+        blue = (38, 111, 145, 255)
+        white = (255, 255, 255, 255)
+
+        # ----------------------------------------------------
+        # Outer emblem
         # ----------------------------------------------------
 
         draw.rounded_rectangle(
-            (15, 15, 585, 585),
+            (25, 25, 575, 575),
             radius=125,
-            fill=(27, 94, 32, 255),
+            fill=dark_green,
         )
 
         # ----------------------------------------------------
-        # Inner badge
+        # Inner emblem
         # ----------------------------------------------------
 
         draw.rounded_rectangle(
-            (35, 35, 565, 565),
+            (45, 45, 555, 555),
             radius=105,
-            fill=(46, 125, 50, 255),
+            fill=green,
         )
 
         # ----------------------------------------------------
@@ -125,59 +129,52 @@ def create_logo():
         # ----------------------------------------------------
 
         draw.ellipse(
-            (190, 85, 410, 305),
-            fill=(242, 190, 45, 255),
+            (185, 105, 415, 335),
+            fill=gold,
         )
 
         # ----------------------------------------------------
-        # Horizon
+        # Nile river
         # ----------------------------------------------------
 
-        draw.rectangle(
-            (55, 275, 545, 330),
-            fill=(129, 199, 132, 255),
+        river_points = [
+            (75, 375),
+            (165, 340),
+            (245, 365),
+            (330, 345),
+            (425, 370),
+            (525, 335),
+            (525, 420),
+            (430, 450),
+            (335, 425),
+            (250, 450),
+            (165, 425),
+            (75, 455),
+        ]
+
+        draw.polygon(
+            river_points,
+            fill=blue,
         )
-
-        # ----------------------------------------------------
-        # Nile water
-        # ----------------------------------------------------
-
-        draw.rounded_rectangle(
-            (55, 310, 545, 400),
-            radius=35,
-            fill=(30, 105, 150, 255),
-        )
-
-        # ----------------------------------------------------
-        # Water highlights
-        # ----------------------------------------------------
-
-        for y in (335, 365):
-
-            draw.line(
-                (100, y, 500, y),
-                fill=(144, 202, 249, 255),
-                width=7,
-            )
 
         # ----------------------------------------------------
         # Soil
         # ----------------------------------------------------
 
         draw.rounded_rectangle(
-            (55, 395, 545, 545),
-            radius=45,
-            fill=(91, 62, 45, 255),
+            (45, 445, 555, 555),
+            radius=70,
+            fill=brown,
         )
 
         # ----------------------------------------------------
-        # Plant stem
+        # Main plant stem
         # ----------------------------------------------------
 
         draw.rounded_rectangle(
-            (292, 205, 308, 440),
+            (292, 235, 308, 475),
             radius=8,
-            fill=(174, 213, 129, 255),
+            fill=light_green,
         )
 
         # ----------------------------------------------------
@@ -185,8 +182,8 @@ def create_logo():
         # ----------------------------------------------------
 
         draw.ellipse(
-            (145, 220, 310, 335),
-            fill=(129, 199, 132, 255),
+            (125, 225, 305, 350),
+            fill=light_green,
         )
 
         # ----------------------------------------------------
@@ -194,27 +191,23 @@ def create_logo():
         # ----------------------------------------------------
 
         draw.ellipse(
-            (290, 220, 455, 335),
-            fill=(129, 199, 132, 255),
+            (295, 225, 475, 350),
+            fill=light_green,
         )
 
         # ----------------------------------------------------
-        # Left leaf vein
+        # Leaf veins
         # ----------------------------------------------------
 
         draw.line(
-            (180, 275, 300, 335),
-            fill=(46, 125, 50, 255),
+            (185, 280, 295, 360),
+            fill=green,
             width=9,
         )
 
-        # ----------------------------------------------------
-        # Right leaf vein
-        # ----------------------------------------------------
-
         draw.line(
-            (420, 275, 300, 335),
-            fill=(46, 125, 50, 255),
+            (415, 280, 305, 360),
+            fill=green,
             width=9,
         )
 
@@ -223,28 +216,27 @@ def create_logo():
         # ----------------------------------------------------
 
         grain_positions = [
-            (120, 440),
-            (165, 415),
-            (205, 450),
-            (395, 450),
-            (435, 415),
-            (480, 440),
+            (115, 420),
+            (155, 400),
+            (195, 430),
+            (405, 430),
+            (445, 400),
+            (485, 420),
         ]
 
         for x, y in grain_positions:
-
             draw.ellipse(
                 (x, y, x + 22, y + 38),
-                fill=(242, 190, 45, 255),
+                fill=gold,
             )
 
         # ----------------------------------------------------
-        # Small gold center
+        # Small central gold seed
         # ----------------------------------------------------
 
         draw.ellipse(
-            (280, 430, 320, 470),
-            fill=(242, 190, 45, 255),
+            (285, 425, 315, 470),
+            fill=gold,
         )
 
         # ----------------------------------------------------
@@ -272,20 +264,11 @@ def create_logo():
         return None
 
 
-# ============================================================
-# CACHE LOGO
-# ============================================================
-
-@st.cache_resource
-def get_logo():
-    return create_logo()
-
-
-LOGO_IMAGE = get_logo()
+LOGO_IMAGE = create_logo()
 
 
 # ============================================================
-# ERP UI
+# UI CSS
 # ============================================================
 
 st.markdown(
@@ -293,20 +276,25 @@ st.markdown(
     <style>
 
     /* ======================================================
-       STREAMLIT CLEANUP
+       REMOVE STREAMLIT DEFAULT UI
        ====================================================== */
 
     #MainMenu {
-        display: none;
+        visibility: hidden;
     }
 
     header {
-        display: none;
+        visibility: hidden;
     }
 
     footer {
-        display: none;
+        visibility: hidden;
     }
+
+
+    /* ======================================================
+       MAIN CONTAINER
+       ====================================================== */
 
     .block-container {
         padding-top: 1.5rem;
@@ -322,58 +310,57 @@ st.markdown(
         border-right: 1px solid rgba(128,128,128,0.25);
     }
 
+    .sidebar-logo {
+        width: 100%;
+        text-align: center;
+        padding-top: 8px;
+        padding-bottom: 12px;
+    }
+
+    .sidebar-logo img {
+        max-width: 115px;
+        margin: auto;
+    }
+
 
     /* ======================================================
-       LOGIN PAGE
+       LOGIN
        ====================================================== */
 
-    .login-page {
+    .login-wrapper {
         width: 100%;
-        min-height: 78vh;
-
         display: flex;
-        flex-direction: column;
-
-        justify-content: flex-start;
+        justify-content: center;
         align-items: center;
-
         padding-top: 35px;
     }
 
-
     .login-logo {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-
+        text-align: center;
         width: 100%;
+    }
 
+    .login-logo img {
+        width: 185px;
+        max-width: 60%;
+        height: auto;
+        margin: auto;
+    }
+
+    .login-title {
+        text-align: center;
+        font-size: 25px;
+        font-weight: 800;
+        margin-top: 8px;
+        margin-bottom: 3px;
+        color: #2e7d32;
+    }
+
+    .login-subtitle {
+        text-align: center;
+        font-size: 14px;
+        opacity: 0.7;
         margin-bottom: 25px;
-    }
-
-
-    .login-form {
-        width: 100%;
-        max-width: 430px;
-
-        margin-left: auto;
-        margin-right: auto;
-    }
-
-
-    /* ======================================================
-       SIDEBAR LOGO
-       ====================================================== */
-
-    .sidebar-logo {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-
-        width: 100%;
-
-        padding-top: 8px;
-        padding-bottom: 10px;
     }
 
 
@@ -386,9 +373,8 @@ st.markdown(
     }
 
     div[data-testid="stTextInput"] input {
+        min-height: 46px;
         border-radius: 10px;
-        min-height: 45px;
-        padding-left: 14px;
     }
 
 
@@ -397,8 +383,8 @@ st.markdown(
        ====================================================== */
 
     div[data-testid="stButton"] > button {
-        border-radius: 10px;
         min-height: 44px;
+        border-radius: 10px;
         font-weight: 700;
     }
 
@@ -408,49 +394,24 @@ st.markdown(
        ====================================================== */
 
     div[data-testid="stSidebar"]
-    div[data-testid="stButton"] > button {
+    div[data-testid="stButton"]
+    > button {
 
         text-align: left;
         border-radius: 9px;
-
-        margin-bottom: 2px;
+        margin-bottom: 3px;
     }
 
 
     /* ======================================================
-       SIDEBAR SECTION HEADINGS
+       SECTION HEADINGS
        ====================================================== */
 
-    div[data-testid="stSidebar"] h3 {
-        margin-top: 0.5rem;
-    }
-
-
-    /* ======================================================
-       LOGIN TITLE
-       ====================================================== */
-
-    .login-title {
-        text-align: center;
-
+    .module-title {
         font-size: 28px;
         font-weight: 800;
-
-        margin-top: 5px;
-        margin-bottom: 4px;
+        margin-bottom: 10px;
     }
-
-
-    .login-subtitle {
-        text-align: center;
-
-        font-size: 14px;
-
-        opacity: 0.7;
-
-        margin-bottom: 22px;
-    }
-
 
     </style>
     """,
@@ -465,21 +426,13 @@ st.markdown(
 module_errors = []
 
 
-def safe_import(
-    module_path,
-    function_name,
-):
-    """
-    Safely import a module function.
-
-    A broken module will not crash
-    the entire ERP application.
-    """
+def safe_import(module_path, function_name):
 
     try:
 
-        module = importlib.import_module(
-            module_path
+        module = __import__(
+            module_path,
+            fromlist=[function_name],
         )
 
         function = getattr(
@@ -488,28 +441,26 @@ def safe_import(
             None,
         )
 
-        if function is not None:
+        if function is None:
 
-            return function
+            error = (
+                f"{module_path}: "
+                f"missing function '{function_name}'"
+            )
 
-        error = (
-            f"{module_path}: "
-            f"missing function "
-            f"'{function_name}'"
-        )
+            module_errors.append(error)
 
-        module_errors.append(error)
+            logging.error(error)
 
-        logging.error(error)
+            return None
 
-        return None
+        return function
 
     except Exception as exc:
 
         error = (
             f"{module_path}: "
-            f"{type(exc).__name__}: "
-            f"{exc}"
+            f"{type(exc).__name__}: {exc}"
         )
 
         module_errors.append(error)
@@ -523,128 +474,8 @@ def safe_import(
 
 
 # ============================================================
-# ADMIN CREATION
-# ============================================================
-
-def create_default_admin(db):
-    """
-    Creates the default administrator.
-
-    The function checks which User fields actually exist
-    before passing values to SQLAlchemy.
-    """
-
-    if User is None:
-        return
-
-    try:
-
-        admin = (
-            db.query(User)
-            .filter(
-                User.username == "admin"
-            )
-            .first()
-        )
-
-        if admin:
-
-            return
-
-        from auth import hash_password
-
-        password_hash = hash_password(
-            "admin123"
-        )
-
-        user_columns = {
-            column.name
-            for column in User.__table__.columns
-        }
-
-        user_data = {}
-
-        if "username" in user_columns:
-            user_data["username"] = "admin"
-
-        if "password_hash" in user_columns:
-            user_data["password_hash"] = (
-                password_hash
-            )
-
-        if "full_name" in user_columns:
-            user_data["full_name"] = (
-                "System Administrator"
-            )
-
-        if "email" in user_columns:
-            user_data["email"] = (
-                "admin@nileharvest.com"
-            )
-
-        if "role" in user_columns:
-            user_data["role"] = (
-                "Administrator"
-            )
-
-        if "active" in user_columns:
-            user_data["active"] = True
-
-        admin = User(
-            **user_data
-        )
-
-        db.add(admin)
-
-        db.commit()
-
-        logging.info(
-            "Default administrator created."
-        )
-
-    except Exception as exc:
-
-        db.rollback()
-
-        logging.exception(
-            "Admin creation failed: %s",
-            exc,
-        )
-
-
-# ============================================================
-# SEED DATA
-# ============================================================
-
-load_seed_data = None
-
-try:
-
-    seed_module = importlib.import_module(
-        "seed.seed_data"
-    )
-
-    load_seed_data = getattr(
-        seed_module,
-        "load_seed_data",
-        None,
-    )
-
-except Exception as exc:
-
-    logging.warning(
-        "Seed data module unavailable: %s",
-        exc,
-    )
-
-
-# ============================================================
 # MODULE REGISTRY
 # ============================================================
-
-# ------------------------------------------------------------
-# OVERVIEW
-# ------------------------------------------------------------
 
 dashboard_home = safe_import(
     "modules.dashboard.home",
@@ -652,9 +483,9 @@ dashboard_home = safe_import(
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # PROCUREMENT
-# ------------------------------------------------------------
+# ============================================================
 
 procurement_dashboard = safe_import(
     "modules.procurement.dashboard",
@@ -677,9 +508,9 @@ procurement_purchase_orders = safe_import(
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # WAREHOUSE
-# ------------------------------------------------------------
+# ============================================================
 
 warehouse_dashboard = safe_import(
     "modules.warehouse.dashboard",
@@ -692,9 +523,9 @@ warehouse_inventory = safe_import(
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # PRODUCTION
-# ------------------------------------------------------------
+# ============================================================
 
 milling_dashboard = safe_import(
     "modules.milling.dashboard",
@@ -707,9 +538,9 @@ packaging_dashboard = safe_import(
 )
 
 
-# ------------------------------------------------------------
-# SALES & DISTRIBUTION
-# ------------------------------------------------------------
+# ============================================================
+# SALES
+# ============================================================
 
 sales_dashboard = safe_import(
     "modules.sales.dashboard",
@@ -747,9 +578,9 @@ sales_payments = safe_import(
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # FINANCE
-# ------------------------------------------------------------
+# ============================================================
 
 finance_dashboard = safe_import(
     "modules.finance.dashboard",
@@ -757,9 +588,9 @@ finance_dashboard = safe_import(
 )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # REPORTS
-# ------------------------------------------------------------
+# ============================================================
 
 reports_dashboard = safe_import(
     "modules.reports.dashboard",
@@ -768,7 +599,7 @@ reports_dashboard = safe_import(
 
 
 # ============================================================
-# FALLBACK PAGE
+# FALLBACK
 # ============================================================
 
 def fallback_page(title):
@@ -776,8 +607,7 @@ def fallback_page(title):
     def render():
 
         st.info(
-            f"{title} - "
-            "This section is currently being prepared."
+            f"{title} is currently being prepared."
         )
 
     return render
@@ -812,105 +642,158 @@ def initialize_database():
 
     try:
 
-        if engine is None:
-
-            logging.error(
-                "Database engine is unavailable."
-            )
-
-            return
-
-        inspector = inspect(
-            engine
-        )
-
-        existing_tables = (
-            inspector.get_table_names()
-        )
-
-        missing_tables = [
-            table_name
-            for table_name in Base.metadata.tables
-            if table_name
-            not in existing_tables
-        ]
-
-        if missing_tables:
-
-            logging.info(
-                "Creating missing tables: %s",
-                missing_tables,
-            )
-
         Base.metadata.create_all(
             bind=engine
         )
 
-        if User is not None:
+        if User is None:
 
-            db = SessionLocal()
+            logging.warning(
+                "User model could not be imported."
+            )
 
-            try:
+            return
 
-                create_default_admin(
-                    db
+        db = SessionLocal()
+
+        try:
+
+            admin = (
+                db.query(User)
+                .filter(
+                    User.username == "admin"
+                )
+                .first()
+            )
+
+            if admin is None:
+
+                password_hash_value = None
+
+                if hash_password:
+
+                    password_hash_value = (
+                        hash_password("admin123")
+                    )
+
+                else:
+
+                    logging.error(
+                        "hash_password unavailable."
+                    )
+
+                    return
+
+                # ------------------------------------------
+                # Build User safely.
+                #
+                # Different versions of models.py may have
+                # different User columns.
+                # ------------------------------------------
+
+                user_columns = {
+                    column.name
+                    for column in User.__table__.columns
+                }
+
+                user_data = {}
+
+                if "username" in user_columns:
+                    user_data["username"] = "admin"
+
+                if "password_hash" in user_columns:
+                    user_data["password_hash"] = (
+                        password_hash_value
+                    )
+
+                if "role" in user_columns:
+                    user_data["role"] = "Administrator"
+
+                if "email" in user_columns:
+                    user_data["email"] = (
+                        "admin@nileharvest.com"
+                    )
+
+                if "active" in user_columns:
+                    user_data["active"] = True
+
+                if "full_name" in user_columns:
+                    user_data["full_name"] = (
+                        "System Administrator"
+                    )
+
+                if "created_at" in user_columns:
+                    user_data["created_at"] = datetime.utcnow()
+
+                admin = User(
+                    **user_data
                 )
 
-            finally:
+                db.add(admin)
+                db.commit()
 
-                db.close()
-
-        if load_seed_data:
-
-            try:
-
-                load_seed_data()
-
-            except TypeError:
-
-                # Some seed functions accept a database
-                # session while others do not.
-                db = SessionLocal()
-
-                try:
-
-                    load_seed_data(db)
-
-                finally:
-
-                    db.close()
-
-            except Exception as exc:
-
-                logging.warning(
-                    "Seed data failed: %s",
-                    exc,
+                logging.info(
+                    "Default administrator account created."
                 )
+
+        except Exception as exc:
+
+            db.rollback()
+
+            logging.exception(
+                "Administrator initialization failed: %s",
+                exc,
+            )
+
+        finally:
+
+            db.close()
 
     except Exception as exc:
 
         logging.exception(
-            "Database initialization failed."
+            "Database initialization failed: %s",
+            exc,
         )
 
         st.error(
-            "Database initialization failed."
+            "Database initialization failed. "
+            "Please check esan_erp.log."
         )
-
-        with st.expander(
-            "Database Error Details"
-        ):
-
-            st.code(
-                str(exc)
-            )
 
 
 initialize_database()
 
 
 # ============================================================
-# SESSION MANAGEMENT
+# SEED DATA
+# ============================================================
+
+try:
+
+    from seed.seed_data import load_seed_data
+
+except Exception:
+
+    load_seed_data = None
+
+
+if load_seed_data:
+
+    try:
+
+        load_seed_data()
+
+    except Exception as exc:
+
+        logging.warning(
+            "Seed data loading failed: %s",
+            exc,
+        )
+
+
+# ============================================================
+# SESSION STATE
 # ============================================================
 
 if "logged_in" not in st.session_state:
@@ -927,40 +810,37 @@ if "role" not in st.session_state:
 
 if "current_page" not in st.session_state:
 
-    st.session_state.current_page = (
-        "🏠 Overview"
-    )
+    st.session_state.current_page = "🏠 Overview"
 
 
 # ============================================================
 # LOGIN FUNCTION
 # ============================================================
 
-def login(
-    username,
-    password,
-):
-    """
-    Authenticate a user safely.
-    """
+def login(username, password):
 
     if User is None:
 
-        logging.error(
-            "Login attempted but User model "
-            "is unavailable."
+        st.error(
+            "The User database model could not be loaded."
         )
 
-        return False, (
-            "User model could not be loaded."
+        return False
+
+    if verify_password is None:
+
+        st.error(
+            "Authentication system could not be loaded."
         )
+
+        return False
+
+    username = (username or "").strip()
+    password = password or ""
 
     if not username or not password:
 
-        return False, (
-            "Please enter your username "
-            "and password."
-        )
+        return False
 
     db = SessionLocal()
 
@@ -969,7 +849,7 @@ def login(
         user = (
             db.query(User)
             .filter(
-                User.username == username.strip()
+                User.username == username
             )
             .first()
         )
@@ -977,13 +857,11 @@ def login(
         if user is None:
 
             logging.warning(
-                "Login failed for unknown user: %s",
+                "Login failed: unknown user '%s'",
                 username,
             )
 
-            return False, (
-                "Invalid username or password."
-            )
+            return False
 
         active = getattr(
             user,
@@ -993,91 +871,86 @@ def login(
 
         if not active:
 
-            return False, (
-                "This user account is inactive."
+            logging.warning(
+                "Login failed: inactive user '%s'",
+                username,
             )
 
-        stored_hash = getattr(
+            return False
+
+        password_hash_value = getattr(
             user,
             "password_hash",
             None,
         )
 
-        if not stored_hash:
+        if not password_hash_value:
 
             logging.error(
-                "User %s has no password_hash.",
+                "User '%s' has no password hash.",
                 username,
             )
 
-            return False, (
-                "This user does not have "
-                "a valid password configured."
-            )
+            return False
 
         try:
 
             valid_password = verify_password(
                 password,
-                stored_hash,
+                password_hash_value,
             )
 
         except Exception as exc:
 
             logging.exception(
-                "Password verification failed."
+                "Password verification failed: %s",
+                exc,
             )
 
-            return False, (
-                f"Password verification error: "
-                f"{exc}"
+            return False
+
+        if valid_password:
+
+            st.session_state.logged_in = True
+
+            st.session_state.username = (
+                getattr(
+                    user,
+                    "username",
+                    username,
+                )
             )
 
-        if not valid_password:
+            st.session_state.role = (
+                getattr(
+                    user,
+                    "role",
+                    "User",
+                )
+            )
 
-            logging.warning(
-                "Invalid password for user: %s",
+            logging.info(
+                "Successful login: %s",
                 username,
             )
 
-            return False, (
-                "Invalid username or password."
-            )
+            return True
 
-        st.session_state.logged_in = True
-
-        st.session_state.username = (
-            getattr(
-                user,
-                "username",
-                username,
-            )
-        )
-
-        st.session_state.role = (
-            getattr(
-                user,
-                "role",
-                "User",
-            )
-        )
-
-        logging.info(
-            "User logged in: %s",
+        logging.warning(
+            "Invalid password for user '%s'",
             username,
         )
 
-        return True, "Login successful."
+        return False
 
     except Exception as exc:
 
         logging.exception(
-            "Login error."
+            "Login error: %s",
+            exc,
         )
 
-        return False, (
-            f"Login error: {exc}"
-        )
+        return False
 
     finally:
 
@@ -1090,18 +963,10 @@ def login(
 
 if not st.session_state.logged_in:
 
-    # --------------------------------------------------------
-    # CENTERED LOGIN AREA
-    # --------------------------------------------------------
-
     st.markdown(
-        '<div class="login-page">',
+        '<div class="login-wrapper">',
         unsafe_allow_html=True,
     )
-
-    # --------------------------------------------------------
-    # CENTERED LOGO
-    # --------------------------------------------------------
 
     st.markdown(
         '<div class="login-logo">',
@@ -1112,7 +977,7 @@ if not st.session_state.logged_in:
 
         st.image(
             LOGO_IMAGE,
-            width=180,
+            width=185,
         )
 
     else:
@@ -1122,6 +987,7 @@ if not st.session_state.logged_in:
             <div style="
                 text-align:center;
                 font-size:90px;
+                padding:20px;
             ">
                 🌾
             </div>
@@ -1130,24 +996,25 @@ if not st.session_state.logged_in:
         )
 
     st.markdown(
+        """
+        <div class="login-title">
+            Nile Harvest Foods Ltd.
+        </div>
+
+        <div class="login-subtitle">
+            Esan Enterprise Resource Planning System
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
         "</div>",
         unsafe_allow_html=True,
     )
 
-    # --------------------------------------------------------
-    # LOGIN TITLE
-    # --------------------------------------------------------
-
     st.markdown(
-        """
-        <div class="login-title">
-            Esan ERP
-        </div>
-
-        <div class="login-subtitle">
-            Nile Harvest Foods Ltd.
-        </div>
-        """,
+        "</div>",
         unsafe_allow_html=True,
     )
 
@@ -1155,11 +1022,11 @@ if not st.session_state.logged_in:
     # LOGIN FORM
     # --------------------------------------------------------
 
-    login_left, login_center, login_right = st.columns(
+    col1, col2, col3 = st.columns(
         [1, 2, 1]
     )
 
-    with login_center:
+    with col2:
 
         username = st.text_input(
             "Username",
@@ -1182,15 +1049,13 @@ if not st.session_state.logged_in:
 
         if login_clicked:
 
-            success, message = login(
+            if login(
                 username,
                 password,
-            )
-
-            if success:
+            ):
 
                 st.success(
-                    message
+                    "Login successful."
                 )
 
                 st.rerun()
@@ -1198,27 +1063,8 @@ if not st.session_state.logged_in:
             else:
 
                 st.error(
-                    message
+                    "Invalid username or password."
                 )
-
-    st.markdown(
-        "</div>",
-        unsafe_allow_html=True,
-    )
-
-    # --------------------------------------------------------
-    # MODEL ERROR INFORMATION
-    # --------------------------------------------------------
-
-    if MODEL_ERROR:
-
-        with st.expander(
-            "⚠️ System Configuration"
-        ):
-
-            st.warning(
-                MODEL_ERROR
-            )
 
     st.stop()
 
@@ -1230,7 +1076,7 @@ if not st.session_state.logged_in:
 with st.sidebar:
 
     # --------------------------------------------------------
-    # CENTERED SIDEBAR LOGO
+    # CENTERED LOGO
     # --------------------------------------------------------
 
     st.markdown(
@@ -1251,7 +1097,7 @@ with st.sidebar:
             """
             <div style="
                 text-align:center;
-                font-size:60px;
+                font-size:65px;
             ">
                 🌾
             </div>
@@ -1267,7 +1113,7 @@ with st.sidebar:
     st.divider()
 
     # --------------------------------------------------------
-    # NAVIGATION BUTTON
+    # NAVIGATION
     # --------------------------------------------------------
 
     def nav_button(label):
@@ -1275,27 +1121,14 @@ with st.sidebar:
         if st.button(
             label,
             use_container_width=True,
+            key=f"nav_{label}",
         ):
 
-            st.session_state.current_page = (
-                label
-            )
-
-            st.rerun()
-
-
-    # --------------------------------------------------------
-    # OVERVIEW
-    # --------------------------------------------------------
+            st.session_state.current_page = label
 
     nav_button(
         "🏠 Overview"
     )
-
-
-    # --------------------------------------------------------
-    # OPERATIONS
-    # --------------------------------------------------------
 
     st.markdown(
         "**OPERATIONS**"
@@ -1317,11 +1150,6 @@ with st.sidebar:
         "📦 Packaging"
     )
 
-
-    # --------------------------------------------------------
-    # COMMERCIAL
-    # --------------------------------------------------------
-
     st.markdown(
         "**COMMERCIAL**"
     )
@@ -1329,11 +1157,6 @@ with st.sidebar:
     nav_button(
         "🚚 Sales & Distribution"
     )
-
-
-    # --------------------------------------------------------
-    # FINANCE
-    # --------------------------------------------------------
 
     st.markdown(
         "**FINANCE**"
@@ -1343,11 +1166,6 @@ with st.sidebar:
         "💰 Finance"
     )
 
-
-    # --------------------------------------------------------
-    # REPORTING
-    # --------------------------------------------------------
-
     st.markdown(
         "**REPORTING**"
     )
@@ -1356,9 +1174,7 @@ with st.sidebar:
         "📊 Reports"
     )
 
-
     st.divider()
-
 
     # --------------------------------------------------------
     # USER PANEL
@@ -1376,22 +1192,15 @@ with st.sidebar:
         f"Role: **{st.session_state.role}**"
     )
 
-
-    # --------------------------------------------------------
-    # LOGOUT
-    # --------------------------------------------------------
-
     if st.button(
         "🚪 Logout",
         use_container_width=True,
+        key="logout_button",
     ):
 
         st.session_state.logged_in = False
-
         st.session_state.username = None
-
         st.session_state.role = None
-
         st.session_state.current_page = (
             "🏠 Overview"
         )
@@ -1429,8 +1238,9 @@ if menu == "🏠 Overview":
 
 elif menu == "🌾 Procurement":
 
-    st.header(
-        "🌾 Procurement"
+    st.markdown(
+        '<div class="module-title">🌾 Procurement</div>',
+        unsafe_allow_html=True,
     )
 
     procurement_menu = st.radio(
@@ -1476,8 +1286,9 @@ elif menu == "🌾 Procurement":
 
 elif menu == "📦 Warehouse":
 
-    st.header(
-        "📦 Warehouse"
+    st.markdown(
+        '<div class="module-title">📦 Warehouse</div>',
+        unsafe_allow_html=True,
     )
 
     warehouse_menu = st.radio(
@@ -1547,8 +1358,9 @@ elif menu == "📦 Packaging":
 
 elif menu == "🚚 Sales & Distribution":
 
-    st.header(
-        "🚚 Sales & Distribution"
+    st.markdown(
+        '<div class="module-title">🚚 Sales & Distribution</div>',
+        unsafe_allow_html=True,
     )
 
     sales_menu = st.radio(
@@ -1590,13 +1402,13 @@ elif menu == "🚚 Sales & Distribution":
             sales_payments,
     }
 
-    page_function = sales_pages.get(
+    page_func = sales_pages.get(
         sales_menu
     )
 
-    if page_function:
+    if page_func:
 
-        page_function()
+        page_func()
 
     else:
 
@@ -1640,7 +1452,7 @@ elif menu == "📊 Reports":
 
 
 # ============================================================
-# MODULE LOADING INFORMATION
+# MODULE ERRORS
 # ============================================================
 
 if module_errors:
