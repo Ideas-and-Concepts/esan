@@ -120,3 +120,19 @@ Sales & Distribution
     ├── Edit
     ├── Post
     └── Reverse
+
+
+Finance
+│
+├── Chart of Accounts
+│   └── Account
+│
+├── General Ledger
+│   ├── Journal Entry
+│   └── Journal Entry Line
+│
+├── Accounts Receivable
+│   └── Invoice / Payment transactions
+│
+└── Audit Trail
+    └── Posting / Reversal records
