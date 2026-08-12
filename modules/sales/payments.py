@@ -1,721 +1,772 @@
 """
-Esan ERP
-Payments Module
+Esan ERP - Sales Payments Module
 
 Nile Harvest Foods Ltd.
 Enterprise Milling & Packaging Management System
-"""
 
-import streamlit as st
+Version 1.4.0 Alpha
+
+Features:
+- Create payments
+- View payments
+- Edit draft payments
+- Post payments
+- Reverse payments
+- Invoice balance tracking
+- Finance journal integration
+"""
 
 from datetime import date
 
+import streamlit as st
+
 from database import SessionLocal
-from models import Customer, Invoice
+
+from models import (
+    Invoice,
+    Payment,
+)
 
 from services.payment_service import (
-    get_all_payments,
-    get_payment,
-    get_invoice_payments,
     create_payment,
     update_payment,
+    get_payment,
+    list_payments,
     post_payment,
     reverse_payment,
-    get_invoice_balance,
-    get_customer_outstanding_balance,
-    get_payment_summary,
+    get_payment_journal,
+    get_invoice_payment_summary,
 )
 
 
-# ==========================================================
+# ============================================================
 # HELPERS
-# ==========================================================
+# ============================================================
 
-def _get(obj, field, default=None):
-    return getattr(obj, field, default)
+def money(value):
+    """Format amount as UGX."""
 
-
-def _money(value):
     try:
-        return f"UGX {float(value):,.0f}"
+        return f"UGX {float(value or 0):,.2f}"
     except Exception:
-        return "UGX 0"
+        return "UGX 0.00"
 
 
-def _status(payment):
-    return _get(
-        payment,
-        "status",
-        "Draft",
-    ) or "Draft"
+def get_invoices(db):
+    """
+    Return invoices that can receive payments.
 
+    Posted and Paid invoices are included because a
+    payment can be entered against a Posted invoice.
+    """
 
-def _status_icon(status):
-
-    status = str(status).lower()
-
-    if status == "draft":
-        return "🟡"
-
-    if status == "posted":
-        return "🟢"
-
-    if status in (
-        "reversed",
-        "void",
-        "voided",
-    ):
-        return "🔴"
-
-    return "⚪"
-
-
-# ==========================================================
-# MAIN PAGE
-# ==========================================================
-
-def payments_page():
-
-    st.title("💳 Payments")
-
-    st.caption(
-        "Manage customer payments and Accounts Receivable."
+    return (
+        db.query(Invoice)
+        .filter(
+            Invoice.status.in_(
+                ["Posted", "Paid"]
+            )
+        )
+        .order_by(
+            Invoice.id.desc()
+        )
+        .all()
     )
+
+
+def payment_status_badge(status):
+    """Return a visual payment status."""
+
+    if status == "Posted":
+        return "🟢 Posted"
+
+    if status == "Draft":
+        return "🟡 Draft"
+
+    if status == "Reversed":
+        return "🔴 Reversed"
+
+    return status or "Unknown"
+
+
+# ============================================================
+# PAYMENT DASHBOARD
+# ============================================================
+
+def payment_dashboard():
+    """Payment overview."""
 
     db = SessionLocal()
 
     try:
 
-        tab_create, tab_list, tab_manage = st.tabs(
-            [
-                "➕ Receive Payment",
-                "📋 Payment Register",
-                "⚙️ Manage Payment",
-            ]
+        payments = list_payments(db)
+
+        posted_payments = [
+            payment
+            for payment in payments
+            if payment.status == "Posted"
+        ]
+
+        draft_payments = [
+            payment
+            for payment in payments
+            if payment.status == "Draft"
+        ]
+
+        reversed_payments = [
+            payment
+            for payment in payments
+            if payment.status == "Reversed"
+        ]
+
+        total_received = sum(
+            float(payment.amount or 0)
+            for payment in posted_payments
         )
 
-        # ==================================================
-        # CREATE PAYMENT
-        # ==================================================
+        total_drafts = sum(
+            float(payment.amount or 0)
+            for payment in draft_payments
+        )
 
-        with tab_create:
+        total_reversed = sum(
+            float(payment.amount or 0)
+            for payment in reversed_payments
+        )
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+
+            st.metric(
+                "Payments Received",
+                money(total_received),
+            )
+
+        with col2:
+
+            st.metric(
+                "Draft Payments",
+                money(total_drafts),
+            )
+
+        with col3:
+
+            st.metric(
+                "Reversed",
+                money(total_reversed),
+            )
+
+        with col4:
+
+            st.metric(
+                "Posted Transactions",
+                len(posted_payments),
+            )
+
+        st.divider()
+
+        if payments:
 
             st.subheader(
-                "Receive Customer Payment"
+                "Recent Payments"
             )
 
-            invoices = (
-                db.query(Invoice)
-                .order_by(
-                    Invoice.id.desc()
+            rows = []
+
+            for payment in payments[:25]:
+
+                invoice = payment.invoice
+
+                customer_name = (
+                    invoice.customer.name
+                    if invoice
+                    and invoice.customer
+                    else "Unknown"
                 )
-                .all()
+
+                rows.append(
+                    {
+                        "Payment":
+                            payment.payment_number,
+                        "Invoice":
+                            (
+                                invoice.invoice_number
+                                if invoice
+                                else "-"
+                            ),
+                        "Customer":
+                            customer_name,
+                        "Date":
+                            payment.payment_date,
+                        "Method":
+                            payment.payment_method,
+                        "Amount":
+                            money(payment.amount),
+                        "Status":
+                            payment.status,
+                    }
+                )
+
+            st.dataframe(
+                rows,
+                use_container_width=True,
+                hide_index=True,
             )
 
-            usable_invoices = []
+        else:
 
-            for invoice in invoices:
-
-                status = str(
-                    _get(
-                        invoice,
-                        "status",
-                        "Draft",
-                    )
-                ).lower()
-
-                if status in (
-                    "void",
-                    "voided",
-                ):
-                    continue
-
-                try:
-
-                    balance = get_invoice_balance(
-                        db,
-                        invoice.id,
-                    )
-
-                    if balance["balance"] > 0:
-                        usable_invoices.append(
-                            invoice
-                        )
-
-                except Exception:
-                    continue
-
-            if not usable_invoices:
-
-                st.info(
-                    "There are no invoices with "
-                    "an outstanding balance."
-                )
-
-            else:
-
-                invoice_map = {}
-
-                for invoice in usable_invoices:
-
-                    customer = (
-                        db.query(Customer)
-                        .filter(
-                            Customer.id
-                            == invoice.customer_id
-                        )
-                        .first()
-                    )
-
-                    customer_name = _get(
-                        customer,
-                        "name",
-                        "Unknown Customer",
-                    )
-
-                    balance = (
-                        get_invoice_balance(
-                            db,
-                            invoice.id,
-                        )
-                    )
-
-                    label = (
-                        f"INV-{invoice.id:05d} | "
-                        f"{customer_name} | "
-                        f"Balance: "
-                        f"{_money(balance['balance'])}"
-                    )
-
-                    invoice_map[label] = invoice
-
-                selected_label = st.selectbox(
-                    "Invoice",
-                    list(
-                        invoice_map.keys()
-                    ),
-                )
-
-                invoice = invoice_map[
-                    selected_label
-                ]
-
-                balance = get_invoice_balance(
-                    db,
-                    invoice.id,
-                )
-
-                st.info(
-                    f"Invoice total: "
-                    f"{_money(balance['invoice_total'])}  |  "
-                    f"Paid: "
-                    f"{_money(balance['paid_amount'])}  |  "
-                    f"Outstanding: "
-                    f"{_money(balance['balance'])}"
-                )
-
-                amount = st.number_input(
-                    "Payment Amount",
-                    min_value=0.01,
-                    max_value=float(
-                        balance["balance"]
-                    ),
-                    value=float(
-                        balance["balance"]
-                    ),
-                    step=1000.0,
-                )
-
-                payment_date = st.date_input(
-                    "Payment Date",
-                    value=date.today(),
-                )
-
-                payment_method = st.selectbox(
-                    "Payment Method",
-                    [
-                        "Cash",
-                        "Bank Transfer",
-                        "Mobile Money",
-                        "Cheque",
-                        "Card",
-                        "Other",
-                    ],
-                )
-
-                reference = st.text_input(
-                    "Reference",
-                    placeholder=(
-                        "Receipt number, bank reference, "
-                        "transaction ID, etc."
-                    ),
-                )
-
-                notes = st.text_area(
-                    "Notes",
-                )
-
-                if st.button(
-                    "Create Draft Payment",
-                    type="primary",
-                    use_container_width=True,
-                ):
-
-                    try:
-
-                        payment = create_payment(
-                            db=db,
-                            invoice_id=invoice.id,
-                            amount=amount,
-                            payment_date=payment_date,
-                            payment_method=payment_method,
-                            reference=reference,
-                            notes=notes,
-                        )
-
-                        st.session_state[
-                            "selected_payment_id"
-                        ] = payment.id
-
-                        st.success(
-                            f"Payment #{payment.id} "
-                            "created successfully."
-                        )
-
-                        st.rerun()
-
-                    except Exception as e:
-
-                        st.error(
-                            f"Could not create payment: {e}"
-                        )
-
-        # ==================================================
-        # PAYMENT REGISTER
-        # ==================================================
-
-        with tab_list:
-
-            st.subheader(
-                "Payment Register"
+            st.info(
+                "No payments have been recorded yet."
             )
-
-            summary = get_payment_summary(
-                db
-            )
-
-            c1, c2, c3, c4 = st.columns(4)
-
-            with c1:
-                st.metric(
-                    "Posted",
-                    _money(
-                        summary[
-                            "total_posted"
-                        ]
-                    ),
-                )
-
-            with c2:
-                st.metric(
-                    "Draft",
-                    _money(
-                        summary[
-                            "total_draft"
-                        ]
-                    ),
-                )
-
-            with c3:
-                st.metric(
-                    "Reversed",
-                    _money(
-                        summary[
-                            "total_reversed"
-                        ]
-                    ),
-                )
-
-            with c4:
-                st.metric(
-                    "Transactions",
-                    summary[
-                        "payment_count"
-                    ],
-                )
-
-            st.divider()
-
-            payments = get_all_payments(
-                db
-            )
-
-            if not payments:
-
-                st.info(
-                    "No payments have been created."
-                )
-
-            else:
-
-                filter_status = st.selectbox(
-                    "Status",
-                    [
-                        "All",
-                        "Draft",
-                        "Posted",
-                        "Reversed",
-                    ],
-                    key="payment_status_filter",
-                )
-
-                for payment in payments:
-
-                    status = _status(
-                        payment
-                    )
-
-                    if (
-                        filter_status != "All"
-                        and status != filter_status
-                    ):
-                        continue
-
-                    customer = (
-                        db.query(Customer)
-                        .filter(
-                            Customer.id
-                            == payment.customer_id
-                        )
-                        .first()
-                    )
-
-                    customer_name = _get(
-                        customer,
-                        "name",
-                        "Unknown",
-                    )
-
-                    invoice_number = (
-                        f"INV-{payment.invoice_id:05d}"
-                        if payment.invoice_id
-                        else "-"
-                    )
-
-                    with st.container(
-                        border=True
-                    ):
-
-                        c1, c2, c3, c4, c5 = st.columns(
-                            [
-                                1.2,
-                                2,
-                                1.5,
-                                1.5,
-                                1.2,
-                            ]
-                        )
-
-                        with c1:
-
-                            payment_number = _get(
-                                payment,
-                                "payment_number",
-                                f"PAY-{payment.id:05d}",
-                            )
-
-                            st.markdown(
-                                f"### {payment_number}"
-                            )
-
-                        with c2:
-
-                            st.write(
-                                f"**{customer_name}**"
-                            )
-
-                            st.caption(
-                                invoice_number
-                            )
-
-                        with c3:
-
-                            st.write(
-                                f"{_status_icon(status)} "
-                                f"{status}"
-                            )
-
-                        with c4:
-
-                            st.write(
-                                _money(
-                                    _get(
-                                        payment,
-                                        "amount",
-                                        0,
-                                    )
-                                )
-                            )
-
-                        with c5:
-
-                            if st.button(
-                                "Open",
-                                key=f"open_payment_{payment.id}",
-                                use_container_width=True,
-                            ):
-
-                                st.session_state[
-                                    "selected_payment_id"
-                                ] = payment.id
-
-                                st.rerun()
-
-        # ==================================================
-        # MANAGE PAYMENT
-        # ==================================================
-
-        with tab_manage:
-
-            payment_id = st.session_state.get(
-                "selected_payment_id"
-            )
-
-            if not payment_id:
-
-                st.info(
-                    "Select a payment from the "
-                    "Payment Register."
-                )
-
-            else:
-
-                payment = get_payment(
-                    db,
-                    payment_id,
-                )
-
-                if not payment:
-
-                    st.error(
-                        "Payment not found."
-                    )
-
-                else:
-
-                    render_payment_manager(
-                        db,
-                        payment,
-                    )
 
     finally:
 
         db.close()
 
 
-# ==========================================================
-# PAYMENT MANAGER
-# ==========================================================
+# ============================================================
+# CREATE PAYMENT
+# ============================================================
 
-def render_payment_manager(
-    db,
-    payment,
-):
+def create_payment_page():
+    """Create a new payment."""
 
-    status = _status(payment)
+    st.subheader("Create Payment")
 
-    invoice = (
-        db.query(Invoice)
-        .filter(
-            Invoice.id
-            == payment.invoice_id
-        )
-        .first()
-    )
+    db = SessionLocal()
 
-    customer = (
-        db.query(Customer)
-        .filter(
-            Customer.id
-            == payment.customer_id
-        )
-        .first()
-    )
+    try:
 
-    customer_name = _get(
-        customer,
-        "name",
-        "Unknown",
-    )
+        invoices = get_invoices(db)
 
-    payment_number = _get(
-        payment,
-        "payment_number",
-        f"PAY-{payment.id:05d}",
-    )
-
-    st.subheader(
-        payment_number
-    )
-
-    c1, c2, c3, c4 = st.columns(4)
-
-    with c1:
-
-        st.metric(
-            "Customer",
-            customer_name,
-        )
-
-    with c2:
-
-        st.metric(
-            "Invoice",
-            (
-                f"INV-{payment.invoice_id:05d}"
-                if payment.invoice_id
-                else "-"
-            ),
-        )
-
-    with c3:
-
-        st.metric(
-            "Status",
-            status,
-        )
-
-    with c4:
-
-        st.metric(
-            "Amount",
-            _money(
-                _get(
-                    payment,
-                    "amount",
-                    0,
-                )
-            ),
-        )
-
-    st.divider()
-
-    # ======================================================
-    # INVOICE BALANCE
-    # ======================================================
-
-    if invoice:
-
-        try:
-
-            balance = get_invoice_balance(
-                db,
-                invoice.id,
-            )
-
-            c1, c2, c3 = st.columns(3)
-
-            with c1:
-
-                st.metric(
-                    "Invoice Total",
-                    _money(
-                        balance[
-                            "invoice_total"
-                        ]
-                    ),
-                )
-
-            with c2:
-
-                st.metric(
-                    "Paid",
-                    _money(
-                        balance[
-                            "paid_amount"
-                        ]
-                    ),
-                )
-
-            with c3:
-
-                st.metric(
-                    "Outstanding",
-                    _money(
-                        balance[
-                            "balance"
-                        ]
-                    ),
-                )
-
-        except Exception as e:
+        if not invoices:
 
             st.warning(
-                f"Could not calculate invoice balance: {e}"
+                "There are no Posted invoices "
+                "available for payment."
             )
 
-    # ======================================================
-    # EDIT DRAFT
-    # ======================================================
+            return
 
-    if status.lower() == "draft":
+        invoice_options = {}
 
-        st.markdown(
-            "### ✏️ Edit Payment"
+        for invoice in invoices:
+
+            customer_name = (
+                invoice.customer.name
+                if invoice.customer
+                else "Unknown Customer"
+            )
+
+            invoice_options[invoice.id] = (
+                f"{invoice.invoice_number} | "
+                f"{customer_name} | "
+                f"Balance: "
+                f"{money(invoice.balance_due)}"
+            )
+
+        selected_invoice_id = st.selectbox(
+            "Invoice",
+            list(invoice_options.keys()),
+            format_func=lambda x:
+            invoice_options[x],
+        )
+
+        invoice = (
+            db.query(Invoice)
+            .filter(
+                Invoice.id
+                == selected_invoice_id
+            )
+            .first()
+        )
+
+        if not invoice:
+            st.error(
+                "Invoice could not be found."
+            )
+            return
+
+        st.markdown("### Invoice Information")
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+
+            st.metric(
+                "Invoice",
+                invoice.invoice_number,
+            )
+
+        with col2:
+
+            st.metric(
+                "Invoice Total",
+                money(
+                    invoice.total_amount
+                ),
+            )
+
+        with col3:
+
+            st.metric(
+                "Paid",
+                money(
+                    invoice.amount_paid
+                ),
+            )
+
+        with col4:
+
+            st.metric(
+                "Balance",
+                money(
+                    invoice.balance_due
+                ),
+            )
+
+        if float(
+            invoice.balance_due or 0
+        ) <= 0:
+
+            st.success(
+                "This invoice is fully paid."
+            )
+
+            return
+
+        st.divider()
+
+        max_amount = float(
+            invoice.balance_due or 0
         )
 
         amount = st.number_input(
             "Payment Amount",
             min_value=0.01,
-            value=float(
-                _get(
-                    payment,
-                    "amount",
-                    0,
-                )
-                or 0.01
-            ),
+            max_value=max_amount,
+            value=max_amount,
             step=1000.0,
-            key=f"payment_amount_{payment.id}",
         )
 
-        existing_date = _get(
-            payment,
-            "payment_date",
-            None,
+        payment_method = st.selectbox(
+            "Payment Method",
+            [
+                "Cash",
+                "Bank Transfer",
+                "Mobile Money",
+                "Cheque",
+                "Other",
+            ],
         )
-
-        if hasattr(
-            existing_date,
-            "date",
-        ):
-            existing_date = (
-                existing_date.date()
-            )
-
-        if not existing_date:
-            existing_date = date.today()
 
         payment_date = st.date_input(
             "Payment Date",
-            value=existing_date,
-            key=f"payment_date_{payment.id}",
+            value=date.today(),
         )
 
-        current_method = _get(
-            payment,
-            "payment_method",
-            "Cash",
-        ) or "Cash"
+        reference = st.text_input(
+            "Payment Reference",
+            placeholder=(
+                "Receipt number, transaction ID, "
+                "cheque number, etc."
+            ),
+        )
+
+        notes = st.text_area(
+            "Notes",
+            placeholder="Optional notes...",
+        )
+
+        st.divider()
+
+        if st.button(
+            "💾 Save Payment",
+            type="primary",
+            use_container_width=True,
+        ):
+
+            try:
+
+                payment = create_payment(
+                    db=db,
+                    invoice_id=invoice.id,
+                    amount=amount,
+                    payment_method=payment_method,
+                    payment_date=payment_date,
+                    reference=reference,
+                    notes=notes,
+                )
+
+                st.success(
+                    f"Payment "
+                    f"{payment.payment_number} "
+                    f"created successfully."
+                )
+
+                st.info(
+                    "The payment is currently Draft. "
+                    "Post it to update the invoice "
+                    "and Finance."
+                )
+
+                st.rerun()
+
+            except Exception as exc:
+
+                db.rollback()
+
+                st.error(
+                    f"Could not create payment: "
+                    f"{exc}"
+                )
+
+    finally:
+
+        db.close()
+
+
+# ============================================================
+# VIEW PAYMENT
+# ============================================================
+
+def view_payment_page():
+    """View payment details."""
+
+    st.subheader("View Payment")
+
+    db = SessionLocal()
+
+    try:
+
+        payments = list_payments(db)
+
+        if not payments:
+
+            st.info(
+                "No payments have been recorded."
+            )
+
+            return
+
+        payment_options = {}
+
+        for payment in payments:
+
+            invoice = payment.invoice
+
+            invoice_number = (
+                invoice.invoice_number
+                if invoice
+                else "-"
+            )
+
+            payment_options[payment.id] = (
+                f"{payment.payment_number} | "
+                f"{invoice_number} | "
+                f"{money(payment.amount)} | "
+                f"{payment.status}"
+            )
+
+        selected_id = st.selectbox(
+            "Select Payment",
+            list(payment_options.keys()),
+            format_func=lambda x:
+            payment_options[x],
+        )
+
+        payment = get_payment(
+            db,
+            selected_id,
+        )
+
+        if not payment:
+            st.error(
+                "Payment not found."
+            )
+            return
+
+        invoice = payment.invoice
+
+        customer_name = (
+            invoice.customer.name
+            if invoice
+            and invoice.customer
+            else "Unknown"
+        )
+
+        st.subheader(
+            payment.payment_number
+        )
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+
+            st.metric(
+                "Amount",
+                money(payment.amount),
+            )
+
+        with col2:
+
+            st.metric(
+                "Method",
+                payment.payment_method,
+            )
+
+        with col3:
+
+            st.metric(
+                "Status",
+                payment.status,
+            )
+
+        with col4:
+
+            st.metric(
+                "Customer",
+                customer_name,
+            )
+
+        st.divider()
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+
+            st.write(
+                f"**Invoice:** "
+                f"{invoice.invoice_number if invoice else '-'}"
+            )
+
+            st.write(
+                f"**Payment Date:** "
+                f"{payment.payment_date}"
+            )
+
+        with col2:
+
+            st.write(
+                f"**Reference:** "
+                f"{payment.reference or '-'}"
+            )
+
+            st.write(
+                f"**Notes:** "
+                f"{payment.notes or '-'}"
+            )
+
+        st.divider()
+
+        if invoice:
+
+            st.subheader(
+                "Invoice Payment Summary"
+            )
+
+            summary = (
+                get_invoice_payment_summary(
+                    db,
+                    invoice.id,
+                )
+            )
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+
+                st.metric(
+                    "Invoice Total",
+                    money(
+                        summary[
+                            "invoice_total"
+                        ]
+                    ),
+                )
+
+            with col2:
+
+                st.metric(
+                    "Total Paid",
+                    money(
+                        summary[
+                            "total_paid"
+                        ]
+                    ),
+                )
+
+            with col3:
+
+                st.metric(
+                    "Balance Due",
+                    money(
+                        summary[
+                            "balance_due"
+                        ]
+                    ),
+                )
+
+        journal = get_payment_journal(
+            db,
+            payment.id,
+        )
+
+        if journal:
+
+            st.divider()
+
+            st.subheader(
+                "Finance Journal"
+            )
+
+            st.write(
+                f"**Journal:** "
+                f"{journal.entry_number}"
+            )
+
+            st.write(
+                f"**Description:** "
+                f"{journal.description}"
+            )
+
+            rows = []
+
+            for line in journal.lines:
+
+                account_name = (
+                    line.account.name
+                    if line.account
+                    else "Unknown"
+                )
+
+                account_code = (
+                    line.account.code
+                    if line.account
+                    else "-"
+                )
+
+                rows.append(
+                    {
+                        "Account":
+                            f"{account_code} - "
+                            f"{account_name}",
+                        "Debit":
+                            money(line.debit),
+                        "Credit":
+                            money(line.credit),
+                        "Description":
+                            line.description or "",
+                    }
+                )
+
+            st.dataframe(
+                rows,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+    finally:
+
+        db.close()
+
+
+# ============================================================
+# EDIT PAYMENT
+# ============================================================
+
+def edit_payment_page():
+    """Edit a Draft payment."""
+
+    st.subheader("Edit Draft Payment")
+
+    db = SessionLocal()
+
+    try:
+
+        payments = list_payments(
+            db,
+            status="Draft",
+        )
+
+        if not payments:
+
+            st.info(
+                "There are no Draft payments "
+                "available for editing."
+            )
+
+            return
+
+        payment_options = {}
+
+        for payment in payments:
+
+            invoice = payment.invoice
+
+            payment_options[payment.id] = (
+                f"{payment.payment_number} | "
+                f"{invoice.invoice_number if invoice else '-'} | "
+                f"{money(payment.amount)}"
+            )
+
+        selected_id = st.selectbox(
+            "Select Draft Payment",
+            list(payment_options.keys()),
+            format_func=lambda x:
+            payment_options[x],
+        )
+
+        payment = get_payment(
+            db,
+            selected_id,
+        )
+
+        if not payment:
+            st.error(
+                "Payment not found."
+            )
+            return
+
+        invoice = payment.invoice
+
+        if not invoice:
+            st.error(
+                "Payment invoice not found."
+            )
+            return
+
+        st.info(
+            f"Invoice balance: "
+            f"{money(invoice.balance_due)}"
+        )
+
+        amount = st.number_input(
+            "Payment Amount",
+            min_value=0.01,
+            max_value=float(
+                invoice.balance_due or 0
+            ),
+            value=float(
+                payment.amount or 0
+            ),
+            step=1000.0,
+        )
 
         methods = [
             "Cash",
             "Bank Transfer",
             "Mobile Money",
             "Cheque",
-            "Card",
             "Other",
         ]
+
+        current_method = (
+            payment.payment_method
+            or "Cash"
+        )
 
         if current_method not in methods:
             methods.append(
@@ -728,211 +779,409 @@ def render_payment_manager(
             index=methods.index(
                 current_method
             ),
-            key=f"payment_method_{payment.id}",
+        )
+
+        payment_date = st.date_input(
+            "Payment Date",
+            value=(
+                payment.payment_date
+                or date.today()
+            ),
         )
 
         reference = st.text_input(
-            "Reference",
-            value=_get(
-                payment,
-                "reference",
-                "",
-            )
-            or "",
-            key=f"payment_reference_{payment.id}",
+            "Payment Reference",
+            value=payment.reference or "",
         )
 
         notes = st.text_area(
             "Notes",
-            value=_get(
-                payment,
-                "notes",
-                "",
-            )
-            or "",
-            key=f"payment_notes_{payment.id}",
+            value=payment.notes or "",
         )
 
         if st.button(
-            "Save Payment Changes",
+            "💾 Update Payment",
             type="primary",
             use_container_width=True,
-            key=f"save_payment_{payment.id}",
         ):
 
             try:
 
-                update_payment(
+                updated = update_payment(
                     db=db,
                     payment_id=payment.id,
                     amount=amount,
-                    payment_date=payment_date,
                     payment_method=payment_method,
+                    payment_date=payment_date,
                     reference=reference,
                     notes=notes,
                 )
 
                 st.success(
-                    "Payment updated successfully."
+                    f"{updated.payment_number} "
+                    f"updated successfully."
                 )
 
                 st.rerun()
 
-            except Exception as e:
+            except Exception as exc:
+
+                db.rollback()
 
                 st.error(
-                    f"Could not update payment: {e}"
+                    f"Could not update payment: "
+                    f"{exc}"
                 )
 
-    # ======================================================
-    # PAYMENT DETAILS
-    # ======================================================
+    finally:
 
-    st.markdown(
-        "### 📄 Payment Details"
+        db.close()
+
+
+# ============================================================
+# POST PAYMENT
+# ============================================================
+
+def post_payment_page():
+    """Post a Draft payment."""
+
+    st.subheader("Post Payment")
+
+    db = SessionLocal()
+
+    try:
+
+        payments = list_payments(
+            db,
+            status="Draft",
+        )
+
+        if not payments:
+
+            st.info(
+                "There are no Draft payments "
+                "waiting to be posted."
+            )
+
+            return
+
+        payment_options = {}
+
+        for payment in payments:
+
+            invoice = payment.invoice
+
+            payment_options[payment.id] = (
+                f"{payment.payment_number} | "
+                f"{invoice.invoice_number if invoice else '-'} | "
+                f"{money(payment.amount)}"
+            )
+
+        selected_id = st.selectbox(
+            "Select Payment",
+            list(payment_options.keys()),
+            format_func=lambda x:
+            payment_options[x],
+        )
+
+        payment = get_payment(
+            db,
+            selected_id,
+        )
+
+        if not payment:
+            st.error(
+                "Payment not found."
+            )
+            return
+
+        invoice = payment.invoice
+
+        st.subheader(
+            payment.payment_number
+        )
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+
+            st.metric(
+                "Payment",
+                money(payment.amount),
+            )
+
+        with col2:
+
+            st.metric(
+                "Invoice",
+                (
+                    invoice.invoice_number
+                    if invoice
+                    else "-"
+                ),
+            )
+
+        with col3:
+
+            st.metric(
+                "Invoice Balance",
+                money(
+                    invoice.balance_due
+                    if invoice
+                    else 0
+                ),
+            )
+
+        st.warning(
+            "Posting this payment will:"
+        )
+
+        st.markdown(
+            """
+            - Update the invoice amount paid.
+            - Reduce the invoice balance.
+            - Mark the payment as Posted.
+            - Create the Cash/Bank → Accounts Receivable journal entry.
+            - Mark the invoice as Paid if the balance reaches zero.
+            """
+        )
+
+        confirmation = st.checkbox(
+            "I confirm that this payment is valid "
+            "and should be posted."
+        )
+
+        if confirmation:
+
+            if st.button(
+                "📌 Post Payment",
+                type="primary",
+                use_container_width=True,
+            ):
+
+                try:
+
+                    posted = post_payment(
+                        db,
+                        payment.id,
+                    )
+
+                    st.success(
+                        f"{posted.payment_number} "
+                        f"posted successfully."
+                    )
+
+                    st.rerun()
+
+                except Exception as exc:
+
+                    db.rollback()
+
+                    st.error(
+                        f"Could not post payment: "
+                        f"{exc}"
+                    )
+
+    finally:
+
+        db.close()
+
+
+# ============================================================
+# REVERSE PAYMENT
+# ============================================================
+
+def reverse_payment_page():
+    """Reverse a posted payment."""
+
+    st.subheader("Reverse Payment")
+
+    db = SessionLocal()
+
+    try:
+
+        payments = list_payments(
+            db,
+            status="Posted",
+        )
+
+        if not payments:
+
+            st.info(
+                "There are no posted payments "
+                "available for reversal."
+            )
+
+            return
+
+        payment_options = {}
+
+        for payment in payments:
+
+            invoice = payment.invoice
+
+            payment_options[payment.id] = (
+                f"{payment.payment_number} | "
+                f"{invoice.invoice_number if invoice else '-'} | "
+                f"{money(payment.amount)}"
+            )
+
+        selected_id = st.selectbox(
+            "Select Payment",
+            list(payment_options.keys()),
+            format_func=lambda x:
+            payment_options[x],
+        )
+
+        payment = get_payment(
+            db,
+            selected_id,
+        )
+
+        if not payment:
+            st.error(
+                "Payment not found."
+            )
+            return
+
+        invoice = payment.invoice
+
+        st.subheader(
+            payment.payment_number
+        )
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+
+            st.metric(
+                "Payment Amount",
+                money(payment.amount),
+            )
+
+        with col2:
+
+            st.metric(
+                "Invoice",
+                (
+                    invoice.invoice_number
+                    if invoice
+                    else "-"
+                ),
+            )
+
+        with col3:
+
+            st.metric(
+                "Payment Method",
+                payment.payment_method,
+            )
+
+        st.error(
+            "Reversing a payment will restore "
+            "the customer's Accounts Receivable "
+            "balance and create a reversing "
+            "Finance journal entry."
+        )
+
+        confirmation = st.checkbox(
+            "I confirm that this payment "
+            "should be reversed."
+        )
+
+        if confirmation:
+
+            if st.button(
+                "↩️ Reverse Payment",
+                type="primary",
+                use_container_width=True,
+            ):
+
+                try:
+
+                    reversed_payment = (
+                        reverse_payment(
+                            db,
+                            payment.id,
+                        )
+                    )
+
+                    st.success(
+                        f"{reversed_payment.payment_number} "
+                        f"has been reversed."
+                    )
+
+                    st.rerun()
+
+                except Exception as exc:
+
+                    db.rollback()
+
+                    st.error(
+                        f"Could not reverse payment: "
+                        f"{exc}"
+                    )
+
+    finally:
+
+        db.close()
+
+
+# ============================================================
+# MAIN PAGE
+# ============================================================
+
+def payments_page():
+    """
+    Main Payments page.
+
+    Designed for integration with streamlit_app.py.
+    """
+
+    st.header("💳 Payments")
+
+    menu = st.radio(
+        "Payment Module",
+        [
+            "Dashboard",
+            "Create",
+            "View",
+            "Edit",
+            "Post",
+            "Reverse",
+        ],
+        horizontal=True,
     )
-
-    c1, c2 = st.columns(2)
-
-    with c1:
-
-        st.write(
-            f"**Payment Method:** "
-            f"{_get(payment, 'payment_method', '-')}"
-        )
-
-        st.write(
-            f"**Reference:** "
-            f"{_get(payment, 'reference', '-') or '-'}"
-        )
-
-    with c2:
-
-        st.write(
-            f"**Payment Date:** "
-            f"{_get(payment, 'payment_date', '-')}"
-        )
-
-        st.write(
-            f"**Notes:** "
-            f"{_get(payment, 'notes', '-') or '-'}"
-        )
-
-    # ======================================================
-    # ACTIONS
-    # ======================================================
 
     st.divider()
 
-    st.markdown(
-        "### ⚙️ Payment Actions"
-    )
+    if menu == "Dashboard":
 
-    if status.lower() == "draft":
+        payment_dashboard()
 
-        if st.button(
-            "📌 Post Payment",
-            type="primary",
-            use_container_width=True,
-            key=f"post_payment_{payment.id}",
-        ):
+    elif menu == "Create":
 
-            try:
+        create_payment_page()
 
-                post_payment(
-                    db=db,
-                    payment_id=payment.id,
-                )
+    elif menu == "View":
 
-                st.success(
-                    "Payment posted successfully."
-                )
+        view_payment_page()
 
-                st.rerun()
+    elif menu == "Edit":
 
-            except Exception as e:
+        edit_payment_page()
 
-                st.error(
-                    f"Could not post payment: {e}"
-                )
+    elif menu == "Post":
 
-    elif status.lower() == "posted":
+        post_payment_page()
 
-        st.warning(
-            "A posted payment should not be deleted. "
-            "Reverse it to preserve the financial audit trail."
-        )
+    elif menu == "Reverse":
 
-        reversal_reason = st.text_input(
-            "Reversal reason",
-            key=f"reversal_reason_{payment.id}",
-        )
-
-        if st.button(
-            "↩️ Reverse Payment",
-            use_container_width=True,
-            key=f"reverse_payment_{payment.id}",
-        ):
-
-            try:
-
-                reverse_payment(
-                    db=db,
-                    payment_id=payment.id,
-                    reason=reversal_reason,
-                )
-
-                st.success(
-                    "Payment reversed successfully."
-                )
-
-                st.rerun()
-
-            except Exception as e:
-
-                st.error(
-                    f"Could not reverse payment: {e}"
-                )
-
-    elif status.lower() == "reversed":
-
-        st.info(
-            "This payment has been reversed and "
-            "can no longer be posted."
-        )
-
-    # ======================================================
-    # CUSTOMER BALANCE
-    # ======================================================
-
-    if payment.customer_id:
-
-        try:
-
-            customer_balance = (
-                get_customer_outstanding_balance(
-                    db,
-                    payment.customer_id,
-                )
-            )
-
-            st.divider()
-
-            st.metric(
-                "Customer Outstanding Balance",
-                _money(customer_balance),
-            )
-
-        except Exception as e:
-
-            st.warning(
-                f"Could not calculate customer balance: {e}"
-            )
+        reverse_payment_page()
 
 
-# ==========================================================
+# ============================================================
 # COMPATIBILITY ALIAS
-# ==========================================================
+# ============================================================
 
-def payments():
-    payments_page()
+payment_page = payments_page
