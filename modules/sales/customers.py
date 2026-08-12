@@ -1,594 +1,387 @@
 """
-Esan ERP Sales - Customer Management
+Esan ERP
+Sales & Distribution - Customers
 
-Nile Harvest Foods Ltd.
-Enterprise Milling & Packaging Management System
-
-Functions:
-- Add customers
-- Edit customers
-- Delete customers
-- Activate/deactivate customers
-- Search customers
-- View customer records
+Customer management interface.
 """
 
 import streamlit as st
-import pandas as pd
 
-from services.sales_service import (
+from database import SessionLocal
+
+from services.customer_service import (
     get_all_customers,
-    search_customers,
+    get_customer,
     create_customer,
     update_customer,
     delete_customer,
-    set_customer_status,
 )
 
 
-# ==================================================
-# MAIN CUSTOMER PAGE
-# ==================================================
-
 def customers_page():
 
-    st.title("👥 Customer Management")
-
-    tab1, tab2, tab3 = st.tabs(
-        [
-            "➕ Add Customer",
-            "📋 Customers",
-            "✏️ Manage Customer",
-        ]
+    st.subheader("👥 Customers")
+    st.caption(
+        "Manage customers for Sales & Distribution."
     )
 
-    with tab1:
-        add_customer()
-
-    with tab2:
-        view_customers()
-
-    with tab3:
-        manage_customer()
-
-
-# ==================================================
-# ADD CUSTOMER
-# ==================================================
-
-def add_customer():
-
-    st.subheader("Register New Customer")
-
-    with st.form("customer_form"):
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-
-            name = st.text_input(
-                "Customer Name *"
-            )
-
-            contact_person = st.text_input(
-                "Contact Person"
-            )
-
-            phone = st.text_input(
-                "Phone Number"
-            )
-
-            email = st.text_input(
-                "Email"
-            )
-
-        with col2:
-
-            customer_type = st.selectbox(
-                "Customer Type",
-                [
-                    "Retail",
-                    "Wholesale",
-                    "Distributor",
-                    "Corporate",
-                    "Institution",
-                    "Export",
-                    "Other",
-                ],
-            )
-
-            location = st.text_input(
-                "Location"
-            )
-
-            country = st.text_input(
-                "Country"
-            )
-
-        address = st.text_area(
-            "Address"
-        )
-
-        submitted = st.form_submit_button(
-            "💾 Save Customer",
-            use_container_width=True,
-        )
-
-    if submitted:
-
-        if not name.strip():
-
-            st.error(
-                "Customer name is required."
-            )
-
-            return
-
-        try:
-
-            customer = create_customer(
-                name=name,
-                phone=phone,
-                email=email,
-                address=address,
-                customer_type=customer_type,
-                location=location,
-                country=country,
-                contact_person=contact_person,
-            )
-
-            st.success(
-                f"Customer '{customer.name}' "
-                "created successfully."
-            )
-
-            st.rerun()
-
-        except Exception as e:
-
-            st.error(
-                f"Unable to create customer: {e}"
-            )
-
-
-# ==================================================
-# VIEW CUSTOMERS
-# ==================================================
-
-def view_customers():
-
-    st.subheader("Customer Directory")
-
-    search_term = st.text_input(
-        "🔎 Search customers",
-        placeholder=(
-            "Search by name, phone, email or address"
-        ),
-    )
+    db = SessionLocal()
 
     try:
 
-        if search_term.strip():
+        # ==================================================
+        # TABS
+        # ==================================================
 
-            customers = search_customers(
-                search_term
-            )
-
-        else:
-
-            customers = get_all_customers()
-
-    except Exception as e:
-
-        st.error(
-            f"Unable to load customers: {e}"
+        tab_create, tab_view, tab_edit, tab_delete = st.tabs(
+            [
+                "➕ Create",
+                "📋 View",
+                "✏️ Edit",
+                "🗑️ Delete",
+            ]
         )
 
-        return
+        # ==================================================
+        # CREATE
+        # ==================================================
 
-    if not customers:
+        with tab_create:
 
-        st.info(
-            "No customers found."
-        )
+            st.markdown("### Create Customer")
 
-        return
-
-    data = []
-
-    for customer in customers:
-
-        active = getattr(
-            customer,
-            "active",
-            True,
-        )
-
-        data.append(
-            {
-                "ID": customer.id,
-                "Customer": customer.name,
-                "Contact Person": getattr(
-                    customer,
-                    "contact_person",
-                    "",
-                ),
-                "Phone": customer.phone or "",
-                "Email": customer.email or "",
-                "Type": getattr(
-                    customer,
-                    "customer_type",
-                    "",
-                ),
-                "Location": getattr(
-                    customer,
-                    "location",
-                    "",
-                ),
-                "Country": getattr(
-                    customer,
-                    "country",
-                    "",
-                ),
-                "Status": (
-                    "Active"
-                    if active
-                    else "Inactive"
-                ),
-            }
-        )
-
-    df = pd.DataFrame(data)
-
-    st.dataframe(
-        df,
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    st.caption(
-        f"Total customers: {len(customers)}"
-    )
-
-
-# ==================================================
-# MANAGE CUSTOMER
-# ==================================================
-
-def manage_customer():
-
-    st.subheader(
-        "✏️ Manage Customer"
-    )
-
-    customers = get_all_customers()
-
-    if not customers:
-
-        st.info(
-            "No customers are available."
-        )
-
-        return
-
-    customer_options = {
-        (
-            f"{customer.name} "
-            f"| {customer.phone or 'No phone'}"
-        ): customer.id
-        for customer in customers
-    }
-
-    selected_customer = st.selectbox(
-        "Select Customer",
-        list(customer_options.keys()),
-    )
-
-    customer_id = customer_options[
-        selected_customer
-    ]
-
-    customer = next(
-        (
-            item
-            for item in customers
-            if item.id == customer_id
-        ),
-        None,
-    )
-
-    if not customer:
-        st.error(
-            "Customer could not be found."
-        )
-        return
-
-    st.divider()
-
-    active = getattr(
-        customer,
-        "active",
-        True,
-    )
-
-    st.write(
-        f"**Current Status:** "
-        f"{'Active' if active else 'Inactive'}"
-    )
-
-    edit_tab, status_tab, delete_tab = st.tabs(
-        [
-            "✏️ Edit",
-            "🔄 Status",
-            "🗑️ Delete",
-        ]
-    )
-
-
-    # ==================================================
-    # EDIT
-    # ==================================================
-
-    with edit_tab:
-
-        with st.form(
-            f"edit_customer_{customer.id}"
-        ):
-
-            col1, col2 = st.columns(2)
-
-            with col1:
+            with st.form("create_customer_form"):
 
                 name = st.text_input(
-                    "Customer Name *",
-                    value=customer.name or "",
+                    "Customer Name *"
                 )
-
-                contact_person = st.text_input(
-                    "Contact Person",
-                    value=getattr(
-                        customer,
-                        "contact_person",
-                        "",
-                    ) or "",
-                )
-
-                phone = st.text_input(
-                    "Phone Number",
-                    value=customer.phone or "",
-                )
-
-                email = st.text_input(
-                    "Email",
-                    value=customer.email or "",
-                )
-
-            with col2:
-
-                customer_types = [
-                    "Retail",
-                    "Wholesale",
-                    "Distributor",
-                    "Corporate",
-                    "Institution",
-                    "Export",
-                    "Other",
-                ]
-
-                current_type = getattr(
-                    customer,
-                    "customer_type",
-                    "Retail",
-                ) or "Retail"
-
-                if current_type not in customer_types:
-                    customer_types.append(
-                        current_type
-                    )
 
                 customer_type = st.selectbox(
                     "Customer Type",
-                    customer_types,
-                    index=customer_types.index(
-                        current_type
-                    ),
+                    [
+                        "Retail",
+                        "Wholesale",
+                        "Distributor",
+                        "Corporate",
+                        "Other",
+                    ],
                 )
 
-                location = st.text_input(
-                    "Location",
-                    value=getattr(
-                        customer,
-                        "location",
-                        "",
-                    ) or "",
+                phone = st.text_input(
+                    "Phone"
                 )
 
-                country = st.text_input(
-                    "Country",
-                    value=getattr(
-                        customer,
-                        "country",
-                        "",
-                    ) or "",
+                email = st.text_input(
+                    "Email"
                 )
 
-            address = st.text_area(
-                "Address",
-                value=customer.address or "",
-            )
-
-            update_button = st.form_submit_button(
-                "💾 Update Customer",
-                use_container_width=True,
-            )
-
-        if update_button:
-
-            if not name.strip():
-
-                st.error(
-                    "Customer name is required."
+                address = st.text_area(
+                    "Address"
                 )
 
-                return
-
-            try:
-
-                updated = update_customer(
-                    customer_id=customer.id,
-                    name=name,
-                    phone=phone,
-                    email=email,
-                    address=address,
-                    customer_type=customer_type,
-                    location=location,
-                    country=country,
-                    contact_person=contact_person,
+                submitted = st.form_submit_button(
+                    "Create Customer",
+                    use_container_width=True,
+                    type="primary",
                 )
 
-                if updated:
+                if submitted:
 
-                    st.success(
-                        f"Customer '{updated.name}' "
-                        "updated successfully."
-                    )
+                    if not name.strip():
 
-                    st.rerun()
-
-                else:
-
-                    st.error(
-                        "Customer not found."
-                    )
-
-            except Exception as e:
-
-                st.error(
-                    f"Unable to update customer: {e}"
-                )
-
-
-    # ==================================================
-    # STATUS
-    # ==================================================
-
-    with status_tab:
-
-        if active:
-
-            st.success(
-                "This customer is currently active."
-            )
-
-            if st.button(
-                "🔴 Deactivate Customer",
-                use_container_width=True,
-            ):
-
-                try:
-
-                    updated = set_customer_status(
-                        customer.id,
-                        False,
-                    )
-
-                    if updated:
-
-                        st.success(
-                            "Customer deactivated."
+                        st.error(
+                            "Customer name is required."
                         )
 
-                        st.rerun()
+                    else:
 
-                except Exception as e:
+                        try:
 
-                    st.error(
-                        f"Unable to change status: {e}"
+                            customer = create_customer(
+                                db=db,
+                                name=name,
+                                phone=phone,
+                                email=email,
+                                address=address,
+                                customer_type=customer_type,
+                            )
+
+                            st.success(
+                                f"Customer '{customer.name}' created successfully."
+                            )
+
+                            st.rerun()
+
+                        except Exception as e:
+
+                            db.rollback()
+
+                            st.error(
+                                f"Unable to create customer: {e}"
+                            )
+
+        # ==================================================
+        # VIEW
+        # ==================================================
+
+        with tab_view:
+
+            st.markdown("### Customer Directory")
+
+            customers = get_all_customers(db)
+
+            if not customers:
+
+                st.info(
+                    "No customers have been registered yet."
+                )
+
+            else:
+
+                rows = []
+
+                for customer in customers:
+
+                    rows.append(
+                        {
+                            "ID": customer.id,
+                            "Name": customer.name,
+                            "Type": customer.customer_type,
+                            "Phone": customer.phone or "",
+                            "Email": customer.email or "",
+                            "Address": customer.address or "",
+                        }
                     )
 
-        else:
+                st.dataframe(
+                    rows,
+                    use_container_width=True,
+                    hide_index=True,
+                )
 
-            st.warning(
-                "This customer is currently inactive."
-            )
+        # ==================================================
+        # EDIT
+        # ==================================================
 
-            if st.button(
-                "🟢 Activate Customer",
-                use_container_width=True,
-            ):
+        with tab_edit:
 
-                try:
+            st.markdown("### Edit Customer")
 
-                    updated = set_customer_status(
-                        customer.id,
-                        True,
-                    )
+            customers = get_all_customers(db)
 
-                    if updated:
+            if not customers:
 
-                        st.success(
-                            "Customer activated."
-                        )
+                st.info(
+                    "There are no customers to edit."
+                )
 
-                        st.rerun()
+            else:
 
-                except Exception as e:
-
-                    st.error(
-                        f"Unable to change status: {e}"
-                    )
-
-
-    # ==================================================
-    # DELETE
-    # ==================================================
-
-    with delete_tab:
-
-        st.warning(
-            "Deleting a customer is permanent."
-        )
-
-        confirm_delete = st.checkbox(
-            "I understand that this customer will be permanently deleted."
-        )
-
-        if st.button(
-            "🗑️ Delete Customer",
-            use_container_width=True,
-            disabled=not confirm_delete,
-        ):
-
-            try:
-
-                deleted = delete_customer(
+                customer_options = {
+                    f"{customer.id} - {customer.name}":
                     customer.id
+                    for customer in customers
+                }
+
+                selected_label = st.selectbox(
+                    "Select Customer",
+                    list(customer_options.keys()),
                 )
 
-                if deleted:
+                selected_id = customer_options[
+                    selected_label
+                ]
 
-                    st.success(
-                        "Customer deleted successfully."
-                    )
-
-                    st.rerun()
-
-                else:
-
-                    st.error(
-                        "Customer could not be found."
-                    )
-
-            except Exception as e:
-
-                st.error(
-                    f"Unable to delete customer: {e}"
+                customer = get_customer(
+                    db,
+                    selected_id,
                 )
 
+                if customer:
 
-# ==================================================
-# STANDALONE EXECUTION
-# ==================================================
+                    with st.form(
+                        "edit_customer_form"
+                    ):
 
-if __name__ == "__main__":
-    customers_page()
+                        name = st.text_input(
+                            "Customer Name *",
+                            value=customer.name or "",
+                        )
+
+                        customer_types = [
+                            "Retail",
+                            "Wholesale",
+                            "Distributor",
+                            "Corporate",
+                            "Other",
+                        ]
+
+                        current_type = (
+                            customer.customer_type
+                            if customer.customer_type
+                            in customer_types
+                            else "Retail"
+                        )
+
+                        customer_type = st.selectbox(
+                            "Customer Type",
+                            customer_types,
+                            index=customer_types.index(
+                                current_type
+                            ),
+                        )
+
+                        phone = st.text_input(
+                            "Phone",
+                            value=customer.phone or "",
+                        )
+
+                        email = st.text_input(
+                            "Email",
+                            value=customer.email or "",
+                        )
+
+                        address = st.text_area(
+                            "Address",
+                            value=customer.address or "",
+                        )
+
+                        submitted = st.form_submit_button(
+                            "Save Changes",
+                            use_container_width=True,
+                            type="primary",
+                        )
+
+                        if submitted:
+
+                            if not name.strip():
+
+                                st.error(
+                                    "Customer name is required."
+                                )
+
+                            else:
+
+                                try:
+
+                                    update_customer(
+                                        db=db,
+                                        customer_id=selected_id,
+                                        name=name,
+                                        phone=phone,
+                                        email=email,
+                                        address=address,
+                                        customer_type=customer_type,
+                                    )
+
+                                    st.success(
+                                        "Customer updated successfully."
+                                    )
+
+                                    st.rerun()
+
+                                except Exception as e:
+
+                                    db.rollback()
+
+                                    st.error(
+                                        f"Unable to update customer: {e}"
+                                    )
+
+        # ==================================================
+        # DELETE
+        # ==================================================
+
+        with tab_delete:
+
+            st.markdown("### Delete Customer")
+
+            customers = get_all_customers(db)
+
+            if not customers:
+
+                st.info(
+                    "There are no customers to delete."
+                )
+
+            else:
+
+                customer_options = {
+                    f"{customer.id} - {customer.name}":
+                    customer.id
+                    for customer in customers
+                }
+
+                selected_label = st.selectbox(
+                    "Select Customer",
+                    list(customer_options.keys()),
+                    key="delete_customer_select",
+                )
+
+                selected_id = customer_options[
+                    selected_label
+                ]
+
+                customer = get_customer(
+                    db,
+                    selected_id,
+                )
+
+                if customer:
+
+                    st.warning(
+                        f"You are about to delete "
+                        f"**{customer.name}**."
+                    )
+
+                    st.caption(
+                        "Only delete customers that have no "
+                        "dependent sales transactions."
+                    )
+
+                    confirm = st.checkbox(
+                        "I understand that this action cannot be undone.",
+                        key="confirm_customer_delete",
+                    )
+
+                    if st.button(
+                        "🗑️ Delete Customer",
+                        disabled=not confirm,
+                        use_container_width=True,
+                        type="secondary",
+                    ):
+
+                        try:
+
+                            deleted = delete_customer(
+                                db,
+                                selected_id,
+                            )
+
+                            if deleted:
+
+                                st.success(
+                                    "Customer deleted successfully."
+                                )
+
+                                st.rerun()
+
+                            else:
+
+                                st.error(
+                                    "Customer could not be found."
+                                )
+
+                        except Exception as e:
+
+                            db.rollback()
+
+                            st.error(
+                                "Customer cannot be deleted "
+                                "because it may have related "
+                                f"transactions.\n\n{e}"
+                            )
+
+    finally:
+
+        db.close()
