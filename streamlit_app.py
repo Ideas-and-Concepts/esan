@@ -6,7 +6,8 @@ Enterprise Resource Planning System
 Version 1.4.0 Alpha
 Full Repository Integration
 
-Main Modules:
+Main Modules
+-------------
 - Overview
 - Procurement
 - Warehouse
@@ -16,6 +17,24 @@ Main Modules:
 - Finance
 - Reports
 - Administration
+
+Sales & Distribution Workflow
+------------------------------
+Customers
+    ↓
+Quotations
+    ↓
+Sales Orders
+    ↓
+Stock Reservation
+    ↓
+Deliveries
+    ↓
+Invoices
+    ↓
+Payments
+    ↓
+Finance / General Ledger
 """
 
 import logging
@@ -60,6 +79,10 @@ st.markdown(
     """
     <style>
 
+    /* ======================================================
+       STREAMLIT CLEANUP
+       ====================================================== */
+
     #MainMenu {
         display: none;
     }
@@ -78,7 +101,7 @@ st.markdown(
     }
 
     div[data-testid="stSidebar"] {
-        border-right: 1px solid #ddd;
+        border-right: 1px solid #dddddd;
     }
 
     /* ======================================================
@@ -86,7 +109,7 @@ st.markdown(
        ====================================================== */
 
     .login-page {
-        min-height: 82vh;
+        min-height: 80vh;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -100,70 +123,41 @@ st.markdown(
     }
 
     /* ======================================================
-       LOGO
+       ESAN LOGO
        ====================================================== */
 
-    .logo {
+    .esan-logo {
         width: 112px;
         height: 112px;
-        margin: 0 auto 18px auto;
-        border-radius: 32px;
-        background: linear-gradient(
-            145deg,
-            #2e7d32,
-            #1b5e20
-        );
+        margin: 0 auto 20px auto;
         display: flex;
         align-items: center;
         justify-content: center;
-        position: relative;
-        box-shadow:
-            0 18px 45px
-            rgba(20, 90, 55, 0.25);
     }
 
-    .logo::before {
-        content: "";
-        position: absolute;
-        bottom: 0;
+    .esan-logo svg {
         width: 100%;
-        height: 28px;
-        background: #4e342e;
-        border-radius: 0 0 28px 28px;
+        height: 100%;
+        display: block;
     }
 
-    .logo-stem {
-        position: absolute;
-        bottom: 28px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 6px;
-        height: 40px;
-        background: #aed581;
-        border-radius: 3px 3px 0 0;
+    .esan-sidebar-logo {
+        width: 82px;
+        height: 82px;
+        margin: 0 auto 12px auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
-    .logo-leaf {
-        position: absolute;
-        bottom: 52px;
-        width: 18px;
-        height: 18px;
-        background: #81c784;
-        border-radius: 50%;
-    }
-
-    .logo-leaf.left {
-        left: 24px;
-        transform: rotate(-30deg);
-    }
-
-    .logo-leaf.right {
-        right: 24px;
-        transform: rotate(30deg);
+    .esan-sidebar-logo svg {
+        width: 100%;
+        height: 100%;
+        display: block;
     }
 
     /* ======================================================
-       INPUTS
+       LOGIN INPUTS
        ====================================================== */
 
     div[data-testid="stTextInput"] label {
@@ -183,27 +177,151 @@ st.markdown(
     }
 
     /* ======================================================
-       SECTION HEADERS
+       ERP HEADERS
        ====================================================== */
-
-    .erp-section {
-        padding: 0.5rem 0 0.75rem 0;
-    }
 
     .erp-title {
         font-size: 1.8rem;
         font-weight: 750;
+        margin-bottom: 0.15rem;
     }
 
     .erp-subtitle {
-        color: #777;
+        color: #777777;
         font-size: 0.95rem;
+        margin-bottom: 1rem;
+    }
+
+    /* ======================================================
+       SIDEBAR
+       ====================================================== */
+
+    .sidebar-section {
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        color: #777777;
+        margin-top: 0.8rem;
+        margin-bottom: 0.25rem;
     }
 
     </style>
     """,
     unsafe_allow_html=True,
 )
+
+
+# ============================================================
+# ESAN LOGO
+# ============================================================
+
+def render_logo(size="normal"):
+    """
+    Render the Esan ERP logo as inline SVG.
+
+    size:
+        normal  -> Login screen
+        sidebar -> Sidebar
+    """
+
+    if size == "sidebar":
+        css_class = "esan-sidebar-logo"
+    else:
+        css_class = "esan-logo"
+
+    st.markdown(
+        f"""
+        <div class="{css_class}">
+
+            <svg
+                viewBox="0 0 200 200"
+                xmlns="http://www.w3.org/2000/svg"
+                role="img"
+                aria-label="Esan ERP"
+            >
+
+                <!-- Main rounded square -->
+                <rect
+                    x="8"
+                    y="8"
+                    width="184"
+                    height="184"
+                    rx="48"
+                    fill="#2E7D32"
+                />
+
+                <!-- Inner green highlight -->
+                <rect
+                    x="18"
+                    y="18"
+                    width="164"
+                    height="164"
+                    rx="40"
+                    fill="#388E3C"
+                    opacity="0.35"
+                />
+
+                <!-- Ground / soil -->
+                <path
+                    d="
+                        M8 142
+                        Q55 126 100 142
+                        Q145 158 192 140
+                        L192 192
+                        L8 192
+                        Z
+                    "
+                    fill="#4E342E"
+                />
+
+                <!-- Stem -->
+                <path
+                    d="
+                        M100 145
+                        C98 125 98 105 100 80
+                    "
+                    stroke="#AED581"
+                    stroke-width="8"
+                    stroke-linecap="round"
+                    fill="none"
+                />
+
+                <!-- Left leaf -->
+                <path
+                    d="
+                        M98 105
+                        C76 103 58 91 52 72
+                        C73 70 92 80 100 96
+                        Z
+                    "
+                    fill="#81C784"
+                />
+
+                <!-- Right leaf -->
+                <path
+                    d="
+                        M102 94
+                        C113 72 133 62 154 66
+                        C151 87 132 101 104 102
+                        Z
+                    "
+                    fill="#A5D66A"
+                />
+
+                <!-- Grain / seed -->
+                <circle
+                    cx="100"
+                    cy="57"
+                    r="8"
+                    fill="#DCE775"
+                />
+
+            </svg>
+
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 # ============================================================
@@ -217,8 +335,8 @@ def safe_import(module_path, function_name):
     """
     Safely import a module function.
 
-    A failed optional module should not prevent
-    the entire ERP application from loading.
+    Missing or broken optional modules are recorded rather
+    than crashing the entire ERP application.
     """
 
     try:
@@ -229,6 +347,7 @@ def safe_import(module_path, function_name):
         )
 
         if hasattr(module, function_name):
+
             return getattr(
                 module,
                 function_name,
@@ -240,6 +359,7 @@ def safe_import(module_path, function_name):
         )
 
         module_errors.append(error)
+
         logging.error(error)
 
         return None
@@ -254,7 +374,7 @@ def safe_import(module_path, function_name):
         module_errors.append(error)
 
         logging.exception(
-            "Failed loading %s",
+            "Failed loading module %s",
             module_path,
         )
 
@@ -262,16 +382,19 @@ def safe_import(module_path, function_name):
 
 
 # ============================================================
-# ADMIN CREATION
+# ADMIN USER CREATION
 # ============================================================
 
 try:
 
     from services.user_service import create_admin
 
-except ImportError:
+except Exception:
 
     def create_admin(db):
+        """
+        Fallback administrator creation.
+        """
 
         admin = (
             db.query(User)
@@ -281,23 +404,24 @@ except ImportError:
             .first()
         )
 
-        if not admin:
+        if admin:
+            return
 
-            from auth import hash_password
+        from auth import hash_password
 
-            admin = User(
-                username="admin",
-                full_name="System Administrator",
-                email="admin@nileharvest.com",
-                password_hash=hash_password(
-                    "admin123"
-                ),
-                role="Administrator",
-                active=True,
-            )
+        admin = User(
+            username="admin",
+            full_name="System Administrator",
+            email="admin@nileharvest.com",
+            password_hash=hash_password(
+                "admin123"
+            ),
+            role="Administrator",
+            active=True,
+        )
 
-            db.add(admin)
-            db.commit()
+        db.add(admin)
+        db.commit()
 
 
 # ============================================================
@@ -308,7 +432,7 @@ try:
 
     from seed.seed_data import load_seed_data
 
-except ImportError:
+except Exception:
 
     load_seed_data = None
 
@@ -341,14 +465,14 @@ procurement_suppliers = safe_import(
     "suppliers_page",
 )
 
-procurement_purchases = safe_import(
-    "modules.procurement.purchases",
-    "purchases_page",
-)
-
 procurement_purchase_orders = safe_import(
     "modules.procurement.purchase_orders",
     "purchase_orders_page",
+)
+
+procurement_purchases = safe_import(
+    "modules.procurement.purchases",
+    "purchases_page",
 )
 
 
@@ -462,17 +586,19 @@ administration_dashboard = safe_import(
 # ============================================================
 
 def fallback_page(title):
+    """
+    Generic fallback for unavailable modules.
+    """
 
     def render():
 
-        st.info(
-            f"{title} is currently unavailable."
+        st.warning(
+            f"{title} module is currently unavailable."
         )
 
         st.caption(
-            "The module could not be loaded. "
             "Check the Module Loading Information "
-            "section at the bottom of the application."
+            "section below for details."
         )
 
     return render
@@ -483,14 +609,14 @@ procurement_suppliers = (
     or fallback_page("Suppliers")
 )
 
-procurement_purchases = (
-    procurement_purchases
-    or fallback_page("Purchases")
-)
-
 procurement_purchase_orders = (
     procurement_purchase_orders
     or fallback_page("Purchase Orders")
+)
+
+procurement_purchases = (
+    procurement_purchases
+    or fallback_page("Purchases")
 )
 
 warehouse_inventory = (
@@ -509,6 +635,9 @@ administration_dashboard = (
 # ============================================================
 
 def initialize_database():
+    """
+    Initialize database tables and administrator account.
+    """
 
     try:
 
@@ -520,15 +649,14 @@ def initialize_database():
 
         missing_tables = [
             table_name
-            for table_name
-            in Base.metadata.tables
+            for table_name in Base.metadata.tables
             if table_name not in existing_tables
         ]
 
         if missing_tables:
 
             logging.info(
-                "Creating missing tables: %s",
+                "Missing database tables detected: %s",
                 missing_tables,
             )
 
@@ -545,6 +673,10 @@ def initialize_database():
         finally:
 
             db.close()
+
+        # ----------------------------------------------------
+        # Seed data
+        # ----------------------------------------------------
 
         if load_seed_data:
 
@@ -570,7 +702,7 @@ def initialize_database():
         )
 
         st.caption(
-            "Check esan_erp.log for details."
+            "Check esan_erp.log for the full error."
         )
 
 
@@ -584,18 +716,30 @@ initialize_database()
 if "logged_in" not in st.session_state:
 
     st.session_state.logged_in = False
+
+if "username" not in st.session_state:
+
     st.session_state.username = None
+
+if "role" not in st.session_state:
+
     st.session_state.role = None
+
+if "current_page" not in st.session_state:
+
     st.session_state.current_page = (
         "🏠 Overview"
     )
 
 
 # ============================================================
-# LOGIN
+# LOGIN FUNCTION
 # ============================================================
 
 def login(username, password):
+    """
+    Authenticate an ERP user.
+    """
 
     db = SessionLocal()
 
@@ -622,10 +766,12 @@ def login(username, password):
             st.session_state.username = (
                 user.username
             )
-            st.session_state.role = user.role
+            st.session_state.role = (
+                user.role
+            )
 
             logging.info(
-                "User logged in: %s",
+                "Successful login: %s",
                 user.username,
             )
 
@@ -634,6 +780,14 @@ def login(username, password):
         logging.warning(
             "Failed login attempt: %s",
             username,
+        )
+
+        return False
+
+    except Exception:
+
+        logging.exception(
+            "Login error"
         )
 
         return False
@@ -652,21 +806,16 @@ if not st.session_state.logged_in:
     st.markdown(
         """
         <div class="login-page">
-
             <div class="login-container">
+        """,
+        unsafe_allow_html=True,
+    )
 
-                <div class="logo">
+    render_logo("normal")
 
-                    <div class="logo-stem"></div>
-
-                    <div class="logo-leaf left"></div>
-
-                    <div class="logo-leaf right"></div>
-
-                </div>
-
+    st.markdown(
+        """
             </div>
-
         </div>
         """,
         unsafe_allow_html=True,
@@ -689,19 +838,21 @@ if not st.session_state.logged_in:
             placeholder="Enter your password",
         )
 
-        if st.button(
+        login_clicked = st.button(
             "Login",
             use_container_width=True,
             type="primary",
-        ):
+        )
+
+        if login_clicked:
 
             if login(
-                username,
+                username.strip(),
                 password,
             ):
 
                 st.success(
-                    "Login successful"
+                    "Login successful."
                 )
 
                 st.rerun()
@@ -709,7 +860,7 @@ if not st.session_state.logged_in:
             else:
 
                 st.error(
-                    "Invalid username or password"
+                    "Invalid username or password."
                 )
 
     st.stop()
@@ -725,37 +876,12 @@ with st.sidebar:
     # LOGO
     # --------------------------------------------------------
 
-    st.markdown(
-        """
-        <div style="
-            text-align:center;
-            margin-bottom:1rem;
-        ">
-
-            <div class="logo"
-                 style="
-                    margin:0 auto;
-                    width:88px;
-                    height:88px;
-                 ">
-
-                <div class="logo-stem"></div>
-
-                <div class="logo-leaf left"></div>
-
-                <div class="logo-leaf right"></div>
-
-            </div>
-
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    render_logo("sidebar")
 
     st.divider()
 
     # --------------------------------------------------------
-    # NAVIGATION BUTTON
+    # NAVIGATION FUNCTION
     # --------------------------------------------------------
 
     def nav_button(label):
@@ -763,37 +889,59 @@ with st.sidebar:
         if st.button(
             label,
             use_container_width=True,
+            key=f"nav_{label}",
         ):
 
             st.session_state.current_page = (
                 label
             )
 
+            st.rerun()
+
     # --------------------------------------------------------
     # OVERVIEW
     # --------------------------------------------------------
 
-    nav_button("🏠 Overview")
+    nav_button(
+        "🏠 Overview"
+    )
 
     # --------------------------------------------------------
     # OPERATIONS
     # --------------------------------------------------------
 
     st.markdown(
-        "**OPERATIONS**"
+        '<div class="sidebar-section">'
+        "OPERATIONS"
+        "</div>",
+        unsafe_allow_html=True,
     )
 
-    nav_button("🌾 Procurement")
-    nav_button("📦 Warehouse")
-    nav_button("🏭 Milling")
-    nav_button("📦 Packaging")
+    nav_button(
+        "🌾 Procurement"
+    )
+
+    nav_button(
+        "📦 Warehouse"
+    )
+
+    nav_button(
+        "🏭 Milling"
+    )
+
+    nav_button(
+        "📦 Packaging"
+    )
 
     # --------------------------------------------------------
     # COMMERCIAL
     # --------------------------------------------------------
 
     st.markdown(
-        "**COMMERCIAL**"
+        '<div class="sidebar-section">'
+        "COMMERCIAL"
+        "</div>",
+        unsafe_allow_html=True,
     )
 
     nav_button(
@@ -805,65 +953,75 @@ with st.sidebar:
     # --------------------------------------------------------
 
     st.markdown(
-        "**FINANCE**"
+        '<div class="sidebar-section">'
+        "FINANCE"
+        "</div>",
+        unsafe_allow_html=True,
     )
 
-    nav_button("💰 Finance")
+    nav_button(
+        "💰 Finance"
+    )
 
     # --------------------------------------------------------
     # REPORTING
     # --------------------------------------------------------
 
     st.markdown(
-        "**REPORTING**"
+        '<div class="sidebar-section">'
+        "REPORTING"
+        "</div>",
+        unsafe_allow_html=True,
     )
 
-    nav_button("📊 Reports")
+    nav_button(
+        "📊 Reports"
+    )
 
     # --------------------------------------------------------
     # ADMINISTRATION
     # --------------------------------------------------------
 
-    if (
-        st.session_state.role
-        in [
-            "Administrator",
-            "Admin",
-            "admin",
-        ]
-    ):
+    if st.session_state.role in [
+        "Administrator",
+        "Administrator ",
+        "Admin",
+        "admin",
+    ]:
 
         st.markdown(
-            "**ADMINISTRATION**"
+            '<div class="sidebar-section">'
+            "ADMINISTRATION"
+            "</div>",
+            unsafe_allow_html=True,
         )
 
         nav_button(
             "🔐 Administration"
         )
 
-    st.divider()
-
     # --------------------------------------------------------
     # USER PANEL
     # --------------------------------------------------------
+
+    st.divider()
 
     st.markdown(
         "### 👤 User Panel"
     )
 
     st.write(
-        f"User: "
-        f"**{st.session_state.username}**"
+        f"User: **{st.session_state.username}**"
     )
 
     st.write(
-        f"Role: "
-        f"**{st.session_state.role}**"
+        f"Role: **{st.session_state.role}**"
     )
 
     if st.button(
         "🚪 Logout",
         use_container_width=True,
+        key="logout_button",
     ):
 
         logging.info(
@@ -915,6 +1073,10 @@ elif menu == "🌾 Procurement":
         "🌾 Procurement"
     )
 
+    st.caption(
+        "Suppliers → Purchase Orders → Purchases"
+    )
+
     procurement_menu = st.radio(
         "Procurement Module",
         [
@@ -924,13 +1086,17 @@ elif menu == "🌾 Procurement":
             "Purchases",
         ],
         horizontal=True,
+        key="procurement_navigation",
     )
 
     if procurement_menu == "Dashboard":
 
         if procurement_dashboard:
+
             procurement_dashboard()
+
         else:
+
             st.warning(
                 "Procurement dashboard unavailable."
             )
@@ -958,6 +1124,11 @@ elif menu == "📦 Warehouse":
         "📦 Warehouse"
     )
 
+    st.caption(
+        "Inventory → Stock Movements → "
+        "Stock Reservation → Dispatch"
+    )
+
     warehouse_menu = st.radio(
         "Warehouse Module",
         [
@@ -965,13 +1136,17 @@ elif menu == "📦 Warehouse":
             "Inventory",
         ],
         horizontal=True,
+        key="warehouse_navigation",
     )
 
     if warehouse_menu == "Dashboard":
 
         if warehouse_dashboard:
+
             warehouse_dashboard()
+
         else:
+
             st.warning(
                 "Warehouse dashboard unavailable."
             )
@@ -986,6 +1161,10 @@ elif menu == "📦 Warehouse":
 # ============================================================
 
 elif menu == "🏭 Milling":
+
+    st.header(
+        "🏭 Milling"
+    )
 
     if milling_dashboard:
 
@@ -1003,6 +1182,10 @@ elif menu == "🏭 Milling":
 # ============================================================
 
 elif menu == "📦 Packaging":
+
+    st.header(
+        "📦 Packaging"
+    )
 
     if packaging_dashboard:
 
@@ -1026,8 +1209,9 @@ elif menu == "🚚 Sales & Distribution":
     )
 
     st.caption(
-        "Customer → Quotation → Sales Order → "
-        "Stock Reservation → Delivery → Invoice → Payment"
+        "Customers → Quotations → Sales Orders → "
+        "Stock Reservation → Deliveries → "
+        "Invoices → Payments → Finance"
     )
 
     sales_menu = st.radio(
@@ -1042,44 +1226,31 @@ elif menu == "🚚 Sales & Distribution":
             "Payments",
         ],
         horizontal=True,
+        key="sales_navigation",
     )
 
     sales_pages = {
-
-        "Dashboard":
-            sales_dashboard,
-
-        "Customers":
-            sales_customers,
-
-        "Quotations":
-            sales_quotations,
-
-        "Sales Orders":
-            sales_orders,
-
-        "Deliveries":
-            sales_deliveries,
-
-        "Invoices":
-            sales_invoices,
-
-        "Payments":
-            sales_payments,
+        "Dashboard": sales_dashboard,
+        "Customers": sales_customers,
+        "Quotations": sales_quotations,
+        "Sales Orders": sales_orders,
+        "Deliveries": sales_deliveries,
+        "Invoices": sales_invoices,
+        "Payments": sales_payments,
     }
 
-    page_func = sales_pages.get(
+    selected_page = sales_pages.get(
         sales_menu
     )
 
-    if page_func:
+    if selected_page:
 
-        page_func()
+        selected_page()
 
     else:
 
         st.warning(
-            f"{sales_menu} page unavailable."
+            f"{sales_menu} page is unavailable."
         )
 
 
@@ -1115,6 +1286,10 @@ elif menu == "💰 Finance":
 
 elif menu == "📊 Reports":
 
+    st.header(
+        "📊 Reports"
+    )
+
     if reports_dashboard:
 
         reports_dashboard()
@@ -1132,14 +1307,12 @@ elif menu == "📊 Reports":
 
 elif menu == "🔐 Administration":
 
-    if (
-        st.session_state.role
-        not in [
-            "Administrator",
-            "Admin",
-            "admin",
-        ]
-    ):
+    if st.session_state.role not in [
+        "Administrator",
+        "Administrator ",
+        "Admin",
+        "admin",
+    ]:
 
         st.error(
             "You do not have permission "
@@ -1147,6 +1320,10 @@ elif menu == "🔐 Administration":
         )
 
     elif administration_dashboard:
+
+        st.header(
+            "🔐 Administration"
+        )
 
         administration_dashboard()
 
