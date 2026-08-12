@@ -3,7 +3,9 @@ Esan ERP
 Invoice Service
 
 Nile Harvest Foods Ltd.
-Enterprise Milling & Packaging Management System
+Enterprise Resource Planning System
+
+Version 1.4.0 Alpha
 """
 
 from datetime import datetime
@@ -11,24 +13,13 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from models import (
-    Invoice,
-    InvoiceItem,
-    Customer,
-    Product,
-    SalesOrder,
-    SalesOrderItem,
-    Delivery,
-)
+from models import Invoice, InvoiceItem, Customer
+from services.finance_service import post_invoice_to_finance
 
 
 # ==========================================================
 # HELPERS
 # ==========================================================
-
-def _get(obj, field, default=None):
-    return getattr(obj, field, default)
-
 
 def _decimal(value):
     try:
@@ -37,25 +28,19 @@ def _decimal(value):
         return Decimal("0")
 
 
-def _commit(db):
-    db.commit()
-
-
-def _rollback(db):
-    try:
-        db.rollback()
-    except Exception:
-        pass
+def _get(obj, field, default=None):
+    return getattr(obj, field, default)
 
 
 # ==========================================================
 # GET INVOICES
 # ==========================================================
 
-def get_all_invoices(db: Session):
+def get_invoices(db: Session):
     """
     Return all invoices, newest first.
     """
+
     return (
         db.query(Invoice)
         .order_by(Invoice.id.desc())
@@ -68,59 +53,59 @@ def get_invoice(
     invoice_id: int,
 ):
     """
-    Return one invoice by ID.
+    Return one invoice.
     """
+
     return (
         db.query(Invoice)
-        .filter(Invoice.id == invoice_id)
+        .filter(
+            Invoice.id == invoice_id
+        )
         .first()
     )
 
 
-def get_invoice_items(
+def get_customer_invoices(
     db: Session,
-    invoice_id: int,
+    customer_id: int,
 ):
     """
-    Return invoice line items.
+    Return invoices belonging to a customer.
     """
+
     return (
-        db.query(InvoiceItem)
+        db.query(Invoice)
         .filter(
-            InvoiceItem.invoice_id == invoice_id
+            Invoice.customer_id == customer_id
         )
-        .order_by(InvoiceItem.id)
+        .order_by(
+            Invoice.id.desc()
+        )
         .all()
     )
 
 
 # ==========================================================
-# TOTAL
+# CALCULATE TOTAL
 # ==========================================================
 
 def calculate_invoice_total(
-    db: Session,
-    invoice_id: int,
+    items,
 ):
     """
-    Calculate invoice total from invoice items.
+    Calculate invoice total from line items.
     """
-
-    items = get_invoice_items(
-        db,
-        invoice_id,
-    )
 
     total = Decimal("0")
 
     for item in items:
 
         quantity = _decimal(
-            _get(item, "quantity", 0)
+            item.get("quantity", 0)
         )
 
         unit_price = _decimal(
-            _get(item, "unit_price", 0)
+            item.get("unit_price", 0)
         )
 
         total += quantity * unit_price
@@ -135,24 +120,31 @@ def calculate_invoice_total(
 def create_invoice(
     db: Session,
     customer_id: int,
-    sales_order_id=None,
-    delivery_id=None,
+    items: list,
     invoice_date=None,
     due_date=None,
     notes=None,
 ):
     """
-    Create a draft invoice.
-    """
+    Create a Draft invoice.
 
-    if not customer_id:
-        raise ValueError(
-            "Customer is required."
-        )
+    Example:
+
+    items = [
+        {
+            "product_id": 1,
+            "description": "Maize Flour 25kg",
+            "quantity": 10,
+            "unit_price": 45000,
+        }
+    ]
+    """
 
     customer = (
         db.query(Customer)
-        .filter(Customer.id == customer_id)
+        .filter(
+            Customer.id == customer_id
+        )
         .first()
     )
 
@@ -161,149 +153,115 @@ def create_invoice(
             "Customer not found."
         )
 
+    if not items:
+        raise ValueError(
+            "Invoice must contain at least "
+            "one item."
+        )
+
+    total = calculate_invoice_total(
+        items
+    )
+
+    if total <= 0:
+        raise ValueError(
+            "Invoice total must be greater than zero."
+        )
+
     invoice = Invoice(
         customer_id=customer_id,
-        sales_order_id=sales_order_id,
-        delivery_id=delivery_id,
-        invoice_date=invoice_date or datetime.utcnow(),
-        due_date=due_date,
-        notes=notes,
-        status="Draft",
-        total=0,
     )
+
+    if hasattr(
+        invoice,
+        "invoice_date",
+    ):
+        invoice.invoice_date = (
+            invoice_date
+            or datetime.utcnow()
+        )
+
+    if hasattr(
+        invoice,
+        "due_date",
+    ):
+        invoice.due_date = due_date
+
+    if hasattr(
+        invoice,
+        "notes",
+    ):
+        invoice.notes = notes
+
+    if hasattr(
+        invoice,
+        "status",
+    ):
+        invoice.status = "Draft"
+
+    if hasattr(
+        invoice,
+        "total",
+    ):
+        invoice.total = total
+
+    elif hasattr(
+        invoice,
+        "total_amount",
+    ):
+        invoice.total_amount = total
 
     db.add(invoice)
+    db.flush()
+
+    for item in items:
+
+        quantity = _decimal(
+            item.get("quantity", 0)
+        )
+
+        unit_price = _decimal(
+            item.get("unit_price", 0)
+        )
+
+        line_total = (
+            quantity * unit_price
+        )
+
+        invoice_item = InvoiceItem(
+            invoice_id=invoice.id,
+            product_id=item.get(
+                "product_id"
+            ),
+            quantity=quantity,
+            unit_price=unit_price,
+        )
+
+        if hasattr(
+            invoice_item,
+            "description",
+        ):
+            invoice_item.description = (
+                item.get("description")
+            )
+
+        if hasattr(
+            invoice_item,
+            "total",
+        ):
+            invoice_item.total = line_total
+
+        elif hasattr(
+            invoice_item,
+            "line_total",
+        ):
+            invoice_item.line_total = (
+                line_total
+            )
+
+        db.add(invoice_item)
 
     try:
-        _commit(db)
-        db.refresh(invoice)
-        return invoice
-
-    except Exception:
-        _rollback(db)
-        raise
-
-
-# ==========================================================
-# CREATE FROM SALES ORDER
-# ==========================================================
-
-def create_invoice_from_sales_order(
-    db: Session,
-    sales_order_id: int,
-    due_date=None,
-    notes=None,
-):
-    """
-    Create a draft invoice using the Sales Order lines.
-    """
-
-    order = (
-        db.query(SalesOrder)
-        .filter(
-            SalesOrder.id == sales_order_id
-        )
-        .first()
-    )
-
-    if not order:
-        raise ValueError(
-            "Sales Order not found."
-        )
-
-    customer_id = _get(
-        order,
-        "customer_id",
-    )
-
-    if not customer_id:
-        raise ValueError(
-            "Sales Order has no customer."
-        )
-
-    existing = (
-        db.query(Invoice)
-        .filter(
-            Invoice.sales_order_id
-            == sales_order_id,
-            Invoice.status != "Void",
-        )
-        .first()
-    )
-
-    if existing:
-        raise ValueError(
-            f"Invoice #{existing.id} already exists "
-            "for this Sales Order."
-        )
-
-    invoice = create_invoice(
-        db=db,
-        customer_id=customer_id,
-        sales_order_id=sales_order_id,
-        due_date=due_date,
-        notes=notes,
-    )
-
-    order_items = (
-        db.query(SalesOrderItem)
-        .filter(
-            SalesOrderItem.sales_order_id
-            == sales_order_id
-        )
-        .all()
-    )
-
-    if not order_items:
-        raise ValueError(
-            "Sales Order contains no items."
-        )
-
-    try:
-
-        for order_item in order_items:
-
-            quantity = _decimal(
-                _get(
-                    order_item,
-                    "quantity",
-                    0,
-                )
-            )
-
-            unit_price = _decimal(
-                _get(
-                    order_item,
-                    "unit_price",
-                    _get(
-                        order_item,
-                        "price",
-                        0,
-                    ),
-                )
-            )
-
-            item = InvoiceItem(
-                invoice_id=invoice.id,
-                product_id=order_item.product_id,
-                description=_get(
-                    order_item,
-                    "description",
-                    None,
-                ),
-                quantity=quantity,
-                unit_price=unit_price,
-                total=quantity * unit_price,
-            )
-
-            db.add(item)
-
-        db.flush()
-
-        invoice.total = calculate_invoice_total(
-            db,
-            invoice.id,
-        )
 
         db.commit()
         db.refresh(invoice)
@@ -311,132 +269,28 @@ def create_invoice_from_sales_order(
         return invoice
 
     except Exception:
-        _rollback(db)
 
-        # Remove partially created invoice if necessary.
-        try:
-            if invoice.id:
-                db.delete(invoice)
-                db.commit()
-        except Exception:
-            _rollback(db)
-
+        db.rollback()
         raise
 
 
 # ==========================================================
-# CREATE FROM DELIVERY
-# ==========================================================
-
-def create_invoice_from_delivery(
-    db: Session,
-    delivery_id: int,
-    due_date=None,
-    notes=None,
-):
-    """
-    Create a draft invoice from a delivery.
-
-    This function is intentionally defensive because
-    different versions of the Delivery model may use
-    different Sales Order relationship fields.
-    """
-
-    delivery = (
-        db.query(Delivery)
-        .filter(
-            Delivery.id == delivery_id
-        )
-        .first()
-    )
-
-    if not delivery:
-        raise ValueError(
-            "Delivery not found."
-        )
-
-    sales_order_id = _get(
-        delivery,
-        "sales_order_id",
-        _get(
-            delivery,
-            "order_id",
-            None,
-        ),
-    )
-
-    customer_id = _get(
-        delivery,
-        "customer_id",
-    )
-
-    if not customer_id and sales_order_id:
-
-        order = (
-            db.query(SalesOrder)
-            .filter(
-                SalesOrder.id
-                == sales_order_id
-            )
-            .first()
-        )
-
-        if order:
-            customer_id = order.customer_id
-
-    if not customer_id:
-        raise ValueError(
-            "Could not determine the customer "
-            "for this delivery."
-        )
-
-    existing = (
-        db.query(Invoice)
-        .filter(
-            Invoice.delivery_id == delivery_id,
-            Invoice.status != "Void",
-        )
-        .first()
-    )
-
-    if existing:
-        raise ValueError(
-            f"Invoice #{existing.id} already exists "
-            "for this delivery."
-        )
-
-    if sales_order_id:
-
-        return create_invoice_from_sales_order(
-            db=db,
-            sales_order_id=sales_order_id,
-            due_date=due_date,
-            notes=notes,
-        )
-
-    return create_invoice(
-        db=db,
-        customer_id=customer_id,
-        delivery_id=delivery_id,
-        due_date=due_date,
-        notes=notes,
-    )
-
-
-# ==========================================================
-# UPDATE INVOICE
+# EDIT INVOICE
 # ==========================================================
 
 def update_invoice(
     db: Session,
     invoice_id: int,
     customer_id=None,
+    items=None,
     invoice_date=None,
     due_date=None,
     notes=None,
 ):
     """
-    Update a Draft invoice only.
+    Edit a Draft invoice.
+
+    Posted invoices should not be edited.
     """
 
     invoice = get_invoice(
@@ -449,13 +303,18 @@ def update_invoice(
             "Invoice not found."
         )
 
-    status = _get(
-        invoice,
-        "status",
-        "Draft",
-    )
+    status = str(
+        _get(
+            invoice,
+            "status",
+            "Draft",
+        )
+    ).lower()
 
-    if str(status).lower() != "draft":
+    if status not in (
+        "draft",
+        "pending",
+    ):
         raise ValueError(
             "Only Draft invoices can be edited."
         )
@@ -477,261 +336,112 @@ def update_invoice(
 
         invoice.customer_id = customer_id
 
-    if invoice_date is not None:
+    if invoice_date is not None and hasattr(
+        invoice,
+        "invoice_date",
+    ):
         invoice.invoice_date = invoice_date
 
-    if due_date is not None:
+    if due_date is not None and hasattr(
+        invoice,
+        "due_date",
+    ):
         invoice.due_date = due_date
 
-    if notes is not None:
+    if notes is not None and hasattr(
+        invoice,
+        "notes",
+    ):
         invoice.notes = notes
+
+    if items is not None:
+
+        if not items:
+            raise ValueError(
+                "Invoice must contain at least "
+                "one item."
+            )
+
+        db.query(InvoiceItem).filter(
+            InvoiceItem.invoice_id
+            == invoice.id
+        ).delete(
+            synchronize_session=False
+        )
+
+        total = calculate_invoice_total(
+            items
+        )
+
+        for item in items:
+
+            quantity = _decimal(
+                item.get("quantity", 0)
+            )
+
+            unit_price = _decimal(
+                item.get("unit_price", 0)
+            )
+
+            line_total = (
+                quantity * unit_price
+            )
+
+            invoice_item = InvoiceItem(
+                invoice_id=invoice.id,
+                product_id=item.get(
+                    "product_id"
+                ),
+                quantity=quantity,
+                unit_price=unit_price,
+            )
+
+            if hasattr(
+                invoice_item,
+                "description",
+            ):
+                invoice_item.description = (
+                    item.get("description")
+                )
+
+            if hasattr(
+                invoice_item,
+                "total",
+            ):
+                invoice_item.total = line_total
+
+            elif hasattr(
+                invoice_item,
+                "line_total",
+            ):
+                invoice_item.line_total = (
+                    line_total
+                )
+
+            db.add(invoice_item)
+
+        if hasattr(
+            invoice,
+            "total",
+        ):
+            invoice.total = total
+
+        elif hasattr(
+            invoice,
+            "total_amount",
+        ):
+            invoice.total_amount = total
 
     try:
 
-        invoice.total = calculate_invoice_total(
-            db,
-            invoice.id,
-        )
-
-        _commit(db)
+        db.commit()
         db.refresh(invoice)
 
         return invoice
 
     except Exception:
-        _rollback(db)
-        raise
 
-
-# ==========================================================
-# ADD ITEM
-# ==========================================================
-
-def add_invoice_item(
-    db: Session,
-    invoice_id: int,
-    product_id: int,
-    quantity,
-    unit_price,
-    description=None,
-):
-    """
-    Add an item to a Draft invoice.
-    """
-
-    invoice = get_invoice(
-        db,
-        invoice_id,
-    )
-
-    if not invoice:
-        raise ValueError(
-            "Invoice not found."
-        )
-
-    if str(
-        _get(invoice, "status", "Draft")
-    ).lower() != "draft":
-        raise ValueError(
-            "Only Draft invoices can be edited."
-        )
-
-    product = (
-        db.query(Product)
-        .filter(
-            Product.id == product_id
-        )
-        .first()
-    )
-
-    if not product:
-        raise ValueError(
-            "Product not found."
-        )
-
-    quantity = _decimal(quantity)
-    unit_price = _decimal(unit_price)
-
-    if quantity <= 0:
-        raise ValueError(
-            "Quantity must be greater than zero."
-        )
-
-    if unit_price < 0:
-        raise ValueError(
-            "Unit price cannot be negative."
-        )
-
-    item = InvoiceItem(
-        invoice_id=invoice_id,
-        product_id=product_id,
-        description=description,
-        quantity=quantity,
-        unit_price=unit_price,
-        total=quantity * unit_price,
-    )
-
-    db.add(item)
-
-    try:
-
-        db.flush()
-
-        invoice.total = calculate_invoice_total(
-            db,
-            invoice_id,
-        )
-
-        _commit(db)
-
-        db.refresh(item)
-
-        return item
-
-    except Exception:
-        _rollback(db)
-        raise
-
-
-# ==========================================================
-# UPDATE ITEM
-# ==========================================================
-
-def update_invoice_item(
-    db: Session,
-    item_id: int,
-    quantity,
-    unit_price,
-    description=None,
-):
-    """
-    Update a Draft invoice item.
-    """
-
-    item = (
-        db.query(InvoiceItem)
-        .filter(
-            InvoiceItem.id == item_id
-        )
-        .first()
-    )
-
-    if not item:
-        raise ValueError(
-            "Invoice item not found."
-        )
-
-    invoice = get_invoice(
-        db,
-        item.invoice_id,
-    )
-
-    if not invoice:
-        raise ValueError(
-            "Invoice not found."
-        )
-
-    if str(
-        _get(invoice, "status", "Draft")
-    ).lower() != "draft":
-        raise ValueError(
-            "Only Draft invoices can be edited."
-        )
-
-    quantity = _decimal(quantity)
-    unit_price = _decimal(unit_price)
-
-    if quantity <= 0:
-        raise ValueError(
-            "Quantity must be greater than zero."
-        )
-
-    if unit_price < 0:
-        raise ValueError(
-            "Unit price cannot be negative."
-        )
-
-    item.quantity = quantity
-    item.unit_price = unit_price
-    item.total = quantity * unit_price
-
-    if description is not None:
-        item.description = description
-
-    try:
-
-        db.flush()
-
-        invoice.total = calculate_invoice_total(
-            db,
-            invoice.id,
-        )
-
-        _commit(db)
-
-        return item
-
-    except Exception:
-        _rollback(db)
-        raise
-
-
-# ==========================================================
-# DELETE ITEM
-# ==========================================================
-
-def delete_invoice_item(
-    db: Session,
-    item_id: int,
-):
-    """
-    Delete a Draft invoice item.
-    """
-
-    item = (
-        db.query(InvoiceItem)
-        .filter(
-            InvoiceItem.id == item_id
-        )
-        .first()
-    )
-
-    if not item:
-        raise ValueError(
-            "Invoice item not found."
-        )
-
-    invoice = get_invoice(
-        db,
-        item.invoice_id,
-    )
-
-    if not invoice:
-        raise ValueError(
-            "Invoice not found."
-        )
-
-    if str(
-        _get(invoice, "status", "Draft")
-    ).lower() != "draft":
-        raise ValueError(
-            "Only Draft invoices can be edited."
-        )
-
-    try:
-
-        db.delete(item)
-        db.flush()
-
-        invoice.total = calculate_invoice_total(
-            db,
-            invoice.id,
-        )
-
-        _commit(db)
-
-    except Exception:
-        _rollback(db)
+        db.rollback()
         raise
 
 
@@ -744,10 +454,12 @@ def post_invoice(
     invoice_id: int,
 ):
     """
-    Post an invoice.
+    Post invoice and integrate it with Finance.
 
-    Posted invoices become read-only and form
-    the Accounts Receivable balance.
+    Accounting:
+
+        DR Accounts Receivable
+        CR Sales Revenue
     """
 
     invoice = get_invoice(
@@ -761,38 +473,49 @@ def post_invoice(
         )
 
     status = str(
-        _get(invoice, "status", "Draft")
+        _get(
+            invoice,
+            "status",
+            "Draft",
+        )
     ).lower()
+
+    if status in (
+        "void",
+        "voided",
+    ):
+        raise ValueError(
+            "A voided invoice cannot be posted."
+        )
 
     if status == "posted":
         raise ValueError(
             "Invoice is already posted."
         )
 
-    if status in (
-        "void",
-        "voided",
-        "cancelled",
-        "canceled",
-    ):
+    if status == "paid":
         raise ValueError(
-            "A void or cancelled invoice cannot be posted."
+            "Invoice is already paid."
         )
 
-    items = get_invoice_items(
-        db,
-        invoice_id,
-    )
-
-    if not items:
-        raise ValueError(
-            "Cannot post an invoice with no items."
+    # Ensure total exists.
+    total = _decimal(
+        _get(
+            invoice,
+            "total",
+            0,
         )
-
-    total = calculate_invoice_total(
-        db,
-        invoice_id,
     )
+
+    if total <= 0:
+
+        total = _decimal(
+            _get(
+                invoice,
+                "total_amount",
+                0,
+            )
+        )
 
     if total <= 0:
         raise ValueError(
@@ -801,22 +524,39 @@ def post_invoice(
 
     try:
 
-        invoice.total = total
-        invoice.status = "Posted"
+        # Set operational status first.
+        if hasattr(
+            invoice,
+            "status",
+        ):
+            invoice.status = "Posted"
 
         if hasattr(
             invoice,
             "posted_at",
         ):
-            invoice.posted_at = datetime.utcnow()
+            invoice.posted_at = (
+                datetime.utcnow()
+            )
 
-        _commit(db)
+        db.flush()
+
+        # Create Finance journal entry.
+        finance_entry = (
+            post_invoice_to_finance(
+                db,
+                invoice.id,
+            )
+        )
+
+        db.commit()
         db.refresh(invoice)
 
         return invoice
 
     except Exception:
-        _rollback(db)
+
+        db.rollback()
         raise
 
 
@@ -832,8 +572,7 @@ def void_invoice(
     """
     Void an invoice.
 
-    A posted invoice is never deleted. It is voided
-    so that the accounting trail remains intact.
+    A posted invoice is not physically deleted.
     """
 
     invoice = get_invoice(
@@ -847,62 +586,65 @@ def void_invoice(
         )
 
     status = str(
-        _get(invoice, "status", "Draft")
+        _get(
+            invoice,
+            "status",
+            "Draft",
+        )
     ).lower()
 
-    if status in (
-        "void",
-        "voided",
-    ):
+    if status == "void":
         raise ValueError(
-            "Invoice is already void."
+            "Invoice is already voided."
         )
 
-    if status == "draft":
+    if status == "paid":
+        raise ValueError(
+            "A paid invoice cannot be voided."
+        )
+
+    if hasattr(
+        invoice,
+        "status",
+    ):
         invoice.status = "Void"
 
-    else:
+    if reason and hasattr(
+        invoice,
+        "notes",
+    ):
+        current_notes = (
+            invoice.notes or ""
+        )
 
-        invoice.status = "Void"
-
-        if hasattr(
-            invoice,
-            "voided_at",
-        ):
-            invoice.voided_at = datetime.utcnow()
-
-        if reason and hasattr(
-            invoice,
-            "void_reason",
-        ):
-            invoice.void_reason = reason
+        invoice.notes = (
+            f"{current_notes}\n"
+            f"Void reason: {reason}"
+        ).strip()
 
     try:
 
-        _commit(db)
+        db.commit()
         db.refresh(invoice)
 
         return invoice
 
     except Exception:
-        _rollback(db)
+
+        db.rollback()
         raise
 
 
 # ==========================================================
-# ACCOUNTS RECEIVABLE
+# DELETE DRAFT INVOICE
 # ==========================================================
 
-def get_invoice_balance(
+def delete_invoice(
     db: Session,
     invoice_id: int,
 ):
     """
-    Return invoice balance.
-
-    This function is intentionally payment-service
-    independent. Once payments are connected, the
-    payment service can supply the collected amount.
+    Delete an invoice only when it is still Draft.
     """
 
     invoice = get_invoice(
@@ -915,26 +657,104 @@ def get_invoice_balance(
             "Invoice not found."
         )
 
-    total = calculate_invoice_total(
+    status = str(
+        _get(
+            invoice,
+            "status",
+            "Draft",
+        )
+    ).lower()
+
+    if status not in (
+        "draft",
+        "pending",
+    ):
+        raise ValueError(
+            "Only Draft invoices can be deleted."
+        )
+
+    try:
+
+        db.delete(invoice)
+        db.commit()
+
+        return True
+
+    except Exception:
+
+        db.rollback()
+        raise
+
+
+# ==========================================================
+# INVOICE BALANCE
+# ==========================================================
+
+def get_invoice_balance(
+    db: Session,
+    invoice_id: int,
+):
+    """
+    Calculate outstanding balance on an invoice.
+    """
+
+    from models import Payment
+
+    invoice = get_invoice(
         db,
         invoice_id,
     )
 
-    paid = _decimal(
+    if not invoice:
+        raise ValueError(
+            "Invoice not found."
+        )
+
+    total = _decimal(
         _get(
             invoice,
-            "paid_amount",
+            "total",
             0,
         )
     )
 
-    balance = total - paid
+    if total <= 0:
+        total = _decimal(
+            _get(
+                invoice,
+                "total_amount",
+                0,
+            )
+        )
 
-    if balance < 0:
-        balance = Decimal("0")
+    payments = (
+        db.query(Payment)
+        .filter(
+            Payment.invoice_id
+            == invoice.id
+        )
+        .filter(
+            Payment.status
+            == "Posted"
+        )
+        .all()
+    )
 
-    return {
-        "total": total,
-        "paid": paid,
-        "balance": balance,
-    }
+    paid = sum(
+        (
+            _decimal(
+                _get(
+                    payment,
+                    "amount",
+                    0,
+                )
+            )
+            for payment in payments
+        ),
+        Decimal("0"),
+    )
+
+    return max(
+        total - paid,
+        Decimal("0"),
+    )
