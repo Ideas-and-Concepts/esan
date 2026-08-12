@@ -136,3 +136,21 @@ Finance
 │
 └── Audit Trail
     └── Posting / Reversal records
+
+
+
+💰 Finance
+│
+├── Dashboard
+│   ├── Revenue
+│   ├── Accounts Receivable
+│   ├── Cash & Bank
+│   ├── Expenses
+│   ├── Net Profit
+│   └── Accounting Control
+│
+├── Chart of Accounts
+│
+├── Journal Entries
+│
+└── General Ledger
