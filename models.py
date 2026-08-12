@@ -1,22 +1,39 @@
 """
-Esan ERP Database Models
+Esan ERP - Database Models
 
 Nile Harvest Foods Ltd.
 Enterprise Milling & Packaging Management System
 
 Version 1.4.0 Alpha
+
+Modules:
+- Users & Authentication
+- Customers
+- Suppliers
+- Products
+- Procurement
+- Warehouse
+- Milling
+- Packaging
+- Quotations
+- Sales Orders
+- Deliveries
+- Invoices
+- Payments
 """
 
-from datetime import datetime
+from datetime import datetime, date
 
 from sqlalchemy import (
     Boolean,
     Column,
+    Date,
     DateTime,
     Float,
     ForeignKey,
     Integer,
     String,
+    Text,
 )
 
 from sqlalchemy.orm import relationship
@@ -24,9 +41,9 @@ from sqlalchemy.orm import relationship
 from database import Base
 
 
-# ==================================================
-# USER
-# ==================================================
+# ============================================================
+# USERS
+# ============================================================
 
 class User(Base):
 
@@ -52,6 +69,7 @@ class User(Base):
 
     email = Column(
         String(200),
+        unique=True,
         nullable=True,
     )
 
@@ -69,19 +87,17 @@ class User(Base):
     active = Column(
         Boolean,
         default=True,
-        nullable=False,
     )
 
     created_at = Column(
         DateTime,
         default=datetime.utcnow,
-        nullable=False,
     )
 
 
-# ==================================================
+# ============================================================
 # CUSTOMER
-# ==================================================
+# ============================================================
 
 class Customer(Base):
 
@@ -96,87 +112,59 @@ class Customer(Base):
     name = Column(
         String(200),
         nullable=False,
-        index=True,
-    )
-
-    contact_person = Column(
-        String(200),
-        nullable=True,
     )
 
     phone = Column(
-        String(100),
+        String(50),
         nullable=True,
-        index=True,
     )
 
     email = Column(
         String(200),
         nullable=True,
-        index=True,
     )
 
     address = Column(
-        String(500),
-        nullable=True,
-    )
-
-    location = Column(
-        String(200),
-        nullable=True,
-    )
-
-    country = Column(
-        String(100),
+        Text,
         nullable=True,
     )
 
     customer_type = Column(
-        String(100),
+        String(50),
         default="Retail",
-        nullable=False,
     )
 
     active = Column(
         Boolean,
         default=True,
-        nullable=False,
     )
 
     created_at = Column(
         DateTime,
         default=datetime.utcnow,
-        nullable=False,
     )
-
-    # --------------------------------------------------
-    # RELATIONSHIPS
-    # --------------------------------------------------
 
     quotations = relationship(
         "Quotation",
         back_populates="customer",
         cascade="all, delete-orphan",
-        lazy="selectin",
     )
 
     sales_orders = relationship(
         "SalesOrder",
         back_populates="customer",
         cascade="all, delete-orphan",
-        lazy="selectin",
     )
 
     invoices = relationship(
         "Invoice",
         back_populates="customer",
-        lazy="selectin",
     )
 
 
-# ==================================================
+# ============================================================
 # SUPPLIER
-# ==================================================
+# ============================================================
 
 class Supplier(Base):
 
@@ -191,16 +179,10 @@ class Supplier(Base):
     name = Column(
         String(200),
         nullable=False,
-        index=True,
-    )
-
-    contact_person = Column(
-        String(200),
-        nullable=True,
     )
 
     phone = Column(
-        String(100),
+        String(50),
         nullable=True,
     )
 
@@ -210,54 +192,122 @@ class Supplier(Base):
     )
 
     address = Column(
-        String(500),
+        Text,
         nullable=True,
     )
 
-    location = Column(
+    contact_person = Column(
         String(200),
-        nullable=True,
-    )
-
-    country = Column(
-        String(100),
         nullable=True,
     )
 
     supplier_type = Column(
         String(100),
-        default="Agricultural Supplier",
-        nullable=False,
+        default="General",
     )
 
     active = Column(
         Boolean,
         default=True,
-        nullable=False,
     )
 
     created_at = Column(
         DateTime,
         default=datetime.utcnow,
-        nullable=False,
     )
 
     purchase_orders = relationship(
         "PurchaseOrder",
         back_populates="supplier",
-        lazy="selectin",
+        cascade="all, delete-orphan",
     )
 
     purchases = relationship(
         "Purchase",
         back_populates="supplier",
-        lazy="selectin",
     )
 
 
-# ==================================================
+# ============================================================
+# PRODUCT
+# ============================================================
+
+class Product(Base):
+
+    __tablename__ = "products"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    name = Column(
+        String(200),
+        nullable=False,
+    )
+
+    sku = Column(
+        String(100),
+        unique=True,
+        nullable=True,
+        index=True,
+    )
+
+    category = Column(
+        String(100),
+        nullable=True,
+    )
+
+    product_type = Column(
+        String(100),
+        default="Finished Product",
+    )
+
+    unit = Column(
+        String(50),
+        default="Kg",
+    )
+
+    quantity = Column(
+        Float,
+        default=0.0,
+    )
+
+    cost_price = Column(
+        Float,
+        default=0.0,
+    )
+
+    selling_price = Column(
+        Float,
+        default=0.0,
+    )
+
+    minimum_stock = Column(
+        Float,
+        default=0.0,
+    )
+
+    active = Column(
+        Boolean,
+        default=True,
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+    )
+
+    stock_movements = relationship(
+        "StockMovement",
+        back_populates="product",
+    )
+
+
+# ============================================================
 # PURCHASE ORDER
-# ==================================================
+# ============================================================
 
 class PurchaseOrder(Base):
 
@@ -270,7 +320,7 @@ class PurchaseOrder(Base):
     )
 
     po_number = Column(
-        String(100),
+        String(50),
         unique=True,
         nullable=False,
         index=True,
@@ -279,47 +329,51 @@ class PurchaseOrder(Base):
     supplier_id = Column(
         Integer,
         ForeignKey(
-            "suppliers.id",
-            ondelete="SET NULL",
+            "suppliers.id"
         ),
-        nullable=True,
+        nullable=False,
+    )
+
+    order_date = Column(
+        Date,
+        default=date.today,
     )
 
     status = Column(
         String(100),
         default="Draft",
-        nullable=False,
     )
 
     total_amount = Column(
         Float,
         default=0.0,
-        nullable=False,
+    )
+
+    notes = Column(
+        Text,
+        nullable=True,
     )
 
     created_at = Column(
         DateTime,
         default=datetime.utcnow,
-        nullable=False,
     )
 
     supplier = relationship(
         "Supplier",
         back_populates="purchase_orders",
-        lazy="joined",
     )
 
     items = relationship(
         "PurchaseOrderItem",
         back_populates="purchase_order",
         cascade="all, delete-orphan",
-        lazy="selectin",
     )
 
 
-# ==================================================
+# ============================================================
 # PURCHASE ORDER ITEM
-# ==================================================
+# ============================================================
 
 class PurchaseOrderItem(Base):
 
@@ -334,67 +388,15 @@ class PurchaseOrderItem(Base):
     purchase_order_id = Column(
         Integer,
         ForeignKey(
-            "purchase_orders.id",
-            ondelete="CASCADE",
+            "purchase_orders.id"
         ),
         nullable=False,
     )
 
-    product_name = Column(
-        String(200),
-        nullable=False,
-    )
-
-    quantity = Column(
-        Float,
-        default=0.0,
-        nullable=False,
-    )
-
-    unit_price = Column(
-        Float,
-        default=0.0,
-        nullable=False,
-    )
-
-    total = Column(
-        Float,
-        default=0.0,
-        nullable=False,
-    )
-
-    purchase_order = relationship(
-        "PurchaseOrder",
-        back_populates="items",
-    )
-
-
-# ==================================================
-# PURCHASE
-# ==================================================
-
-class Purchase(Base):
-
-    __tablename__ = "purchases"
-
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True,
-    )
-
-    purchase_number = Column(
-        String(100),
-        unique=True,
-        nullable=False,
-        index=True,
-    )
-
-    supplier_id = Column(
+    product_id = Column(
         Integer,
         ForeignKey(
-            "suppliers.id",
-            ondelete="SET NULL",
+            "products.id"
         ),
         nullable=True,
     )
@@ -407,43 +409,237 @@ class Purchase(Base):
     quantity = Column(
         Float,
         default=0.0,
-        nullable=False,
     )
 
     unit_price = Column(
         Float,
         default=0.0,
+    )
+
+    total = Column(
+        Float,
+        default=0.0,
+    )
+
+    received_quantity = Column(
+        Float,
+        default=0.0,
+    )
+
+    purchase_order = relationship(
+        "PurchaseOrder",
+        back_populates="items",
+    )
+
+    product = relationship(
+        "Product",
+    )
+
+
+# ============================================================
+# PURCHASE
+# ============================================================
+
+class Purchase(Base):
+
+    __tablename__ = "purchases"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    purchase_number = Column(
+        String(50),
+        unique=True,
         nullable=False,
+        index=True,
+    )
+
+    supplier_id = Column(
+        Integer,
+        ForeignKey(
+            "suppliers.id"
+        ),
+        nullable=False,
+    )
+
+    purchase_order_id = Column(
+        Integer,
+        ForeignKey(
+            "purchase_orders.id"
+        ),
+        nullable=True,
+    )
+
+    purchase_date = Column(
+        Date,
+        default=date.today,
+    )
+
+    status = Column(
+        String(100),
+        default="Received",
     )
 
     total_amount = Column(
         Float,
         default=0.0,
-        nullable=False,
     )
 
-    status = Column(
-        String(100),
-        default="Pending",
-        nullable=False,
+    notes = Column(
+        Text,
+        nullable=True,
     )
 
     created_at = Column(
         DateTime,
         default=datetime.utcnow,
-        nullable=False,
     )
 
     supplier = relationship(
         "Supplier",
         back_populates="purchases",
-        lazy="joined",
+    )
+
+    purchase_order = relationship(
+        "PurchaseOrder",
+    )
+
+    items = relationship(
+        "PurchaseItem",
+        back_populates="purchase",
+        cascade="all, delete-orphan",
     )
 
 
-# ==================================================
+# ============================================================
+# PURCHASE ITEM
+# ============================================================
+
+class PurchaseItem(Base):
+
+    __tablename__ = "purchase_items"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    purchase_id = Column(
+        Integer,
+        ForeignKey(
+            "purchases.id"
+        ),
+        nullable=False,
+    )
+
+    product_id = Column(
+        Integer,
+        ForeignKey(
+            "products.id"
+        ),
+        nullable=True,
+    )
+
+    product_name = Column(
+        String(200),
+        nullable=False,
+    )
+
+    quantity = Column(
+        Float,
+        default=0.0,
+    )
+
+    unit_price = Column(
+        Float,
+        default=0.0,
+    )
+
+    total = Column(
+        Float,
+        default=0.0,
+    )
+
+    purchase = relationship(
+        "Purchase",
+        back_populates="items",
+    )
+
+    product = relationship(
+        "Product",
+    )
+
+
+# ============================================================
+# STOCK MOVEMENT
+# ============================================================
+
+class StockMovement(Base):
+
+    __tablename__ = "stock_movements"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    product_id = Column(
+        Integer,
+        ForeignKey(
+            "products.id"
+        ),
+        nullable=False,
+    )
+
+    movement_type = Column(
+        String(100),
+        nullable=False,
+    )
+
+    quantity = Column(
+        Float,
+        default=0.0,
+    )
+
+    reference_type = Column(
+        String(100),
+        nullable=True,
+    )
+
+    reference_id = Column(
+        Integer,
+        nullable=True,
+    )
+
+    unit_cost = Column(
+        Float,
+        default=0.0,
+    )
+
+    notes = Column(
+        Text,
+        nullable=True,
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+    )
+
+    product = relationship(
+        "Product",
+        back_populates="stock_movements",
+    )
+
+
+# ============================================================
 # WAREHOUSE
-# ==================================================
+# ============================================================
 
 class Warehouse(Base):
 
@@ -461,164 +657,29 @@ class Warehouse(Base):
     )
 
     location = Column(
-        String(200),
+        String(300),
         nullable=True,
     )
 
-    capacity = Column(
-        Float,
-        default=0.0,
-        nullable=False,
+    warehouse_type = Column(
+        String(100),
+        default="General",
     )
 
     active = Column(
         Boolean,
         default=True,
-        nullable=False,
     )
 
     created_at = Column(
         DateTime,
         default=datetime.utcnow,
-        nullable=False,
     )
 
 
-# ==================================================
-# PRODUCT
-# ==================================================
-
-class Product(Base):
-
-    __tablename__ = "products"
-
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True,
-    )
-
-    name = Column(
-        String(200),
-        nullable=False,
-        index=True,
-    )
-
-    sku = Column(
-        String(100),
-        unique=True,
-        nullable=True,
-        index=True,
-    )
-
-    category = Column(
-        String(100),
-        nullable=True,
-    )
-
-    unit = Column(
-        String(50),
-        default="Kg",
-        nullable=False,
-    )
-
-    quantity = Column(
-        Float,
-        default=0.0,
-        nullable=False,
-    )
-
-    cost_price = Column(
-        Float,
-        default=0.0,
-        nullable=False,
-    )
-
-    selling_price = Column(
-        Float,
-        default=0.0,
-        nullable=False,
-    )
-
-    active = Column(
-        Boolean,
-        default=True,
-        nullable=False,
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-        nullable=False,
-    )
-
-    stock_movements = relationship(
-        "StockMovement",
-        back_populates="product",
-        lazy="selectin",
-    )
-
-
-# ==================================================
-# STOCK MOVEMENT
-# ==================================================
-
-class StockMovement(Base):
-
-    __tablename__ = "stock_movements"
-
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True,
-    )
-
-    product_id = Column(
-        Integer,
-        ForeignKey(
-            "products.id",
-            ondelete="SET NULL",
-        ),
-        nullable=True,
-    )
-
-    movement_type = Column(
-        String(100),
-        nullable=False,
-    )
-
-    quantity = Column(
-        Float,
-        default=0.0,
-        nullable=False,
-    )
-
-    reference = Column(
-        String(200),
-        nullable=True,
-    )
-
-    notes = Column(
-        String(500),
-        nullable=True,
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow,
-        nullable=False,
-    )
-
-    product = relationship(
-        "Product",
-        back_populates="stock_movements",
-        lazy="joined",
-    )
-
-
-# ==================================================
+# ============================================================
 # MILLING BATCH
-# ==================================================
+# ============================================================
 
 class MillingBatch(Base):
 
@@ -637,39 +698,50 @@ class MillingBatch(Base):
         index=True,
     )
 
-    product_name = Column(
+    raw_material = Column(
         String(200),
-        nullable=True,
+        nullable=False,
     )
 
     input_quantity = Column(
         Float,
         default=0.0,
-        nullable=False,
     )
 
     output_quantity = Column(
         Float,
         default=0.0,
-        nullable=False,
+    )
+
+    waste_quantity = Column(
+        Float,
+        default=0.0,
     )
 
     status = Column(
         String(100),
         default="Planned",
-        nullable=False,
+    )
+
+    production_date = Column(
+        Date,
+        default=date.today,
+    )
+
+    notes = Column(
+        Text,
+        nullable=True,
     )
 
     created_at = Column(
         DateTime,
         default=datetime.utcnow,
-        nullable=False,
     )
 
 
-# ==================================================
+# ============================================================
 # PACKAGING BATCH
-# ==================================================
+# ============================================================
 
 class PackagingBatch(Base):
 
@@ -690,36 +762,58 @@ class PackagingBatch(Base):
 
     product_name = Column(
         String(200),
-        nullable=True,
-    )
-
-    quantity = Column(
-        Float,
-        default=0.0,
         nullable=False,
     )
 
+    input_quantity = Column(
+        Float,
+        default=0.0,
+    )
+
+    output_quantity = Column(
+        Float,
+        default=0.0,
+    )
+
     package_size = Column(
-        String(100),
-        nullable=True,
+        Float,
+        default=0.0,
+    )
+
+    package_unit = Column(
+        String(50),
+        default="Kg",
+    )
+
+    number_of_packages = Column(
+        Integer,
+        default=0,
     )
 
     status = Column(
         String(100),
         default="Planned",
-        nullable=False,
+    )
+
+    packaging_date = Column(
+        Date,
+        default=date.today,
+    )
+
+    notes = Column(
+        Text,
+        nullable=True,
     )
 
     created_at = Column(
         DateTime,
         default=datetime.utcnow,
-        nullable=False,
     )
 
 
-# ==================================================
+# ============================================================
 # QUOTATION
-# ==================================================
+# ============================================================
 
 class Quotation(Base):
 
@@ -732,7 +826,7 @@ class Quotation(Base):
     )
 
     quotation_number = Column(
-        String(100),
+        String(50),
         unique=True,
         nullable=False,
         index=True,
@@ -741,57 +835,61 @@ class Quotation(Base):
     customer_id = Column(
         Integer,
         ForeignKey(
-            "customers.id",
-            ondelete="SET NULL",
+            "customers.id"
         ),
+        nullable=False,
+    )
+
+    quotation_date = Column(
+        Date,
+        default=date.today,
+    )
+
+    valid_until = Column(
+        Date,
         nullable=True,
     )
 
     status = Column(
         String(100),
         default="Draft",
-        nullable=False,
     )
 
     total_amount = Column(
         Float,
         default=0.0,
-        nullable=False,
-    )
-
-    valid_until = Column(
-        DateTime,
-        nullable=True,
     )
 
     notes = Column(
-        String(1000),
+        Text,
         nullable=True,
     )
 
     created_at = Column(
         DateTime,
         default=datetime.utcnow,
-        nullable=False,
     )
 
     customer = relationship(
         "Customer",
         back_populates="quotations",
-        lazy="joined",
     )
 
     items = relationship(
         "QuotationItem",
         back_populates="quotation",
         cascade="all, delete-orphan",
-        lazy="selectin",
+    )
+
+    sales_orders = relationship(
+        "SalesOrder",
+        back_populates="quotation",
     )
 
 
-# ==================================================
+# ============================================================
 # QUOTATION ITEM
-# ==================================================
+# ============================================================
 
 class QuotationItem(Base):
 
@@ -806,10 +904,17 @@ class QuotationItem(Base):
     quotation_id = Column(
         Integer,
         ForeignKey(
-            "quotations.id",
-            ondelete="CASCADE",
+            "quotations.id"
         ),
         nullable=False,
+    )
+
+    product_id = Column(
+        Integer,
+        ForeignKey(
+            "products.id"
+        ),
+        nullable=True,
     )
 
     product_name = Column(
@@ -820,30 +925,31 @@ class QuotationItem(Base):
     quantity = Column(
         Float,
         default=0.0,
-        nullable=False,
     )
 
     unit_price = Column(
         Float,
         default=0.0,
-        nullable=False,
     )
 
     total = Column(
         Float,
         default=0.0,
-        nullable=False,
     )
 
     quotation = relationship(
         "Quotation",
-        back_popates="items",
+        back_populates="items",
+    )
+
+    product = relationship(
+        "Product",
     )
 
 
-# ==================================================
+# ============================================================
 # SALES ORDER
-# ==================================================
+# ============================================================
 
 class SalesOrder(Base):
 
@@ -856,7 +962,7 @@ class SalesOrder(Base):
     )
 
     order_number = Column(
-        String(100),
+        String(50),
         unique=True,
         nullable=False,
         index=True,
@@ -865,61 +971,75 @@ class SalesOrder(Base):
     customer_id = Column(
         Integer,
         ForeignKey(
-            "customers.id",
-            ondelete="SET NULL",
+            "customers.id"
         ),
-        nullable=True,
+        nullable=False,
     )
 
     quotation_id = Column(
         Integer,
         ForeignKey(
-            "quotations.id",
-            ondelete="SET NULL",
+            "quotations.id"
         ),
         nullable=True,
     )
 
+    order_date = Column(
+        Date,
+        default=date.today,
+    )
+
     status = Column(
         String(100),
-        default="Pending",
-        nullable=False,
+        default="Draft",
     )
 
     total_amount = Column(
         Float,
         default=0.0,
-        nullable=False,
+    )
+
+    notes = Column(
+        Text,
+        nullable=True,
     )
 
     created_at = Column(
         DateTime,
         default=datetime.utcnow,
-        nullable=False,
     )
 
     customer = relationship(
         "Customer",
         back_populates="sales_orders",
-        lazy="joined",
     )
 
     quotation = relationship(
         "Quotation",
-        lazy="joined",
+        back_populates="sales_orders",
     )
 
     items = relationship(
         "SalesOrderItem",
         back_populates="sales_order",
         cascade="all, delete-orphan",
-        lazy="selectin",
+    )
+
+    deliveries = relationship(
+        "Delivery",
+        back_populates="sales_order",
+        cascade="all, delete-orphan",
+    )
+
+    invoices = relationship(
+        "Invoice",
+        back_populates="sales_order",
     )
 
 
-# ==================================================
+# ============================================================
 # SALES ORDER ITEM
-# ==================================================
+# ============================================================
 
 class SalesOrderItem(Base):
 
@@ -931,13 +1051,20 @@ class SalesOrderItem(Base):
         index=True,
     )
 
-    order_id = Column(
+    sales_order_id = Column(
         Integer,
         ForeignKey(
-            "sales_orders.id",
-            ondelete="CASCADE",
+            "sales_orders.id"
         ),
         nullable=False,
+    )
+
+    product_id = Column(
+        Integer,
+        ForeignKey(
+            "products.id"
+        ),
+        nullable=True,
     )
 
     product_name = Column(
@@ -948,19 +1075,26 @@ class SalesOrderItem(Base):
     quantity = Column(
         Float,
         default=0.0,
-        nullable=False,
     )
 
     unit_price = Column(
         Float,
         default=0.0,
-        nullable=False,
     )
 
     total = Column(
         Float,
         default=0.0,
-        nullable=False,
+    )
+
+    reserved_quantity = Column(
+        Float,
+        default=0.0,
+    )
+
+    delivered_quantity = Column(
+        Float,
+        default=0.0,
     )
 
     sales_order = relationship(
@@ -968,10 +1102,19 @@ class SalesOrderItem(Base):
         back_populates="items",
     )
 
+    product = relationship(
+        "Product",
+    )
 
-# ==================================================
+    delivery_items = relationship(
+        "DeliveryItem",
+        back_populates="sales_order_item",
+    )
+
+
+# ============================================================
 # DELIVERY
-# ==================================================
+# ============================================================
 
 class Delivery(Base):
 
@@ -984,51 +1127,148 @@ class Delivery(Base):
     )
 
     delivery_number = Column(
-        String(100),
+        String(50),
         unique=True,
         nullable=False,
         index=True,
     )
 
-    order_id = Column(
+    sales_order_id = Column(
         Integer,
         ForeignKey(
-            "sales_orders.id",
-            ondelete="SET NULL",
+            "sales_orders.id"
         ),
-        nullable=True,
+        nullable=False,
     )
 
-    customer_id = Column(
-        Integer,
-        ForeignKey(
-            "customers.id",
-            ondelete="SET NULL",
-        ),
-        nullable=True,
+    delivery_date = Column(
+        Date,
+        default=date.today,
     )
 
     status = Column(
         String(100),
-        default="Pending",
-        nullable=False,
+        default="Draft",
+    )
+
+    vehicle_number = Column(
+        String(100),
+        nullable=True,
+    )
+
+    driver_name = Column(
+        String(200),
+        nullable=True,
     )
 
     delivery_address = Column(
-        String(500),
+        Text,
+        nullable=True,
+    )
+
+    total_amount = Column(
+        Float,
+        default=0.0,
+    )
+
+    notes = Column(
+        Text,
         nullable=True,
     )
 
     created_at = Column(
         DateTime,
         default=datetime.utcnow,
-        nullable=False,
+    )
+
+    sales_order = relationship(
+        "SalesOrder",
+        back_populates="deliveries",
+    )
+
+    items = relationship(
+        "DeliveryItem",
+        back_populates="delivery",
+        cascade="all, delete-orphan",
     )
 
 
-# ==================================================
+# ============================================================
+# DELIVERY ITEM
+# ============================================================
+
+class DeliveryItem(Base):
+
+    __tablename__ = "delivery_items"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    delivery_id = Column(
+        Integer,
+        ForeignKey(
+            "deliveries.id"
+        ),
+        nullable=False,
+    )
+
+    sales_order_item_id = Column(
+        Integer,
+        ForeignKey(
+            "sales_order_items.id"
+        ),
+        nullable=True,
+    )
+
+    product_id = Column(
+        Integer,
+        ForeignKey(
+            "products.id"
+        ),
+        nullable=True,
+    )
+
+    product_name = Column(
+        String(200),
+        nullable=False,
+    )
+
+    quantity = Column(
+        Float,
+        default=0.0,
+    )
+
+    unit_price = Column(
+        Float,
+        default=0.0,
+    )
+
+    total = Column(
+        Float,
+        default=0.0,
+    )
+
+    delivery = relationship(
+        "Delivery",
+        back_populates="items",
+    )
+
+    sales_order_item = relationship(
+        "SalesOrderItem",
+        back_populates="delivery_items",
+    )
+
+    product = relationship(
+        "Product",
+    )
+
+
+# ============================================================
 # INVOICE
-# ==================================================
+# ============================================================
 
 class Invoice(Base):
 
@@ -1041,7 +1281,7 @@ class Invoice(Base):
     )
 
     invoice_number = Column(
-        String(100),
+        String(50),
         unique=True,
         nullable=False,
         index=True,
@@ -1050,54 +1290,154 @@ class Invoice(Base):
     customer_id = Column(
         Integer,
         ForeignKey(
-            "customers.id",
-            ondelete="SET NULL",
+            "customers.id"
         ),
-        nullable=True,
+        nullable=False,
     )
 
-    order_id = Column(
+    sales_order_id = Column(
         Integer,
         ForeignKey(
-            "sales_orders.id",
-            ondelete="SET NULL",
+            "sales_orders.id"
         ),
         nullable=True,
     )
 
-    amount = Column(
-        Float,
-        default=0.0,
-        nullable=False,
+    invoice_date = Column(
+        Date,
+        default=date.today,
+    )
+
+    due_date = Column(
+        Date,
+        nullable=True,
     )
 
     status = Column(
         String(100),
-        default="Unpaid",
-        nullable=False,
+        default="Draft",
     )
 
-    due_date = Column(
-        DateTime,
+    subtotal = Column(
+        Float,
+        default=0.0,
+    )
+
+    tax_amount = Column(
+        Float,
+        default=0.0,
+    )
+
+    total_amount = Column(
+        Float,
+        default=0.0,
+    )
+
+    amount_paid = Column(
+        Float,
+        default=0.0,
+    )
+
+    balance_due = Column(
+        Float,
+        default=0.0,
+    )
+
+    notes = Column(
+        Text,
         nullable=True,
     )
 
     created_at = Column(
         DateTime,
         default=datetime.utcnow,
-        nullable=False,
     )
 
     customer = relationship(
         "Customer",
         back_populates="invoices",
-        lazy="joined",
+    )
+
+    sales_order = relationship(
+        "SalesOrder",
+        back_populates="invoices",
+    )
+
+    items = relationship(
+        "InvoiceItem",
+        back_populates="invoice",
+        cascade="all, delete-orphan",
+    )
+
+    payments = relationship(
+        "Payment",
+        back_populates="invoice",
     )
 
 
-# ==================================================
+# ============================================================
+# INVOICE ITEM
+# ============================================================
+
+class InvoiceItem(Base):
+
+    __tablename__ = "invoice_items"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    invoice_id = Column(
+        Integer,
+        ForeignKey(
+            "invoices.id"
+        ),
+        nullable=False,
+    )
+
+    product_id = Column(
+        Integer,
+        ForeignKey(
+            "products.id"
+        ),
+        nullable=True,
+    )
+
+    product_name = Column(
+        String(200),
+        nullable=False,
+    )
+
+    quantity = Column(
+        Float,
+        default=0.0,
+    )
+
+    unit_price = Column(
+        Float,
+        default=0.0,
+    )
+
+    total = Column(
+        Float,
+        default=0.0,
+    )
+
+    invoice = relationship(
+        "Invoice",
+        back_populates="items",
+    )
+
+    product = relationship(
+        "Product",
+    )
+
+
+# ============================================================
 # PAYMENT
-# ==================================================
+# ============================================================
 
 class Payment(Base):
 
@@ -1110,7 +1450,7 @@ class Payment(Base):
     )
 
     payment_number = Column(
-        String(100),
+        String(50),
         unique=True,
         nullable=False,
         index=True,
@@ -1119,22 +1459,24 @@ class Payment(Base):
     invoice_id = Column(
         Integer,
         ForeignKey(
-            "invoices.id",
-            ondelete="SET NULL",
+            "invoices.id"
         ),
-        nullable=True,
+        nullable=False,
+    )
+
+    payment_date = Column(
+        Date,
+        default=date.today,
     )
 
     amount = Column(
         Float,
         default=0.0,
-        nullable=False,
     )
 
     payment_method = Column(
         String(100),
         default="Cash",
-        nullable=False,
     )
 
     reference = Column(
@@ -1145,16 +1487,19 @@ class Payment(Base):
     status = Column(
         String(100),
         default="Completed",
-        nullable=False,
+    )
+
+    notes = Column(
+        Text,
+        nullable=True,
     )
 
     created_at = Column(
         DateTime,
         default=datetime.utcnow,
-        nullable=False,
     )
 
-
-# ==================================================
-# END OF MODELS
-# ==================================================
+    invoice = relationship(
+        "Invoice",
+        back_populates="payments",
+    )
