@@ -1,141 +1,282 @@
 """
-Sales Service
-Handles Customers, Quotations, Sales Orders
+Esan ERP Sales Service
+
+Nile Harvest Foods Ltd.
+Enterprise Milling & Packaging Management System
+
+Sales Services:
+- Customer management
+- Customer search
+- Customer creation
+- Customer editing
+- Customer deletion
+- Customer activation/deactivation
 """
 
 from datetime import datetime
-from sqlalchemy.orm import Session
+
 from database import SessionLocal
-from models import Customer, Quotation, QuotationItem, SalesOrder, SalesOrderItem
+from models import Customer
+
+
+# ==================================================
+# CUSTOMER SERVICES
+# ==================================================
 
 def get_all_customers():
-    db: Session = SessionLocal()
+    """Return all customers ordered by name."""
+
+    db = SessionLocal()
+
     try:
-        return db.query(Customer).order_by(Customer.name).all()
+        return (
+            db.query(Customer)
+            .order_by(Customer.name.asc())
+            .all()
+        )
+
     finally:
         db.close()
 
-def create_customer(name, customer_type="Retail", phone=None, email=None, address=None, location=None, country=None, contact_person=None):
+
+def get_customer(customer_id):
+    """Return one customer by ID."""
+
     db = SessionLocal()
+
     try:
+        return (
+            db.query(Customer)
+            .filter(Customer.id == customer_id)
+            .first()
+        )
+
+    finally:
+        db.close()
+
+
+def search_customers(search_term):
+    """Search customers by name, phone, email or address."""
+
+    db = SessionLocal()
+
+    try:
+
+        term = f"%{search_term.strip()}%"
+
+        return (
+            db.query(Customer)
+            .filter(
+                (Customer.name.ilike(term))
+                | (Customer.phone.ilike(term))
+                | (Customer.email.ilike(term))
+                | (Customer.address.ilike(term))
+            )
+            .order_by(Customer.name.asc())
+            .all()
+        )
+
+    finally:
+        db.close()
+
+
+def create_customer(
+    name,
+    phone=None,
+    email=None,
+    address=None,
+    customer_type="Retail",
+    location=None,
+    country=None,
+    contact_person=None,
+):
+    """Create a new customer."""
+
+    if not name or not name.strip():
+        raise ValueError(
+            "Customer name is required."
+        )
+
+    db = SessionLocal()
+
+    try:
+
         customer = Customer(
-            name=name,
-            customer_type=customer_type,
+            name=name.strip(),
             phone=phone,
             email=email,
             address=address,
+            customer_type=customer_type,
             location=location,
             country=country,
             contact_person=contact_person,
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
         )
+
         db.add(customer)
+
         db.commit()
+
         db.refresh(customer)
+
         return customer
+
     except Exception:
+
         db.rollback()
+
         raise
+
     finally:
+
         db.close()
 
-def create_quotation(customer_id, items_data):
-    """
-    items_data: list of dict with keys: product_name, quantity, unit_price
-    """
-    db = SessionLocal()
-    try:
-        total = sum(item['quantity'] * item['unit_price'] for item in items_data)
-        count = db.query(Quotation).count()
-        number = f"Q-{datetime.utcnow().strftime('%Y%m')}-{count+1:04d}"
-        quotation = Quotation(
-            quotation_number=number,
-            customer_id=customer_id,
-            status="Draft",
-            total_amount=total,
-            created_at=datetime.utcnow()
-        )
-        db.add(quotation)
-        db.flush()  # get id
 
-        for item in items_data:
-            qi = QuotationItem(
-                quotation_id=quotation.id,
-                product_name=item['product_name'],
-                quantity=item['quantity'],
-                unit_price=item['unit_price'],
-                total=item['quantity'] * item['unit_price']
-            )
-            db.add(qi)
+def update_customer(
+    customer_id,
+    name=None,
+    phone=None,
+    email=None,
+    address=None,
+    customer_type=None,
+    location=None,
+    country=None,
+    contact_person=None,
+):
+    """Update an existing customer."""
+
+    db = SessionLocal()
+
+    try:
+
+        customer = (
+            db.query(Customer)
+            .filter(Customer.id == customer_id)
+            .first()
+        )
+
+        if not customer:
+            return None
+
+        if name is not None:
+            if not name.strip():
+                raise ValueError(
+                    "Customer name cannot be empty."
+                )
+
+            customer.name = name.strip()
+
+        if phone is not None:
+            customer.phone = phone
+
+        if email is not None:
+            customer.email = email
+
+        if address is not None:
+            customer.address = address
+
+        if customer_type is not None:
+            customer.customer_type = customer_type
+
+        if location is not None:
+            customer.location = location
+
+        if country is not None:
+            customer.country = country
+
+        if contact_person is not None:
+            customer.contact_person = contact_person
 
         db.commit()
-        db.refresh(quotation)
-        return quotation
+
+        db.refresh(customer)
+
+        return customer
+
     except Exception:
+
         db.rollback()
+
         raise
+
     finally:
+
         db.close()
 
-def get_all_quotations():
-    db = SessionLocal()
-    try:
-        return db.query(Quotation).order_by(Quotation.created_at.desc()).all()
-    finally:
-        db.close()
 
-def create_sales_order(customer_id, items_data, status="Pending"):
+def delete_customer(customer_id):
+    """Delete a customer."""
+
     db = SessionLocal()
+
     try:
-        total = sum(item['quantity'] * item['unit_price'] for item in items_data)
-        count = db.query(SalesOrder).count()
-        order_number = f"SO-{datetime.utcnow().strftime('%Y%m')}-{count+1:04d}"
-        order = SalesOrder(
-            order_number=order_number,
-            customer_id=customer_id,
-            status=status,
-            total_amount=total,
-            created_at=datetime.utcnow()
+
+        customer = (
+            db.query(Customer)
+            .filter(Customer.id == customer_id)
+            .first()
         )
-        db.add(order)
-        db.flush()
 
-        for item in items_data:
-            soi = SalesOrderItem(
-                order_id=order.id,
-                product_name=item['product_name'],
-                quantity=item['quantity'],
-                unit_price=item['unit_price'],
-                total=item['quantity'] * item['unit_price']
-            )
-            db.add(soi)
+        if not customer:
+            return False
+
+        db.delete(customer)
 
         db.commit()
-        db.refresh(order)
-        return order
+
+        return True
+
     except Exception:
+
         db.rollback()
+
         raise
+
     finally:
+
         db.close()
 
-def get_all_sales_orders():
-    db = SessionLocal()
-    try:
-        return db.query(SalesOrder).order_by(SalesOrder.created_at.desc()).all()
-    finally:
-        db.close()
 
-def update_order_status(order_id, new_status):
+def set_customer_status(customer_id, active):
+    """
+    Activate or deactivate a customer.
+
+    This function expects the Customer model to have
+    an 'active' field.
+    """
+
     db = SessionLocal()
+
     try:
-        order = db.query(SalesOrder).filter(SalesOrder.id == order_id).first()
-        if order:
-            order.status = new_status
-            db.commit()
-            return order
+
+        customer = (
+            db.query(Customer)
+            .filter(Customer.id == customer_id)
+            .first()
+        )
+
+        if not customer:
+            return None
+
+        if hasattr(customer, "active"):
+            customer.active = bool(active)
+        else:
+            raise AttributeError(
+                "Customer model does not have an 'active' field."
+            )
+
+        db.commit()
+
+        db.refresh(customer)
+
+        return customer
+
     except Exception:
+
         db.rollback()
+
         raise
+
     finally:
+
         db.close()
