@@ -1,169 +1,241 @@
 """
-Esan ERP - Sales Service
+Esan ERP
+Sales Service
+
+Sales Orders, Sales Order Items and Stock Reservation.
 
 Nile Harvest Foods Ltd.
-Enterprise Milling & Packaging Management System
-
-Version 1.4.0 Alpha
-
-Responsibilities:
-- Customers
-- Products
-- Quotations
-- Sales Orders
-- Quotation conversion
-- Sales Order status management
-- Sales Order editing
-- Sales Order deletion
 """
 
 from datetime import datetime
 
-from sqlalchemy.orm import joinedload
-
-from database import SessionLocal
 from models import (
     Customer,
     Product,
-    Quotation,
-    QuotationItem,
     SalesOrder,
     SalesOrderItem,
 )
 
 
-# ============================================================
-# SALES ORDER STATUSES
-# ============================================================
+# ==========================================================
+# GENERIC HELPERS
+# ==========================================================
 
-SALES_ORDER_STATUSES = [
-    "Draft",
-    "Pending Approval",
-    "Approved",
-    "Confirmed",
-    "Processing",
-    "Partially Delivered",
-    "Delivered",
-    "Cancelled",
-]
+def _get(obj, field, default=None):
+    """Safely read a model attribute."""
+    return getattr(obj, field, default)
 
 
-# ============================================================
-# HELPERS
-# ============================================================
+def _set(obj, field, value):
+    """Safely set a model attribute when the field exists."""
+    if hasattr(obj, field):
+        setattr(obj, field, value)
+        return True
+    return False
 
-def _generate_number(
-    prefix,
-    model,
-    field_name,
-    db,
-):
-    """
-    Generate a sequential business document number.
 
-    Example:
-        SO-00001
-        QT-00001
-    """
+def _number(value, default=0.0):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
 
-    field = getattr(
-        model,
-        field_name,
+
+def _status(order):
+    return _get(order, "status", "Draft") or "Draft"
+
+
+def _is_draft(order):
+    return _status(order).lower() == "draft"
+
+
+def _is_confirmed(order):
+    return _status(order).lower() == "confirmed"
+
+
+# ==========================================================
+# SALES ORDER QUERIES
+# ==========================================================
+
+def get_all_sales_orders(db):
+    """Return all sales orders, newest first."""
+
+    return (
+        db.query(SalesOrder)
+        .order_by(SalesOrder.id.desc())
+        .all()
     )
 
-    last_record = (
-        db.query(model)
-        .order_by(model.id.desc())
+
+def get_sales_order(db, order_id):
+    """Return one sales order."""
+
+    return (
+        db.query(SalesOrder)
+        .filter(SalesOrder.id == order_id)
         .first()
     )
 
-    if not last_record:
 
-        next_number = 1
-
-    else:
-
-        current_value = getattr(
-            last_record,
-            field_name,
-            "",
-        )
-
-        try:
-
-            number_part = (
-                str(current_value)
-                .split("-")[-1]
-            )
-
-            next_number = (
-                int(number_part) + 1
-            )
-
-        except (
-            ValueError,
-            TypeError,
-        ):
-
-            next_number = (
-                last_record.id + 1
-            )
+def get_sales_order_items(db, order_id):
+    """Return all items belonging to a sales order."""
 
     return (
-        f"{prefix}-{next_number:05d}"
+        db.query(SalesOrderItem)
+        .filter(
+            SalesOrderItem.sales_order_id == order_id
+        )
+        .all()
     )
 
 
-# ============================================================
-# CUSTOMER SERVICES
-# ============================================================
+def get_sales_order_item(db, item_id):
+    """Return one sales order item."""
 
-def get_all_customers(
-    active_only=False,
+    return (
+        db.query(SalesOrderItem)
+        .filter(
+            SalesOrderItem.id == item_id
+        )
+        .first()
+    )
+
+
+# ==========================================================
+# CUSTOMER
+# ==========================================================
+
+def get_customers(db):
+    """Return customers for order forms."""
+
+    return (
+        db.query(Customer)
+        .order_by(Customer.name)
+        .all()
+    )
+
+
+# ==========================================================
+# CREATE SALES ORDER
+# ==========================================================
+
+def create_sales_order(
+    db,
+    customer_id,
+    quotation_id=None,
+    order_date=None,
+    notes=None,
 ):
     """
-    Return all customers.
-
-    active_only=True limits results to active customers
-    when the Customer model contains an active field.
+    Create a Draft Sales Order.
     """
 
-    db = SessionLocal()
+    customer = (
+        db.query(Customer)
+        .filter(Customer.id == customer_id)
+        .first()
+    )
 
-    try:
-
-        query = db.query(Customer)
-
-        if active_only and hasattr(
-            Customer,
-            "active",
-        ):
-
-            query = query.filter(
-                Customer.active.is_(True)
-            )
-
-        return (
-            query
-            .order_by(Customer.name.asc())
-            .all()
+    if not customer:
+        raise ValueError(
+            "Customer not found."
         )
 
-    finally:
+    if quotation_id is not None:
 
-        db.close()
+        # Only validate if the SalesOrder model
+        # supports quotation_id.
+        if hasattr(SalesOrder, "quotation_id"):
+
+            from models import Quotation
+
+            quotation = (
+                db.query(Quotation)
+                .filter(
+                    Quotation.id == quotation_id
+                )
+                .first()
+            )
+
+            if not quotation:
+                raise ValueError(
+                    "Quotation not found."
+                )
+
+    order = SalesOrder(
+        customer_id=customer_id
+    )
+
+    _set(
+        order,
+        "quotation_id",
+        quotation_id,
+    )
+
+    _set(
+        order,
+        "order_date",
+        order_date or datetime.utcnow(),
+    )
+
+    _set(
+        order,
+        "notes",
+        notes,
+    )
+
+    _set(
+        order,
+        "status",
+        "Draft",
+    )
+
+    _set(
+        order,
+        "total_amount",
+        0,
+    )
+
+    db.add(order)
+    db.commit()
+    db.refresh(order)
+
+    return order
 
 
-def get_customer(
-    customer_id,
+# ==========================================================
+# UPDATE SALES ORDER
+# ==========================================================
+
+def update_sales_order(
+    db,
+    order_id,
+    customer_id=None,
+    order_date=None,
+    notes=None,
 ):
-    """Return one customer."""
+    """
+    Edit a Draft Sales Order.
+    """
 
-    db = SessionLocal()
+    order = get_sales_order(
+        db,
+        order_id,
+    )
 
-    try:
+    if not order:
+        raise ValueError(
+            "Sales Order not found."
+        )
 
-        return (
+    if not _is_draft(order):
+        raise ValueError(
+            "Only Draft Sales Orders can be edited."
+        )
+
+    if customer_id is not None:
+
+        customer = (
             db.query(Customer)
             .filter(
                 Customer.id == customer_id
@@ -171,1053 +243,1099 @@ def get_customer(
             .first()
         )
 
-    finally:
-
-        db.close()
-
-
-# ============================================================
-# PRODUCT SERVICES
-# ============================================================
-
-def get_all_products(
-    active_only=False,
-):
-    """
-    Return products.
-
-    This function is used by the quotation module.
-    """
-
-    db = SessionLocal()
-
-    try:
-
-        query = db.query(Product)
-
-        if active_only and hasattr(
-            Product,
-            "active",
-        ):
-
-            query = query.filter(
-                Product.active.is_(True)
+        if not customer:
+            raise ValueError(
+                "Customer not found."
             )
 
-        return (
-            query
-            .order_by(Product.name.asc())
-            .all()
+        order.customer_id = customer_id
+
+    if order_date is not None:
+        _set(
+            order,
+            "order_date",
+            order_date,
         )
 
-    finally:
+    if notes is not None:
+        _set(
+            order,
+            "notes",
+            notes,
+        )
 
-        db.close()
+    db.commit()
+    db.refresh(order)
+
+    return order
 
 
-def get_sales_products(
-    active_only=True,
+# ==========================================================
+# ADD ORDER ITEM
+# ==========================================================
+
+def add_sales_order_item(
+    db,
+    order_id,
+    product_id,
+    quantity,
+    unit_price=None,
 ):
     """
-    Alias used by Sales Orders.
+    Add an item to a Draft Sales Order.
     """
 
-    return get_all_products(
-        active_only=active_only
+    order = get_sales_order(
+        db,
+        order_id,
+    )
+
+    if not order:
+        raise ValueError(
+            "Sales Order not found."
+        )
+
+    if not _is_draft(order):
+        raise ValueError(
+            "Items can only be added to Draft Sales Orders."
+        )
+
+    product = (
+        db.query(Product)
+        .filter(
+            Product.id == product_id
+        )
+        .first()
+    )
+
+    if not product:
+        raise ValueError(
+            "Product not found."
+        )
+
+    quantity = _number(quantity)
+
+    if quantity <= 0:
+        raise ValueError(
+            "Quantity must be greater than zero."
+        )
+
+    if unit_price is None:
+        unit_price = _number(
+            _get(
+                product,
+                "selling_price",
+                0,
+            )
+        )
+
+    unit_price = _number(unit_price)
+
+    if unit_price < 0:
+        raise ValueError(
+            "Unit price cannot be negative."
+        )
+
+    item = SalesOrderItem(
+        sales_order_id=order_id,
+        product_id=product_id,
+        quantity=quantity,
+    )
+
+    _set(
+        item,
+        "unit_price",
+        unit_price,
+    )
+
+    _set(
+        item,
+        "price",
+        unit_price,
+    )
+
+    _set(
+        item,
+        "total",
+        quantity * unit_price,
+    )
+
+    _set(
+        item,
+        "total_price",
+        quantity * unit_price,
+    )
+
+    db.add(item)
+
+    db.flush()
+
+    recalculate_sales_order_total(
+        db,
+        order_id,
+        commit=False,
+    )
+
+    db.commit()
+    db.refresh(item)
+
+    return item
+
+
+# ==========================================================
+# UPDATE ORDER ITEM
+# ==========================================================
+
+def update_sales_order_item(
+    db,
+    item_id,
+    quantity,
+    unit_price=None,
+):
+    """Edit an item on a Draft Sales Order."""
+
+    item = get_sales_order_item(
+        db,
+        item_id,
+    )
+
+    if not item:
+        raise ValueError(
+            "Sales Order item not found."
+        )
+
+    order = get_sales_order(
+        db,
+        item.sales_order_id,
+    )
+
+    if not order:
+        raise ValueError(
+            "Sales Order not found."
+        )
+
+    if not _is_draft(order):
+        raise ValueError(
+            "Only Draft Sales Orders can be edited."
+        )
+
+    quantity = _number(quantity)
+
+    if quantity <= 0:
+        raise ValueError(
+            "Quantity must be greater than zero."
+        )
+
+    if unit_price is None:
+        unit_price = _number(
+            _get(
+                item,
+                "unit_price",
+                _get(item, "price", 0),
+            )
+        )
+
+    unit_price = _number(unit_price)
+
+    item.quantity = quantity
+
+    _set(
+        item,
+        "unit_price",
+        unit_price,
+    )
+
+    _set(
+        item,
+        "price",
+        unit_price,
+    )
+
+    total = quantity * unit_price
+
+    _set(
+        item,
+        "total",
+        total,
+    )
+
+    _set(
+        item,
+        "total_price",
+        total,
+    )
+
+    recalculate_sales_order_total(
+        db,
+        order.id,
+        commit=False,
+    )
+
+    db.commit()
+    db.refresh(item)
+
+    return item
+
+
+# ==========================================================
+# DELETE ORDER ITEM
+# ==========================================================
+
+def delete_sales_order_item(
+    db,
+    item_id,
+):
+    """Delete an item from a Draft Sales Order."""
+
+    item = get_sales_order_item(
+        db,
+        item_id,
+    )
+
+    if not item:
+        raise ValueError(
+            "Sales Order item not found."
+        )
+
+    order = get_sales_order(
+        db,
+        item.sales_order_id,
+    )
+
+    if not order:
+        raise ValueError(
+            "Sales Order not found."
+        )
+
+    if not _is_draft(order):
+        raise ValueError(
+            "Only Draft Sales Orders can be edited."
+        )
+
+    order_id = order.id
+
+    db.delete(item)
+    db.flush()
+
+    recalculate_sales_order_total(
+        db,
+        order_id,
+        commit=False,
+    )
+
+    db.commit()
+
+    return True
+
+
+# ==========================================================
+# CALCULATE TOTAL
+# ==========================================================
+
+def calculate_sales_order_total(
+    db,
+    order_id,
+):
+    """Calculate the order total from its items."""
+
+    items = get_sales_order_items(
+        db,
+        order_id,
+    )
+
+    total = 0.0
+
+    for item in items:
+
+        quantity = _number(
+            _get(item, "quantity", 0)
+        )
+
+        unit_price = _number(
+            _get(
+                item,
+                "unit_price",
+                _get(item, "price", 0),
+            )
+        )
+
+        item_total = (
+            _get(
+                item,
+                "total",
+                None,
+            )
+        )
+
+        if item_total is None:
+
+            item_total = (
+                quantity * unit_price
+            )
+
+        total += _number(
+            item_total
+        )
+
+    return total
+
+
+def recalculate_sales_order_total(
+    db,
+    order_id,
+    commit=True,
+):
+    """Update the Sales Order total."""
+
+    order = get_sales_order(
+        db,
+        order_id,
+    )
+
+    if not order:
+        raise ValueError(
+            "Sales Order not found."
+        )
+
+    total = calculate_sales_order_total(
+        db,
+        order_id,
+    )
+
+    _set(
+        order,
+        "total_amount",
+        total,
+    )
+
+    _set(
+        order,
+        "total",
+        total,
+    )
+
+    if commit:
+        db.commit()
+        db.refresh(order)
+
+    return total
+
+
+# ==========================================================
+# STOCK RESERVATION HELPERS
+# ==========================================================
+
+def _get_reserved_quantity(
+    product,
+    exclude_order_id=None,
+):
+    """
+    Read an optional reserved quantity field.
+
+    The existing Product model may not yet have
+    reserved_quantity, so this remains compatible
+    with older versions.
+    """
+
+    return _number(
+        _get(
+            product,
+            "reserved_quantity",
+            0,
+        )
     )
 
 
-def get_product(
+def get_available_stock(
+    db,
     product_id,
 ):
-    """Return one product."""
+    """
+    Return stock available for new reservations.
 
-    db = SessionLocal()
+    Available = physical quantity - reserved quantity.
+    """
 
-    try:
+    product = (
+        db.query(Product)
+        .filter(
+            Product.id == product_id
+        )
+        .first()
+    )
 
-        return (
+    if not product:
+        raise ValueError(
+            "Product not found."
+        )
+
+    quantity = _number(
+        _get(
+            product,
+            "quantity",
+            0,
+        )
+    )
+
+    reserved = _get_reserved_quantity(
+        product
+    )
+
+    return max(
+        quantity - reserved,
+        0,
+    )
+
+
+# ==========================================================
+# CHECK STOCK FOR ORDER
+# ==========================================================
+
+def check_order_stock(
+    db,
+    order_id,
+):
+    """
+    Check whether all Sales Order items
+    can be reserved.
+    """
+
+    order = get_sales_order(
+        db,
+        order_id,
+    )
+
+    if not order:
+        raise ValueError(
+            "Sales Order not found."
+        )
+
+    items = get_sales_order_items(
+        db,
+        order_id,
+    )
+
+    results = []
+    all_available = True
+
+    for item in items:
+
+        product = (
             db.query(Product)
             .filter(
-                Product.id == product_id
+                Product.id
+                == item.product_id
             )
             .first()
         )
 
-    finally:
+        if not product:
 
-        db.close()
+            results.append(
+                {
+                    "product_id":
+                        item.product_id,
+                    "product":
+                        "Unknown",
+                    "requested":
+                        _number(
+                            item.quantity
+                        ),
+                    "available":
+                        0,
+                    "sufficient":
+                        False,
+                }
+            )
 
+            all_available = False
+            continue
 
-# ============================================================
-# QUOTATION SERVICES
-# ============================================================
-
-def generate_quotation_number():
-
-    db = SessionLocal()
-
-    try:
-
-        return _generate_number(
-            prefix="QT",
-            model=Quotation,
-            field_name="quotation_number",
-            db=db,
+        requested = _number(
+            item.quantity
         )
 
-    finally:
+        available = get_available_stock(
+            db,
+            product.id,
+        )
 
-        db.close()
+        sufficient = (
+            available >= requested
+        )
+
+        if not sufficient:
+            all_available = False
+
+        results.append(
+            {
+                "product_id":
+                    product.id,
+                "product":
+                    _get(
+                        product,
+                        "name",
+                        "Unknown",
+                    ),
+                "requested":
+                    requested,
+                "available":
+                    available,
+                "sufficient":
+                    sufficient,
+            }
+        )
+
+    return {
+        "available":
+            all_available,
+        "items":
+            results,
+    }
 
 
-def get_all_quotations(
-    status=None,
+# ==========================================================
+# RESERVE STOCK
+# ==========================================================
+
+def reserve_stock(
+    db,
+    order_id,
 ):
-    """Return quotations with customer and items loaded."""
+    """
+    Reserve stock for a Sales Order.
 
-    db = SessionLocal()
+    Reservation does NOT reduce physical stock.
 
-    try:
+    It increases Product.reserved_quantity when
+    that field exists.
+    """
 
-        query = (
-            db.query(Quotation)
-            .options(
-                joinedload(
-                    Quotation.customer
-                ),
-                joinedload(
-                    Quotation.items
-                ),
-            )
+    order = get_sales_order(
+        db,
+        order_id,
+    )
+
+    if not order:
+        raise ValueError(
+            "Sales Order not found."
         )
 
-        if status:
+    status = _status(order).lower()
 
-            query = query.filter(
-                Quotation.status == status
-            )
-
-        return (
-            query
-            .order_by(
-                Quotation.id.desc()
-            )
-            .all()
+    if status not in (
+        "confirmed",
+        "draft",
+    ):
+        raise ValueError(
+            "Only Draft or Confirmed Sales Orders "
+            "can reserve stock."
         )
 
-    finally:
+    items = get_sales_order_items(
+        db,
+        order_id,
+    )
 
-        db.close()
+    if not items:
+        raise ValueError(
+            "Sales Order has no items."
+        )
 
+    stock_check = check_order_stock(
+        db,
+        order_id,
+    )
 
-def get_quotation(
-    quotation_id,
-):
-    """Return one quotation with its items."""
+    if not stock_check["available"]:
 
-    db = SessionLocal()
+        shortages = [
+            x
+            for x in stock_check["items"]
+            if not x["sufficient"]
+        ]
 
-    try:
+        message = "; ".join(
+            f"{x['product']}: "
+            f"requested {x['requested']}, "
+            f"available {x['available']}"
+            for x in shortages
+        )
 
-        return (
-            db.query(Quotation)
-            .options(
-                joinedload(
-                    Quotation.customer
-                ),
-                joinedload(
-                    Quotation.items
-                ),
-            )
+        raise ValueError(
+            f"Insufficient stock: {message}"
+        )
+
+    # ------------------------------------------------------
+    # Reserve each item
+    # ------------------------------------------------------
+
+    for item in items:
+
+        product = (
+            db.query(Product)
             .filter(
-                Quotation.id == quotation_id
+                Product.id
+                == item.product_id
             )
             .first()
         )
 
-    finally:
-
-        db.close()
-
-
-def create_quotation(
-    customer_id,
-    items,
-    valid_until=None,
-    status="Draft",
-    notes=None,
-):
-    """
-    Create a quotation.
-
-    items format:
-
-    [
-        {
-            "product_id": 1,
-            "product_name": "Maize Flour 25Kg",
-            "quantity": 10,
-            "unit_price": 50000,
-        }
-    ]
-    """
-
-    db = SessionLocal()
-
-    try:
-
-        quotation_number = _generate_number(
-            prefix="QT",
-            model=Quotation,
-            field_name="quotation_number",
-            db=db,
+        quantity = _number(
+            item.quantity
         )
 
-        quotation = Quotation(
-            quotation_number=quotation_number,
-            customer_id=customer_id,
-            status=status,
-            total_amount=0,
-            notes=notes,
+        # --------------------------------------------------
+        # If Product.reserved_quantity exists,
+        # maintain it directly.
+        # --------------------------------------------------
+
+        if hasattr(
+            product,
+            "reserved_quantity",
+        ):
+
+            current_reserved = (
+                _get_reserved_quantity(
+                    product
+                )
+            )
+
+            product.reserved_quantity = (
+                current_reserved
+                + quantity
+            )
+
+        # --------------------------------------------------
+        # Otherwise try the warehouse service.
+        # --------------------------------------------------
+
+        else:
+
+            try:
+
+                from services import warehouse_service
+
+                if hasattr(
+                    warehouse_service,
+                    "reserve_stock",
+                ):
+
+                    warehouse_service.reserve_stock(
+                        db=db,
+                        product_id=product.id,
+                        quantity=quantity,
+                        reference_id=order.id,
+                    )
+
+            except Exception:
+                # Older warehouse implementations
+                # may not have reservation support.
+                pass
+
+    _set(
+        order,
+        "stock_reserved",
+        True,
+    )
+
+    _set(
+        order,
+        "reserved",
+        True,
+    )
+
+    _set(
+        order,
+        "stock_status",
+        "Reserved",
+    )
+
+    _set(
+        order,
+        "reserved_at",
+        datetime.utcnow(),
+    )
+
+    db.commit()
+    db.refresh(order)
+
+    return order
+
+
+# ==========================================================
+# RELEASE STOCK
+# ==========================================================
+
+def release_stock(
+    db,
+    order_id,
+):
+    """
+    Release previously reserved stock.
+    """
+
+    order = get_sales_order(
+        db,
+        order_id,
+    )
+
+    if not order:
+        raise ValueError(
+            "Sales Order not found."
+        )
+
+    items = get_sales_order_items(
+        db,
+        order_id,
+    )
+
+    for item in items:
+
+        product = (
+            db.query(Product)
+            .filter(
+                Product.id
+                == item.product_id
+            )
+            .first()
+        )
+
+        if not product:
+            continue
+
+        quantity = _number(
+            item.quantity
         )
 
         if hasattr(
-            Quotation,
-            "valid_until",
+            product,
+            "reserved_quantity",
         ):
 
-            quotation.valid_until = (
-                valid_until
+            reserved = _get_reserved_quantity(
+                product
             )
 
-        db.add(quotation)
-
-        db.flush()
-
-        total_amount = 0.0
-
-        for item_data in items:
-
-            quantity = float(
-                item_data.get(
-                    "quantity",
-                    0,
-                )
+            product.reserved_quantity = max(
+                reserved - quantity,
+                0,
             )
 
-            unit_price = float(
-                item_data.get(
-                    "unit_price",
-                    0,
-                )
-            )
+        else:
 
-            item_total = (
-                quantity * unit_price
-            )
+            try:
 
-            quotation_item = QuotationItem(
-                quotation_id=quotation.id,
-                product_name=item_data.get(
-                    "product_name",
-                    "",
-                ),
-                quantity=quantity,
-                unit_price=unit_price,
-                total=item_total,
-            )
-
-            if hasattr(
-                QuotationItem,
-                "product_id",
-            ):
-
-                quotation_item.product_id = (
-                    item_data.get(
-                        "product_id"
-                    )
-                )
-
-            db.add(
-                quotation_item
-            )
-
-            total_amount += item_total
-
-        quotation.total_amount = (
-            total_amount
-        )
-
-        db.commit()
-
-        db.refresh(quotation)
-
-        return quotation
-
-    except Exception:
-
-        db.rollback()
-
-        raise
-
-    finally:
-
-        db.close()
-
-
-def update_quotation(
-    quotation_id,
-    customer_id=None,
-    items=None,
-    valid_until=None,
-    status=None,
-    notes=None,
-):
-    """Update an existing quotation."""
-
-    db = SessionLocal()
-
-    try:
-
-        quotation = (
-            db.query(Quotation)
-            .filter(
-                Quotation.id == quotation_id
-            )
-            .first()
-        )
-
-        if not quotation:
-
-            return None
-
-        if customer_id is not None:
-
-            quotation.customer_id = (
-                customer_id
-            )
-
-        if status is not None:
-
-            quotation.status = status
-
-        if notes is not None:
-
-            quotation.notes = notes
-
-        if (
-            valid_until is not None
-            and hasattr(
-                Quotation,
-                "valid_until",
-            )
-        ):
-
-            quotation.valid_until = (
-                valid_until
-            )
-
-        if items is not None:
-
-            quotation.items.clear()
-
-            db.flush()
-
-            total_amount = 0.0
-
-            for item_data in items:
-
-                quantity = float(
-                    item_data.get(
-                        "quantity",
-                        0,
-                    )
-                )
-
-                unit_price = float(
-                    item_data.get(
-                        "unit_price",
-                        0,
-                    )
-                )
-
-                item_total = (
-                    quantity * unit_price
-                )
-
-                quotation_item = QuotationItem(
-                    quotation_id=quotation.id,
-                    product_name=item_data.get(
-                        "product_name",
-                        "",
-                    ),
-                    quantity=quantity,
-                    unit_price=unit_price,
-                    total=item_total,
-                )
+                from services import warehouse_service
 
                 if hasattr(
-                    QuotationItem,
-                    "product_id",
+                    warehouse_service,
+                    "release_stock",
                 ):
 
-                    quotation_item.product_id = (
-                        item_data.get(
-                            "product_id"
-                        )
+                    warehouse_service.release_stock(
+                        db=db,
+                        product_id=product.id,
+                        quantity=quantity,
+                        reference_id=order.id,
                     )
 
-                db.add(
-                    quotation_item
-                )
+            except Exception:
+                pass
 
-                total_amount += (
-                    item_total
-                )
+    _set(
+        order,
+        "stock_reserved",
+        False,
+    )
 
-            quotation.total_amount = (
-                total_amount
-            )
+    _set(
+        order,
+        "reserved",
+        False,
+    )
 
-        db.commit()
+    _set(
+        order,
+        "stock_status",
+        "Available",
+    )
 
-        db.refresh(quotation)
+    _set(
+        order,
+        "released_at",
+        datetime.utcnow(),
+    )
 
-        return quotation
+    db.commit()
+    db.refresh(order)
 
-    except Exception:
-
-        db.rollback()
-
-        raise
-
-    finally:
-
-        db.close()
-
-
-def delete_quotation(
-    quotation_id,
-):
-    """Delete a quotation and its items."""
-
-    db = SessionLocal()
-
-    try:
-
-        quotation = (
-            db.query(Quotation)
-            .filter(
-                Quotation.id == quotation_id
-            )
-            .first()
-        )
-
-        if not quotation:
-
-            return False
-
-        db.delete(
-            quotation
-        )
-
-        db.commit()
-
-        return True
-
-    except Exception:
-
-        db.rollback()
-
-        raise
-
-    finally:
-
-        db.close()
+    return order
 
 
-def set_quotation_status(
-    quotation_id,
-    status,
-):
-    """Change quotation status."""
+# ==========================================================
+# CONFIRM SALES ORDER
+# ==========================================================
 
-    db = SessionLocal()
-
-    try:
-
-        quotation = (
-            db.query(Quotation)
-            .filter(
-                Quotation.id == quotation_id
-            )
-            .first()
-        )
-
-        if not quotation:
-
-            return None
-
-        quotation.status = status
-
-        db.commit()
-
-        db.refresh(quotation)
-
-        return quotation
-
-    except Exception:
-
-        db.rollback()
-
-        raise
-
-    finally:
-
-        db.close()
-
-
-# ============================================================
-# SALES ORDER SERVICES
-# ============================================================
-
-def generate_sales_order_number():
-
-    db = SessionLocal()
-
-    try:
-
-        return _generate_number(
-            prefix="SO",
-            model=SalesOrder,
-            field_name="order_number",
-            db=db,
-        )
-
-    finally:
-
-        db.close()
-
-
-def get_all_sales_orders():
-    """Return all Sales Orders."""
-
-    db = SessionLocal()
-
-    try:
-
-        return (
-            db.query(SalesOrder)
-            .options(
-                joinedload(
-                    SalesOrder.customer
-                ),
-                joinedload(
-                    SalesOrder.items
-                ),
-            )
-            .order_by(
-                SalesOrder.id.desc()
-            )
-            .all()
-        )
-
-    finally:
-
-        db.close()
-
-
-def get_sales_order(
+def confirm_sales_order(
+    db,
     order_id,
-):
-    """Return one Sales Order."""
-
-    db = SessionLocal()
-
-    try:
-
-        return (
-            db.query(SalesOrder)
-            .options(
-                joinedload(
-                    SalesOrder.customer
-                ),
-                joinedload(
-                    SalesOrder.items
-                ),
-            )
-            .filter(
-                SalesOrder.id == order_id
-            )
-            .first()
-        )
-
-    finally:
-
-        db.close()
-
-
-def create_sales_order(
-    customer_id,
-    items,
-    status="Draft",
-    notes=None,
+    reserve=True,
 ):
     """
-    Create a Sales Order.
+    Confirm a Draft Sales Order.
 
-    items format:
-
-    [
-        {
-            "product_name": "Maize Flour 25Kg",
-            "quantity": 10,
-            "unit_price": 50000,
-        }
-    ]
+    By default, confirmation also reserves stock.
     """
 
-    db = SessionLocal()
-
-    try:
-
-        order_number = _generate_number(
-            prefix="SO",
-            model=SalesOrder,
-            field_name="order_number",
-            db=db,
-        )
-
-        order = SalesOrder(
-            order_number=order_number,
-            customer_id=customer_id,
-            status=status,
-            total_amount=0,
-            notes=notes,
-        )
-
-        db.add(order)
-
-        db.flush()
-
-        total_amount = 0.0
-
-        for item_data in items:
-
-            quantity = float(
-                item_data.get(
-                    "quantity",
-                    0,
-                )
-            )
-
-            unit_price = float(
-                item_data.get(
-                    "unit_price",
-                    0,
-                )
-            )
-
-            item_total = (
-                quantity * unit_price
-            )
-
-            order_item = SalesOrderItem(
-                sales_order_id=order.id,
-                product_name=item_data.get(
-                    "product_name",
-                    "",
-                ),
-                quantity=quantity,
-                unit_price=unit_price,
-                total=item_total,
-            )
-
-            if hasattr(
-                SalesOrderItem,
-                "product_id",
-            ):
-
-                order_item.product_id = (
-                    item_data.get(
-                        "product_id"
-                    )
-                )
-
-            db.add(
-                order_item
-            )
-
-            total_amount += item_total
-
-        order.total_amount = (
-            total_amount
-        )
-
-        db.commit()
-
-        db.refresh(order)
-
-        return order
-
-    except Exception:
-
-        db.rollback()
-
-        raise
-
-    finally:
-
-        db.close()
-
-
-def create_sales_order_from_quotation(
-    quotation_id,
-    status="Draft",
-):
-    """
-    Convert an accepted quotation
-    into a Sales Order.
-    """
-
-    db = SessionLocal()
-
-    try:
-
-        quotation = (
-            db.query(Quotation)
-            .options(
-                joinedload(
-                    Quotation.items
-                )
-            )
-            .filter(
-                Quotation.id
-                == quotation_id
-            )
-            .first()
-        )
-
-        if not quotation:
-
-            raise ValueError(
-                "Quotation not found."
-            )
-
-        if quotation.status != "Accepted":
-
-            raise ValueError(
-                "Only accepted quotations "
-                "can be converted to Sales Orders."
-            )
-
-        order_number = _generate_number(
-            prefix="SO",
-            model=SalesOrder,
-            field_name="order_number",
-            db=db,
-        )
-
-        order = SalesOrder(
-            order_number=order_number,
-            customer_id=quotation.customer_id,
-            status=status,
-            total_amount=0,
-            notes=quotation.notes,
-        )
-
-        db.add(order)
-
-        db.flush()
-
-        total_amount = 0.0
-
-        for quotation_item in (
-            quotation.items
-        ):
-
-            item_total = (
-                float(
-                    quotation_item.quantity
-                    or 0
-                )
-                *
-                float(
-                    quotation_item.unit_price
-                    or 0
-                )
-            )
-
-            order_item = SalesOrderItem(
-                sales_order_id=order.id,
-                product_name=(
-                    quotation_item.product_name
-                ),
-                quantity=(
-                    quotation_item.quantity
-                ),
-                unit_price=(
-                    quotation_item.unit_price
-                ),
-                total=item_total,
-            )
-
-            if (
-                hasattr(
-                    SalesOrderItem,
-                    "product_id",
-                )
-                and hasattr(
-                    quotation_item,
-                    "product_id",
-                )
-            ):
-
-                order_item.product_id = (
-                    quotation_item.product_id
-                )
-
-            db.add(
-                order_item
-            )
-
-            total_amount += item_total
-
-        order.total_amount = (
-            total_amount
-        )
-
-        # Keep the quotation history.
-        # We do not delete the quotation.
-
-        db.commit()
-
-        db.refresh(order)
-
-        return order
-
-    except Exception:
-
-        db.rollback()
-
-        raise
-
-    finally:
-
-        db.close()
-
-
-def update_sales_order(
-    order_id,
-    customer_id=None,
-    items=None,
-    status=None,
-    notes=None,
-):
-    """Update an existing Sales Order."""
-
-    db = SessionLocal()
-
-    try:
-
-        order = (
-            db.query(SalesOrder)
-            .options(
-                joinedload(
-                    SalesOrder.items
-                )
-            )
-            .filter(
-                SalesOrder.id == order_id
-            )
-            .first()
-        )
-
-        if not order:
-
-            return None
-
-        if customer_id is not None:
-
-            order.customer_id = (
-                customer_id
-            )
-
-        if status is not None:
-
-            order.status = status
-
-        if notes is not None:
-
-            order.notes = notes
-
-        if items is not None:
-
-            # Remove existing items.
-            for item in list(
-                order.items
-            ):
-
-                db.delete(item)
-
-            db.flush()
-
-            total_amount = 0.0
-
-            for item_data in items:
-
-                quantity = float(
-                    item_data.get(
-                        "quantity",
-                        0,
-                    )
-                )
-
-                unit_price = float(
-                    item_data.get(
-                        "unit_price",
-                        0,
-                    )
-                )
-
-                item_total = (
-                    quantity
-                    * unit_price
-                )
-
-                order_item = SalesOrderItem(
-                    sales_order_id=order.id,
-                    product_name=item_data.get(
-                        "product_name",
-                        "",
-                    ),
-                    quantity=quantity,
-                    unit_price=unit_price,
-                    total=item_total,
-                )
-
-                if hasattr(
-                    SalesOrderItem,
-                    "product_id",
-                ):
-
-                    order_item.product_id = (
-                        item_data.get(
-                            "product_id"
-                        )
-                    )
-
-                db.add(
-                    order_item
-                )
-
-                total_amount += (
-                    item_total
-                )
-
-            order.total_amount = (
-                total_amount
-            )
-
-        db.commit()
-
-        db.refresh(order)
-
-        return order
-
-    except Exception:
-
-        db.rollback()
-
-        raise
-
-    finally:
-
-        db.close()
-
-
-def update_sales_order_status(
-    order_id,
-    status,
-):
-    """Update only the Sales Order status."""
-
-    if status not in SALES_ORDER_STATUSES:
-
+    order = get_sales_order(
+        db,
+        order_id,
+    )
+
+    if not order:
         raise ValueError(
-            f"Invalid Sales Order status: "
-            f"{status}"
+            "Sales Order not found."
         )
 
-    db = SessionLocal()
+    if not _is_draft(order):
+        raise ValueError(
+            "Only Draft Sales Orders can be confirmed."
+        )
 
-    try:
+    items = get_sales_order_items(
+        db,
+        order_id,
+    )
 
-        order = (
-            db.query(SalesOrder)
-            .filter(
-                SalesOrder.id == order_id
+    if not items:
+        raise ValueError(
+            "A Sales Order must contain at least "
+            "one item before confirmation."
+        )
+
+    recalculate_sales_order_total(
+        db,
+        order_id,
+        commit=False,
+    )
+
+    if reserve:
+
+        # Check first, before changing status.
+        stock_check = check_order_stock(
+            db,
+            order_id,
+        )
+
+        if not stock_check["available"]:
+
+            shortages = [
+                x
+                for x in stock_check["items"]
+                if not x["sufficient"]
+            ]
+
+            message = "; ".join(
+                f"{x['product']}: "
+                f"requested {x['requested']}, "
+                f"available {x['available']}"
+                for x in shortages
             )
-            .first()
+
+            raise ValueError(
+                f"Cannot confirm order because "
+                f"stock is insufficient: {message}"
+            )
+
+    _set(
+        order,
+        "status",
+        "Confirmed",
+    )
+
+    _set(
+        order,
+        "confirmed_at",
+        datetime.utcnow(),
+    )
+
+    db.commit()
+
+    if reserve:
+        reserve_stock(
+            db,
+            order_id,
         )
 
-        if not order:
+    db.refresh(order)
 
-            return None
-
-        order.status = status
-
-        db.commit()
-
-        db.refresh(order)
-
-        return order
-
-    except Exception:
-
-        db.rollback()
-
-        raise
-
-    finally:
-
-        db.close()
+    return order
 
 
-def delete_sales_order(
+# ==========================================================
+# CANCEL SALES ORDER
+# ==========================================================
+
+def cancel_sales_order(
+    db,
     order_id,
 ):
-    """Delete a Sales Order and its items."""
+    """
+    Cancel a Sales Order.
 
-    db = SessionLocal()
+    Any reservation is released first.
+    """
 
-    try:
+    order = get_sales_order(
+        db,
+        order_id,
+    )
 
-        order = (
-            db.query(SalesOrder)
-            .filter(
-                SalesOrder.id == order_id
-            )
-            .first()
+    if not order:
+        raise ValueError(
+            "Sales Order not found."
         )
 
-        if not order:
+    status = _status(order).lower()
 
-            return False
+    if status == "cancelled":
+        raise ValueError(
+            "Sales Order is already cancelled."
+        )
 
-        db.delete(order)
+    if status in (
+        "delivered",
+        "completed",
+        "closed",
+    ):
+        raise ValueError(
+            "Completed Sales Orders cannot be cancelled."
+        )
 
-        db.commit()
+    reserved = (
+        bool(
+            _get(
+                order,
+                "stock_reserved",
+                False,
+            )
+        )
+        or bool(
+            _get(
+                order,
+                "reserved",
+                False,
+            )
+        )
+    )
 
-        return True
+    if reserved:
+        release_stock(
+            db,
+            order_id,
+        )
 
-    except Exception:
+    _set(
+        order,
+        "status",
+        "Cancelled",
+    )
 
-        db.rollback()
+    _set(
+        order,
+        "cancelled_at",
+        datetime.utcnow(),
+    )
 
-        raise
+    db.commit()
+    db.refresh(order)
 
-    finally:
+    return order
 
-        db.close()
+
+# ==========================================================
+# ORDER SUMMARY
+# ==========================================================
+
+def get_sales_order_summary(
+    db,
+    order_id,
+):
+    """Return useful order information for the UI."""
+
+    order = get_sales_order(
+        db,
+        order_id,
+    )
+
+    if not order:
+        raise ValueError(
+            "Sales Order not found."
+        )
+
+    items = get_sales_order_items(
+        db,
+        order_id,
+    )
+
+    customer = (
+        db.query(Customer)
+        .filter(
+            Customer.id
+            == order.customer_id
+        )
+        .first()
+    )
+
+    total_quantity = sum(
+        _number(
+            item.quantity
+        )
+        for item in items
+    )
+
+    total_amount = calculate_sales_order_total(
+        db,
+        order_id,
+    )
+
+    return {
+        "id":
+            order.id,
+
+        "customer_id":
+            order.customer_id,
+
+        "customer":
+            _get(
+                customer,
+                "name",
+                "Unknown",
+            ),
+
+        "status":
+            _status(order),
+
+        "items":
+            len(items),
+
+        "quantity":
+            total_quantity,
+
+        "total":
+            total_amount,
+
+        "stock_reserved":
+            bool(
+                _get(
+                    order,
+                    "stock_reserved",
+                    _get(
+                        order,
+                        "reserved",
+                        False,
+                    ),
+                )
+            ),
+    }
