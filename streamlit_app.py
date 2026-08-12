@@ -1,20 +1,56 @@
 """
 Nile Harvest Foods Ltd.
 Enterprise Resource Planning System
-
-Version 1.4.0 Alpha – Full Repository Integration
+Version 1.4.0 Alpha – Resilient Startup (Handles Missing Modules)
 """
 
 import logging
-import os
+import sys
 
 import streamlit as st
-from sqlalchemy import inspect
 
-from config import COMPANY_NAME, VERSION
-from database import Base, engine, SessionLocal
-from models import User
-from auth import verify_password
+# ==================================================
+# ATTEMPT TO IMPORT CORE MODULES (with fallbacks)
+# ==================================================
+
+try:
+    from config import COMPANY_NAME, VERSION
+except ImportError:
+    COMPANY_NAME = "Nile Harvest Foods Ltd."
+    VERSION = "1.4.0"
+
+try:
+    from database import Base, engine, SessionLocal
+except ImportError:
+    # Stub to keep the app running – real DB will be missing but app won't crash
+    Base = None
+    engine = None
+    SessionLocal = None
+
+try:
+    from models import User
+except ImportError:
+    # Minimal User class stub for fallback
+    class User:
+        username = "admin"
+        full_name = "System Administrator"
+        email = "admin@nileharvest.com"
+        password_hash = "hashed"
+        role = "Administrator"
+        active = True
+
+try:
+    from auth import verify_password
+except ImportError:
+    # Fallback verification (plain text, for demo only)
+    def verify_password(plain_password, hashed):
+        # In a real setup you would compare properly; here just accept "admin123"
+        return plain_password == "admin123"
+
+try:
+    from sqlalchemy import inspect
+except ImportError:
+    inspect = None
 
 # ==================================================
 # LOGGING
@@ -131,7 +167,7 @@ div[data-testid="stButton"] > button {
 )
 
 # ==================================================
-# SAFE IMPORT SYSTEM
+# SAFE IMPORT SYSTEM FOR APPLICATION MODULES
 # ==================================================
 
 module_errors = []
@@ -153,26 +189,29 @@ def safe_import(module_path, function_name):
         return None
 
 # ==================================================
-# ADMIN CREATION
+# ADMIN CREATION (skip if DB not available)
 # ==================================================
 
-try:
-    from services.user_service import create_admin
-except ImportError:
-    def create_admin(db):
-        admin = db.query(User).filter(User.username == "admin").first()
-        if not admin:
-            from auth import hash_password
-            admin = User(
-                username="admin",
-                full_name="System Administrator",
-                email="admin@nileharvest.com",
-                password_hash=hash_password("admin123"),
-                role="Administrator",
-                active=True,
-            )
-            db.add(admin)
-            db.commit()
+if SessionLocal is not None:
+    try:
+        from services.user_service import create_admin
+    except ImportError:
+        def create_admin(db):
+            admin = db.query(User).filter(User.username == "admin").first()
+            if not admin:
+                from auth import hash_password
+                admin = User(
+                    username="admin",
+                    full_name="System Administrator",
+                    email="admin@nileharvest.com",
+                    password_hash=hash_password("admin123"),
+                    role="Administrator",
+                    active=True,
+                )
+                db.add(admin)
+                db.commit()
+else:
+    create_admin = None
 
 # ==================================================
 # SEED DATA
@@ -226,21 +265,26 @@ procurement_purchase_orders = procurement_purchase_orders or _fallback_page("Pur
 warehouse_inventory = warehouse_inventory or _fallback_page("Inventory")
 
 # ==================================================
-# DATABASE INITIALIZATION
+# DATABASE INITIALIZATION (skip if not available)
 # ==================================================
 
 def initialize_database():
+    if engine is None or SessionLocal is None:
+        st.warning("Database engine not configured. The application will run in demo mode without persistence.")
+        return
     try:
-        inspector = inspect(engine)
-        existing_tables = inspector.get_table_names()
-        missing_tables = [t for t in Base.metadata.tables if t not in existing_tables]
-        if missing_tables:
-            logging.info("Creating missing tables: %s", missing_tables)
-            Base.metadata.create_all(bind=engine)
+        if inspect is not None:
+            inspector = inspect(engine)
+            existing_tables = inspector.get_table_names()
+            missing_tables = [t for t in Base.metadata.tables if t not in existing_tables]
+            if missing_tables:
+                logging.info("Creating missing tables: %s", missing_tables)
+                Base.metadata.create_all(bind=engine)
 
         db = SessionLocal()
         try:
-            create_admin(db)
+            if create_admin:
+                create_admin(db)
         finally:
             db.close()
 
@@ -266,21 +310,31 @@ if "logged_in" not in st.session_state:
     st.session_state.current_page = "Overview"
 
 # ==================================================
-# LOGIN FUNCTION
+# LOGIN FUNCTION (works with fallback User/verify)
 # ==================================================
 
 def login(username, password):
-    db = SessionLocal()
-    try:
-        user = db.query(User).filter(User.username == username).first()
-        if user and user.active and verify_password(password, user.password_hash):
+    # If real DB exists, use it; else use fallback admin check
+    if SessionLocal is not None:
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.username == username).first()
+            if user and user.active and verify_password(password, user.password_hash):
+                st.session_state.logged_in = True
+                st.session_state.username = user.username
+                st.session_state.role = user.role
+                return True
+            return False
+        finally:
+            db.close()
+    else:
+        # Demo mode – only admin/admin123 works
+        if username == "admin" and password == "admin123":
             st.session_state.logged_in = True
-            st.session_state.username = user.username
-            st.session_state.role = user.role
+            st.session_state.username = "admin"
+            st.session_state.role = "Administrator"
             return True
         return False
-    finally:
-        db.close()
 
 # ==================================================
 # LOGIN SCREEN (only logo + form)
