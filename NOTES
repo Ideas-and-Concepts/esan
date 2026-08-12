@@ -41,3 +41,17 @@ esan/
 ├── docs/
 ├── tests/
 └── scripts/
+
+
+modules/
+└── sales/
+    ├── dashboard.py
+    ├── customers.py
+    ├── quotations.py
+    ├── orders.py
+    ├── deliveries.py
+    ├── invoices.py
+    └── payments.py
+
+services/
+└── sales_service.py
