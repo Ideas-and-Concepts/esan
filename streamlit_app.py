@@ -2,27 +2,22 @@
 Nile Harvest Foods Ltd.
 Enterprise Resource Planning System
 
+Esan ERP
 Version 1.4.0 Alpha
+
 Full Repository Integration
 """
 
 import io
 import logging
+import importlib
 
 import streamlit as st
 from sqlalchemy import inspect
 
-
-# ============================================================
-# PAGE CONFIGURATION
-# ============================================================
-
-st.set_page_config(
-    page_title="Nile Harvest ERP",
-    page_icon="🌱",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+from config import COMPANY_NAME, VERSION
+from database import Base, engine, SessionLocal
+from auth import verify_password
 
 
 # ============================================================
@@ -37,67 +32,26 @@ logging.basicConfig(
 
 
 # ============================================================
-# SAFE CORE IMPORTS
+# PAGE CONFIGURATION
 # ============================================================
 
-core_errors = []
+st.set_page_config(
+    page_title="Nile Harvest ERP",
+    page_icon="🌾",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
 
-try:
-    from config import COMPANY_NAME, VERSION
-except Exception as exc:
-    COMPANY_NAME = "Nile Harvest Foods Ltd."
-    VERSION = "1.4.0 Alpha"
+# ============================================================
+# SAFE MODEL LOADING
+# ============================================================
 
-    core_errors.append(
-        f"config: {type(exc).__name__}: {exc}"
-    )
-
-    logging.exception(
-        "Unable to import config"
-    )
-
-
-# ------------------------------------------------------------
-# DATABASE
-# ------------------------------------------------------------
-
-try:
-    from database import Base, engine, SessionLocal
-
-except Exception as exc:
-
-    Base = None
-    engine = None
-    SessionLocal = None
-
-    core_errors.append(
-        f"database: {type(exc).__name__}: {exc}"
-    )
-
-    logging.exception(
-        "Unable to import database"
-    )
-
-
-# ------------------------------------------------------------
-# MODELS
-#
-# IMPORTANT:
-# We import the models module first instead of directly doing:
-#
-#     from models import User
-#
-# This prevents the application from crashing immediately
-# when models.py has another model/import issue.
-# ------------------------------------------------------------
-
-models_module = None
 User = None
+MODEL_ERROR = None
 
 try:
-
-    import models as models_module
+    models_module = importlib.import_module("models")
 
     User = getattr(
         models_module,
@@ -106,64 +60,37 @@ try:
     )
 
     if User is None:
-
-        core_errors.append(
-            "models: User model was not found."
-        )
-
-        logging.error(
-            "User model was not found in models.py"
+        MODEL_ERROR = (
+            "The models.py file was loaded, "
+            "but it does not contain a User model."
         )
 
 except Exception as exc:
-
-    core_errors.append(
-        f"models: {type(exc).__name__}: {exc}"
+    MODEL_ERROR = (
+        f"Unable to load models.py: "
+        f"{type(exc).__name__}: {exc}"
     )
 
     logging.exception(
-        "Unable to import models.py"
-    )
-
-
-# ------------------------------------------------------------
-# AUTH
-# ------------------------------------------------------------
-
-try:
-
-    from auth import verify_password
-
-except Exception as exc:
-
-    verify_password = None
-
-    core_errors.append(
-        f"auth: {type(exc).__name__}: {exc}"
-    )
-
-    logging.exception(
-        "Unable to import auth"
+        "Unable to load models.py"
     )
 
 
 # ============================================================
-# LOGO GENERATOR
+# NEW NILE HARVEST LOGO
 # ============================================================
 
 def create_logo():
     """
-    Generate the Nile Harvest Foods logo as a PNG image
-    entirely in memory.
+    Generate the Nile Harvest Foods logo completely in memory.
 
-    This avoids relying on an external image file.
+    No external image file is required.
     """
 
     try:
-
         from PIL import Image, ImageDraw
 
-        size = 420
+        size = 600
 
         image = Image.new(
             "RGBA",
@@ -174,41 +101,72 @@ def create_logo():
         draw = ImageDraw.Draw(image)
 
         # ----------------------------------------------------
-        # Outer rounded square
+        # Outer badge
         # ----------------------------------------------------
 
         draw.rounded_rectangle(
-            (15, 15, size - 15, size - 15),
-            radius=85,
-            fill=(30, 100, 55, 255),
+            (15, 15, 585, 585),
+            radius=125,
+            fill=(27, 94, 32, 255),
         )
 
         # ----------------------------------------------------
-        # Inner green area
+        # Inner badge
         # ----------------------------------------------------
 
         draw.rounded_rectangle(
-            (30, 30, size - 30, size - 30),
-            radius=70,
+            (35, 35, 565, 565),
+            radius=105,
             fill=(46, 125, 50, 255),
         )
 
         # ----------------------------------------------------
-        # Gold sunrise
+        # Golden sun
         # ----------------------------------------------------
 
         draw.ellipse(
-            (135, 70, 285, 220),
+            (190, 85, 410, 305),
             fill=(242, 190, 45, 255),
         )
+
+        # ----------------------------------------------------
+        # Horizon
+        # ----------------------------------------------------
+
+        draw.rectangle(
+            (55, 275, 545, 330),
+            fill=(129, 199, 132, 255),
+        )
+
+        # ----------------------------------------------------
+        # Nile water
+        # ----------------------------------------------------
+
+        draw.rounded_rectangle(
+            (55, 310, 545, 400),
+            radius=35,
+            fill=(30, 105, 150, 255),
+        )
+
+        # ----------------------------------------------------
+        # Water highlights
+        # ----------------------------------------------------
+
+        for y in (335, 365):
+
+            draw.line(
+                (100, y, 500, y),
+                fill=(144, 202, 249, 255),
+                width=7,
+            )
 
         # ----------------------------------------------------
         # Soil
         # ----------------------------------------------------
 
         draw.rounded_rectangle(
-            (30, 285, size - 30, size - 30),
-            radius=60,
+            (55, 395, 545, 545),
+            radius=45,
             fill=(91, 62, 45, 255),
         )
 
@@ -217,7 +175,7 @@ def create_logo():
         # ----------------------------------------------------
 
         draw.rounded_rectangle(
-            (202, 145, 218, 310),
+            (292, 205, 308, 440),
             radius=8,
             fill=(174, 213, 129, 255),
         )
@@ -227,7 +185,7 @@ def create_logo():
         # ----------------------------------------------------
 
         draw.ellipse(
-            (95, 145, 215, 230),
+            (145, 220, 310, 335),
             fill=(129, 199, 132, 255),
         )
 
@@ -236,53 +194,61 @@ def create_logo():
         # ----------------------------------------------------
 
         draw.ellipse(
-            (205, 145, 325, 230),
+            (290, 220, 455, 335),
             fill=(129, 199, 132, 255),
         )
 
         # ----------------------------------------------------
-        # Leaf veins
+        # Left leaf vein
         # ----------------------------------------------------
 
         draw.line(
-            (155, 190, 205, 230),
+            (180, 275, 300, 335),
             fill=(46, 125, 50, 255),
-            width=6,
+            width=9,
         )
+
+        # ----------------------------------------------------
+        # Right leaf vein
+        # ----------------------------------------------------
 
         draw.line(
-            (265, 190, 215, 230),
+            (420, 275, 300, 335),
             fill=(46, 125, 50, 255),
-            width=6,
+            width=9,
         )
 
         # ----------------------------------------------------
-        # Gold grain symbols
+        # Grain symbols
         # ----------------------------------------------------
 
-        grains = [
-            (95, 315),
-            (125, 300),
-            (155, 320),
-            (265, 320),
-            (295, 300),
-            (325, 315),
+        grain_positions = [
+            (120, 440),
+            (165, 415),
+            (205, 450),
+            (395, 450),
+            (435, 415),
+            (480, 440),
         ]
 
-        for x, y in grains:
+        for x, y in grain_positions:
 
             draw.ellipse(
-                (
-                    x,
-                    y,
-                    x + 18,
-                    y + 30,
-                ),
+                (x, y, x + 22, y + 38),
                 fill=(242, 190, 45, 255),
             )
 
         # ----------------------------------------------------
-        # PNG buffer
+        # Small gold center
+        # ----------------------------------------------------
+
+        draw.ellipse(
+            (280, 430, 320, 470),
+            fill=(242, 190, 45, 255),
+        )
+
+        # ----------------------------------------------------
+        # Export PNG
         # ----------------------------------------------------
 
         buffer = io.BytesIO()
@@ -299,7 +265,7 @@ def create_logo():
     except Exception as exc:
 
         logging.exception(
-            "Unable to generate Nile Harvest logo: %s",
+            "Logo generation failed: %s",
             exc,
         )
 
@@ -319,7 +285,7 @@ LOGO_IMAGE = get_logo()
 
 
 # ============================================================
-# UI CSS
+# ERP UI
 # ============================================================
 
 st.markdown(
@@ -334,16 +300,17 @@ st.markdown(
         display: none;
     }
 
-    footer {
+    header {
         display: none;
     }
 
-    header {
+    footer {
         display: none;
     }
 
     .block-container {
         padding-top: 1.5rem;
+        padding-bottom: 2rem;
     }
 
 
@@ -355,51 +322,63 @@ st.markdown(
         border-right: 1px solid rgba(128,128,128,0.25);
     }
 
-    div[data-testid="stSidebar"] div[data-testid="stButton"] > button {
-        text-align: left;
-        border-radius: 9px;
-        min-height: 42px;
-        font-weight: 600;
-    }
-
 
     /* ======================================================
-       LOGO CONTAINERS
+       LOGIN PAGE
        ====================================================== */
 
-    .login-logo-container {
-
+    .login-page {
         width: 100%;
+        min-height: 78vh;
 
         display: flex;
+        flex-direction: column;
 
-        justify-content: center;
-
+        justify-content: flex-start;
         align-items: center;
 
-        margin-top: 20px;
-
-        margin-bottom: 15px;
+        padding-top: 35px;
     }
 
-    .sidebar-logo-container {
+
+    .login-logo {
+        display: flex;
+        justify-content: center;
+        align-items: center;
 
         width: 100%;
 
-        display: flex;
+        margin-bottom: 25px;
+    }
 
-        justify-content: center;
 
-        align-items: center;
+    .login-form {
+        width: 100%;
+        max-width: 430px;
 
-        margin-top: 5px;
-
-        margin-bottom: 15px;
+        margin-left: auto;
+        margin-right: auto;
     }
 
 
     /* ======================================================
-       LOGIN
+       SIDEBAR LOGO
+       ====================================================== */
+
+    .sidebar-logo {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        width: 100%;
+
+        padding-top: 8px;
+        padding-bottom: 10px;
+    }
+
+
+    /* ======================================================
+       INPUTS
        ====================================================== */
 
     div[data-testid="stTextInput"] label {
@@ -407,11 +386,8 @@ st.markdown(
     }
 
     div[data-testid="stTextInput"] input {
-
         border-radius: 10px;
-
         min-height: 45px;
-
         padding-left: 14px;
     }
 
@@ -421,31 +397,60 @@ st.markdown(
        ====================================================== */
 
     div[data-testid="stButton"] > button {
-
         border-radius: 10px;
-
         min-height: 44px;
-
         font-weight: 700;
     }
 
 
     /* ======================================================
-       SIDEBAR USER PANEL
+       SIDEBAR BUTTONS
        ====================================================== */
 
-    .user-panel {
+    div[data-testid="stSidebar"]
+    div[data-testid="stButton"] > button {
 
-        padding: 12px;
+        text-align: left;
+        border-radius: 9px;
 
-        border-radius: 12px;
-
-        border: 1px solid rgba(128,128,128,0.20);
-
-        margin-top: 10px;
-
-        margin-bottom: 10px;
+        margin-bottom: 2px;
     }
+
+
+    /* ======================================================
+       SIDEBAR SECTION HEADINGS
+       ====================================================== */
+
+    div[data-testid="stSidebar"] h3 {
+        margin-top: 0.5rem;
+    }
+
+
+    /* ======================================================
+       LOGIN TITLE
+       ====================================================== */
+
+    .login-title {
+        text-align: center;
+
+        font-size: 28px;
+        font-weight: 800;
+
+        margin-top: 5px;
+        margin-bottom: 4px;
+    }
+
+
+    .login-subtitle {
+        text-align: center;
+
+        font-size: 14px;
+
+        opacity: 0.7;
+
+        margin-bottom: 22px;
+    }
+
 
     </style>
     """,
@@ -454,24 +459,27 @@ st.markdown(
 
 
 # ============================================================
-# SAFE MODULE IMPORT SYSTEM
+# SAFE IMPORT SYSTEM
 # ============================================================
 
 module_errors = []
 
 
-def safe_import(module_path, function_name):
+def safe_import(
+    module_path,
+    function_name,
+):
     """
     Safely import a module function.
 
-    If a module fails, the entire ERP will continue running.
+    A broken module will not crash
+    the entire ERP application.
     """
 
     try:
 
-        module = __import__(
-            module_path,
-            fromlist=[function_name],
+        module = importlib.import_module(
+            module_path
         )
 
         function = getattr(
@@ -480,32 +488,34 @@ def safe_import(module_path, function_name):
             None,
         )
 
-        if function is None:
+        if function is not None:
 
-            error = (
-                f"{module_path}: "
-                f"missing function '{function_name}'"
-            )
+            return function
 
-            module_errors.append(error)
+        error = (
+            f"{module_path}: "
+            f"missing function "
+            f"'{function_name}'"
+        )
 
-            logging.error(error)
+        module_errors.append(error)
 
-            return None
+        logging.error(error)
 
-        return function
+        return None
 
     except Exception as exc:
 
         error = (
             f"{module_path}: "
-            f"{type(exc).__name__}: {exc}"
+            f"{type(exc).__name__}: "
+            f"{exc}"
         )
 
         module_errors.append(error)
 
         logging.exception(
-            "Failed loading module %s",
+            "Failed loading %s",
             module_path,
         )
 
@@ -513,11 +523,127 @@ def safe_import(module_path, function_name):
 
 
 # ============================================================
+# ADMIN CREATION
+# ============================================================
+
+def create_default_admin(db):
+    """
+    Creates the default administrator.
+
+    The function checks which User fields actually exist
+    before passing values to SQLAlchemy.
+    """
+
+    if User is None:
+        return
+
+    try:
+
+        admin = (
+            db.query(User)
+            .filter(
+                User.username == "admin"
+            )
+            .first()
+        )
+
+        if admin:
+
+            return
+
+        from auth import hash_password
+
+        password_hash = hash_password(
+            "admin123"
+        )
+
+        user_columns = {
+            column.name
+            for column in User.__table__.columns
+        }
+
+        user_data = {}
+
+        if "username" in user_columns:
+            user_data["username"] = "admin"
+
+        if "password_hash" in user_columns:
+            user_data["password_hash"] = (
+                password_hash
+            )
+
+        if "full_name" in user_columns:
+            user_data["full_name"] = (
+                "System Administrator"
+            )
+
+        if "email" in user_columns:
+            user_data["email"] = (
+                "admin@nileharvest.com"
+            )
+
+        if "role" in user_columns:
+            user_data["role"] = (
+                "Administrator"
+            )
+
+        if "active" in user_columns:
+            user_data["active"] = True
+
+        admin = User(
+            **user_data
+        )
+
+        db.add(admin)
+
+        db.commit()
+
+        logging.info(
+            "Default administrator created."
+        )
+
+    except Exception as exc:
+
+        db.rollback()
+
+        logging.exception(
+            "Admin creation failed: %s",
+            exc,
+        )
+
+
+# ============================================================
+# SEED DATA
+# ============================================================
+
+load_seed_data = None
+
+try:
+
+    seed_module = importlib.import_module(
+        "seed.seed_data"
+    )
+
+    load_seed_data = getattr(
+        seed_module,
+        "load_seed_data",
+        None,
+    )
+
+except Exception as exc:
+
+    logging.warning(
+        "Seed data module unavailable: %s",
+        exc,
+    )
+
+
+# ============================================================
 # MODULE REGISTRY
 # ============================================================
 
 # ------------------------------------------------------------
-# DASHBOARD
+# OVERVIEW
 # ------------------------------------------------------------
 
 dashboard_home = safe_import(
@@ -540,14 +666,14 @@ procurement_suppliers = safe_import(
     "suppliers_page",
 )
 
-procurement_purchase_orders = safe_import(
-    "modules.procurement.purchase_orders",
-    "purchase_orders_page",
-)
-
 procurement_purchases = safe_import(
     "modules.procurement.purchases",
     "purchases_page",
+)
+
+procurement_purchase_orders = safe_import(
+    "modules.procurement.purchase_orders",
+    "purchase_orders_page",
 )
 
 
@@ -582,7 +708,7 @@ packaging_dashboard = safe_import(
 
 
 # ------------------------------------------------------------
-# SALES
+# SALES & DISTRIBUTION
 # ------------------------------------------------------------
 
 sales_dashboard = safe_import(
@@ -650,7 +776,7 @@ def fallback_page(title):
     def render():
 
         st.info(
-            f"{title} – "
+            f"{title} - "
             "This section is currently being prepared."
         )
 
@@ -662,14 +788,14 @@ procurement_suppliers = (
     or fallback_page("Suppliers")
 )
 
-procurement_purchase_orders = (
-    procurement_purchase_orders
-    or fallback_page("Purchase Orders")
-)
-
 procurement_purchases = (
     procurement_purchases
     or fallback_page("Purchases")
+)
+
+procurement_purchase_orders = (
+    procurement_purchase_orders
+    or fallback_page("Purchase Orders")
 )
 
 warehouse_inventory = (
@@ -679,143 +805,24 @@ warehouse_inventory = (
 
 
 # ============================================================
-# ADMIN CREATION
-# ============================================================
-
-def create_default_admin(db):
-    """
-    Creates the default administrator if the User model
-    is available and the user does not already exist.
-    """
-
-    if User is None:
-
-        logging.warning(
-            "User model unavailable. "
-            "Administrator creation skipped."
-        )
-
-        return
-
-    try:
-
-        admin = (
-            db.query(User)
-            .filter(
-                User.username == "admin"
-            )
-            .first()
-        )
-
-        if admin:
-
-            return
-
-        try:
-
-            from auth import hash_password
-
-        except Exception as exc:
-
-            logging.exception(
-                "Unable to import hash_password"
-            )
-
-            return
-
-        # ----------------------------------------------------
-        # Build only fields that actually exist in User.
-        #
-        # This prevents errors such as:
-        # "full_name is an invalid keyword argument for User"
-        # ----------------------------------------------------
-
-        user_columns = {
-            column.name
-            for column in User.__table__.columns
-        }
-
-        values = {}
-
-        if "username" in user_columns:
-            values["username"] = "admin"
-
-        if "full_name" in user_columns:
-            values["full_name"] = (
-                "System Administrator"
-            )
-
-        if "email" in user_columns:
-            values["email"] = (
-                "admin@nileharvest.com"
-            )
-
-        if "password_hash" in user_columns:
-            values["password_hash"] = (
-                hash_password("admin123")
-            )
-
-        if "role" in user_columns:
-            values["role"] = "Administrator"
-
-        if "active" in user_columns:
-            values["active"] = True
-
-        admin = User(**values)
-
-        db.add(admin)
-
-        db.commit()
-
-        logging.info(
-            "Default administrator created."
-        )
-
-    except Exception as exc:
-
-        db.rollback()
-
-        logging.exception(
-            "Unable to create default administrator: %s",
-            exc,
-        )
-
-
-# ============================================================
-# SEED DATA
-# ============================================================
-
-try:
-
-    from seed.seed_data import load_seed_data
-
-except Exception as exc:
-
-    load_seed_data = None
-
-    logging.warning(
-        "Seed data unavailable: %s",
-        exc,
-    )
-
-
-# ============================================================
 # DATABASE INITIALIZATION
 # ============================================================
 
 def initialize_database():
 
-    if engine is None or Base is None:
-
-        logging.error(
-            "Database engine/Base unavailable."
-        )
-
-        return
-
     try:
 
-        inspector = inspect(engine)
+        if engine is None:
+
+            logging.error(
+                "Database engine is unavailable."
+            )
+
+            return
+
+        inspector = inspect(
+            engine
+        )
 
         existing_tables = (
             inspector.get_table_names()
@@ -824,13 +831,14 @@ def initialize_database():
         missing_tables = [
             table_name
             for table_name in Base.metadata.tables
-            if table_name not in existing_tables
+            if table_name
+            not in existing_tables
         ]
 
         if missing_tables:
 
             logging.info(
-                "Missing database tables: %s",
+                "Creating missing tables: %s",
                 missing_tables,
             )
 
@@ -838,13 +846,15 @@ def initialize_database():
             bind=engine
         )
 
-        if SessionLocal is not None:
+        if User is not None:
 
             db = SessionLocal()
 
             try:
 
-                create_default_admin(db)
+                create_default_admin(
+                    db
+                )
 
             finally:
 
@@ -856,6 +866,20 @@ def initialize_database():
 
                 load_seed_data()
 
+            except TypeError:
+
+                # Some seed functions accept a database
+                # session while others do not.
+                db = SessionLocal()
+
+                try:
+
+                    load_seed_data(db)
+
+                finally:
+
+                    db.close()
+
             except Exception as exc:
 
                 logging.warning(
@@ -866,14 +890,20 @@ def initialize_database():
     except Exception as exc:
 
         logging.exception(
-            "Database initialization failed: %s",
-            exc,
+            "Database initialization failed."
         )
 
         st.error(
-            "Database initialization failed. "
-            "Please check esan_erp.log."
+            "Database initialization failed."
         )
+
+        with st.expander(
+            "Database Error Details"
+        ):
+
+            st.code(
+                str(exc)
+            )
 
 
 initialize_database()
@@ -906,20 +936,31 @@ if "current_page" not in st.session_state:
 # LOGIN FUNCTION
 # ============================================================
 
-def login(username, password):
+def login(
+    username,
+    password,
+):
+    """
+    Authenticate a user safely.
+    """
 
-    if (
-        SessionLocal is None
-        or User is None
-        or verify_password is None
-    ):
+    if User is None:
 
         logging.error(
-            "Login unavailable because "
-            "database/User/auth components are missing."
+            "Login attempted but User model "
+            "is unavailable."
         )
 
-        return False
+        return False, (
+            "User model could not be loaded."
+        )
+
+    if not username or not password:
+
+        return False, (
+            "Please enter your username "
+            "and password."
+        )
 
     db = SessionLocal()
 
@@ -928,14 +969,21 @@ def login(username, password):
         user = (
             db.query(User)
             .filter(
-                User.username == username
+                User.username == username.strip()
             )
             .first()
         )
 
-        if not user:
+        if user is None:
 
-            return False
+            logging.warning(
+                "Login failed for unknown user: %s",
+                username,
+            )
+
+            return False, (
+                "Invalid username or password."
+            )
 
         active = getattr(
             user,
@@ -943,51 +991,93 @@ def login(username, password):
             True,
         )
 
-        password_hash = getattr(
+        if not active:
+
+            return False, (
+                "This user account is inactive."
+            )
+
+        stored_hash = getattr(
             user,
             "password_hash",
             None,
         )
 
-        if (
-            active
-            and password_hash
-            and verify_password(
+        if not stored_hash:
+
+            logging.error(
+                "User %s has no password_hash.",
+                username,
+            )
+
+            return False, (
+                "This user does not have "
+                "a valid password configured."
+            )
+
+        try:
+
+            valid_password = verify_password(
                 password,
-                password_hash,
-            )
-        ):
-
-            st.session_state.logged_in = True
-
-            st.session_state.username = (
-                getattr(
-                    user,
-                    "username",
-                    username,
-                )
+                stored_hash,
             )
 
-            st.session_state.role = (
-                getattr(
-                    user,
-                    "role",
-                    "User",
-                )
+        except Exception as exc:
+
+            logging.exception(
+                "Password verification failed."
             )
 
-            return True
+            return False, (
+                f"Password verification error: "
+                f"{exc}"
+            )
 
-        return False
+        if not valid_password:
+
+            logging.warning(
+                "Invalid password for user: %s",
+                username,
+            )
+
+            return False, (
+                "Invalid username or password."
+            )
+
+        st.session_state.logged_in = True
+
+        st.session_state.username = (
+            getattr(
+                user,
+                "username",
+                username,
+            )
+        )
+
+        st.session_state.role = (
+            getattr(
+                user,
+                "role",
+                "User",
+            )
+        )
+
+        logging.info(
+            "User logged in: %s",
+            username,
+        )
+
+        return True, "Login successful."
 
     except Exception as exc:
 
         logging.exception(
-            "Login error: %s",
-            exc,
+            "Login error."
         )
 
-        return False
+        return False, (
+            f"Login error: {exc}"
+        )
 
     finally:
 
@@ -1000,27 +1090,30 @@ def login(username, password):
 
 if not st.session_state.logged_in:
 
+    # --------------------------------------------------------
+    # CENTERED LOGIN AREA
+    # --------------------------------------------------------
+
     st.markdown(
-        '<div class="login-logo-container"></div>',
+        '<div class="login-page">',
         unsafe_allow_html=True,
     )
 
     # --------------------------------------------------------
-    # LOGO
+    # CENTERED LOGO
     # --------------------------------------------------------
+
+    st.markdown(
+        '<div class="login-logo">',
+        unsafe_allow_html=True,
+    )
 
     if LOGO_IMAGE is not None:
 
-        logo_left, logo_center, logo_right = st.columns(
-            [1, 1, 1]
+        st.image(
+            LOGO_IMAGE,
+            width=180,
         )
-
-        with logo_center:
-
-            st.image(
-                LOGO_IMAGE,
-                width=145,
-            )
 
     else:
 
@@ -1028,34 +1121,57 @@ if not st.session_state.logged_in:
             """
             <div style="
                 text-align:center;
-                font-size:80px;
-                margin:20px;
+                font-size:90px;
             ">
-                🌱
+                🌾
             </div>
             """,
             unsafe_allow_html=True,
         )
 
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # LOGIN TITLE
+    # --------------------------------------------------------
+
+    st.markdown(
+        """
+        <div class="login-title">
+            Esan ERP
+        </div>
+
+        <div class="login-subtitle">
+            Nile Harvest Foods Ltd.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     # --------------------------------------------------------
     # LOGIN FORM
     # --------------------------------------------------------
 
-    col1, col2, col3 = st.columns(
+    login_left, login_center, login_right = st.columns(
         [1, 2, 1]
     )
 
-    with col2:
+    with login_center:
 
         username = st.text_input(
             "Username",
             placeholder="Enter your username",
+            key="login_username",
         )
 
         password = st.text_input(
             "Password",
             type="password",
             placeholder="Enter your password",
+            key="login_password",
         )
 
         login_clicked = st.button(
@@ -1066,20 +1182,15 @@ if not st.session_state.logged_in:
 
         if login_clicked:
 
-            if not username or not password:
-
-                st.warning(
-                    "Please enter your username "
-                    "and password."
-                )
-
-            elif login(
+            success, message = login(
                 username,
                 password,
-            ):
+            )
+
+            if success:
 
                 st.success(
-                    "Login successful."
+                    message
                 )
 
                 st.rerun()
@@ -1087,8 +1198,27 @@ if not st.session_state.logged_in:
             else:
 
                 st.error(
-                    "Invalid username or password."
+                    message
                 )
+
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # MODEL ERROR INFORMATION
+    # --------------------------------------------------------
+
+    if MODEL_ERROR:
+
+        with st.expander(
+            "⚠️ System Configuration"
+        ):
+
+            st.warning(
+                MODEL_ERROR
+            )
 
     st.stop()
 
@@ -1100,26 +1230,20 @@ if not st.session_state.logged_in:
 with st.sidebar:
 
     # --------------------------------------------------------
-    # LOGO
+    # CENTERED SIDEBAR LOGO
     # --------------------------------------------------------
 
     st.markdown(
-        '<div class="sidebar-logo-container"></div>',
+        '<div class="sidebar-logo">',
         unsafe_allow_html=True,
     )
 
     if LOGO_IMAGE is not None:
 
-        logo_col1, logo_col2, logo_col3 = st.columns(
-            [0.6, 1.8, 0.6]
+        st.image(
+            LOGO_IMAGE,
+            width=115,
         )
-
-        with logo_col2:
-
-            st.image(
-                LOGO_IMAGE,
-                width=105,
-            )
 
     else:
 
@@ -1128,18 +1252,22 @@ with st.sidebar:
             <div style="
                 text-align:center;
                 font-size:60px;
-                margin:10px;
             ">
-                🌱
+                🌾
             </div>
             """,
             unsafe_allow_html=True,
         )
 
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
     st.divider()
 
     # --------------------------------------------------------
-    # NAVIGATION FUNCTION
+    # NAVIGATION BUTTON
     # --------------------------------------------------------
 
     def nav_button(label):
@@ -1149,7 +1277,9 @@ with st.sidebar:
             use_container_width=True,
         ):
 
-            st.session_state.current_page = label
+            st.session_state.current_page = (
+                label
+            )
 
             st.rerun()
 
@@ -1312,6 +1442,7 @@ elif menu == "🌾 Procurement":
             "Purchases",
         ],
         horizontal=True,
+        key="procurement_navigation",
     )
 
     if procurement_menu == "Dashboard":
@@ -1356,6 +1487,7 @@ elif menu == "📦 Warehouse":
             "Inventory",
         ],
         horizontal=True,
+        key="warehouse_navigation",
     )
 
     if warehouse_menu == "Dashboard":
@@ -1431,25 +1563,40 @@ elif menu == "🚚 Sales & Distribution":
             "Payments",
         ],
         horizontal=True,
+        key="sales_navigation",
     )
 
     sales_pages = {
-        "Dashboard": sales_dashboard,
-        "Customers": sales_customers,
-        "Quotations": sales_quotations,
-        "Sales Orders": sales_orders,
-        "Deliveries": sales_deliveries,
-        "Invoices": sales_invoices,
-        "Payments": sales_payments,
+
+        "Dashboard":
+            sales_dashboard,
+
+        "Customers":
+            sales_customers,
+
+        "Quotations":
+            sales_quotations,
+
+        "Sales Orders":
+            sales_orders,
+
+        "Deliveries":
+            sales_deliveries,
+
+        "Invoices":
+            sales_invoices,
+
+        "Payments":
+            sales_payments,
     }
 
-    page_func = sales_pages.get(
+    page_function = sales_pages.get(
         sales_menu
     )
 
-    if page_func:
+    if page_function:
 
-        page_func()
+        page_function()
 
     else:
 
@@ -1490,28 +1637,6 @@ elif menu == "📊 Reports":
         st.warning(
             "Reports module unavailable."
         )
-
-
-# ============================================================
-# CORE SYSTEM WARNINGS
-# ============================================================
-
-if core_errors:
-
-    with st.expander(
-        "⚠️ Core System Diagnostics"
-    ):
-
-        st.warning(
-            "One or more core components "
-            "could not be loaded."
-        )
-
-        for error in core_errors:
-
-            st.code(
-                error
-            )
 
 
 # ============================================================
