@@ -6,7 +6,6 @@ Version 1.4.0 Alpha – Full Repository Integration
 """
 
 import logging
-import os
 
 import streamlit as st
 from sqlalchemy import inspect
