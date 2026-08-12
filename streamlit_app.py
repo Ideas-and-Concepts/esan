@@ -6,7 +6,6 @@ Version 1.4.0 Alpha – Full Repository Integration
 """
 
 import logging
-import os
 
 import streamlit as st
 from sqlalchemy import inspect
@@ -17,9 +16,9 @@ from models import User
 from auth import verify_password
 
 
-# ==================================================
+# ============================================================
 # LOGGING
-# ==================================================
+# ============================================================
 
 logging.basicConfig(
     filename="esan_erp.log",
@@ -28,25 +27,29 @@ logging.basicConfig(
 )
 
 
-# ==================================================
+# ============================================================
 # PAGE CONFIGURATION
-# ==================================================
+# ============================================================
 
 st.set_page_config(
     page_title="Nile Harvest ERP",
-    page_icon="🌱",
+    page_icon="🌾",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 
-# ==================================================
-# CLEAN ERP UI
-# ==================================================
+# ============================================================
+# ERP UI
+# ============================================================
 
 st.markdown(
     """
     <style>
+
+    /* ========================================================
+       HIDE STREAMLIT DEFAULT UI
+       ======================================================== */
 
     #MainMenu {
         display: none;
@@ -62,16 +65,26 @@ st.markdown(
 
     .block-container {
         padding-top: 1.5rem;
+        padding-bottom: 2rem;
     }
+
+
+    /* ========================================================
+       SIDEBAR
+       ======================================================== */
 
     div[data-testid="stSidebar"] {
-        border-right: 1px solid #ddd;
+        border-right: 1px solid rgba(100, 100, 100, 0.20);
+    }
+
+    div[data-testid="stSidebar"] > div:first-child {
+        padding-top: 1rem;
     }
 
 
-    /* ==========================================
+    /* ========================================================
        LOGIN PAGE
-       ========================================== */
+       ======================================================== */
 
     .login-page {
         min-height: 82vh;
@@ -82,55 +95,51 @@ st.markdown(
     }
 
     .login-container {
-        width: 420px;
+        width: 430px;
         max-width: 100%;
         text-align: center;
     }
 
 
-    /* ==========================================
-       ESAN ERP SVG LOGO
-       ========================================== */
+    /* ========================================================
+       NILE HARVEST LOGO
+       ======================================================== */
 
-    .esan-logo {
-        width: 118px;
-        height: 118px;
-        margin: 0 auto 20px auto;
+    .nh-logo {
         display: flex;
         align-items: center;
         justify-content: center;
-    }
-
-    .esan-logo svg {
         width: 100%;
-        height: 100%;
+    }
+
+    .nh-logo-login {
+        margin: 0 auto 24px auto;
+    }
+
+    .nh-logo-sidebar {
+        margin: 4px auto 12px auto;
+    }
+
+    .nh-logo svg {
         display: block;
-    }
-
-
-    /* ==========================================
-       SIDEBAR LOGO
-       ========================================== */
-
-    .esan-sidebar-logo {
-        width: 82px;
-        height: 82px;
-        margin: 0 auto 10px auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .esan-sidebar-logo svg {
         width: 100%;
-        height: 100%;
-        display: block;
+        height: auto;
+    }
+
+    .nh-logo-login svg {
+        width: 230px;
+        max-width: 90%;
+    }
+
+    .nh-logo-sidebar svg {
+        width: 175px;
+        max-width: 90%;
     }
 
 
-    /* ==========================================
-       LOGIN INPUTS & BUTTON
-       ========================================== */
+    /* ========================================================
+       LOGIN INPUTS
+       ======================================================== */
 
     div[data-testid="stTextInput"] label {
         font-weight: 600;
@@ -142,10 +151,80 @@ st.markdown(
         padding-left: 14px;
     }
 
+
+    /* ========================================================
+       BUTTONS
+       ======================================================== */
+
     div[data-testid="stButton"] > button {
         border-radius: 10px;
-        min-height: 46px;
+        min-height: 44px;
         font-weight: 700;
+    }
+
+
+    /* ========================================================
+       NAVIGATION BUTTONS
+       ======================================================== */
+
+    div[data-testid="stSidebar"] div[data-testid="stButton"] > button {
+        border-radius: 9px;
+        text-align: left;
+        padding-left: 14px;
+        margin-bottom: 3px;
+    }
+
+
+    /* ========================================================
+       USER PANEL
+       ======================================================== */
+
+    .user-panel {
+        padding: 12px;
+        border-radius: 12px;
+        background: rgba(128, 128, 128, 0.08);
+        margin-top: 10px;
+        margin-bottom: 10px;
+    }
+
+    .user-panel-title {
+        font-weight: 700;
+        margin-bottom: 7px;
+    }
+
+    .user-panel-text {
+        font-size: 13px;
+        line-height: 1.7;
+    }
+
+
+    /* ========================================================
+       MODULE HEADERS
+       ======================================================== */
+
+    .module-header {
+        padding: 8px 0 15px 0;
+    }
+
+
+    /* ========================================================
+       RESPONSIVE
+       ======================================================== */
+
+    @media (max-width: 768px) {
+
+        .nh-logo-login svg {
+            width: 200px;
+        }
+
+        .nh-logo-sidebar svg {
+            width: 150px;
+        }
+
+        .block-container {
+            padding-top: 1rem;
+        }
+
     }
 
     </style>
@@ -154,186 +233,290 @@ st.markdown(
 )
 
 
-# ==================================================
-# ESAN ERP LOGO
-# ==================================================
+# ============================================================
+# NILE HARVEST LOGO
+# ============================================================
 
-def render_esan_logo(size="normal"):
+def render_nile_harvest_logo(location="login"):
     """
-    Render the Esan ERP logo as inline SVG.
+    Render the Nile Harvest Foods Ltd. logo using inline SVG.
 
-    size:
-        normal  -> login page
-        sidebar -> sidebar
+    Using SVG instead of CSS shapes makes the logo much more
+    reliable across Streamlit browsers and deployments.
     """
 
-    if size == "sidebar":
-        logo_class = "esan-sidebar-logo"
+    if location == "sidebar":
+        logo_class = "nh-logo nh-logo-sidebar"
     else:
-        logo_class = "esan-logo"
+        logo_class = "nh-logo nh-logo-login"
+
+    logo_html = f"""
+    <div class="{logo_class}">
+        <svg
+            viewBox="0 0 520 190"
+            xmlns="http://www.w3.org/2000/svg"
+            role="img"
+            aria-label="Nile Harvest Foods Ltd."
+        >
+
+            <!-- =================================================
+                 ICON BACKGROUND
+                 ================================================= -->
+
+            <defs>
+
+                <linearGradient
+                    id="nhGreen"
+                    x1="0%"
+                    y1="0%"
+                    x2="100%"
+                    y2="100%"
+                >
+                    <stop
+                        offset="0%"
+                        stop-color="#2E7D32"
+                    />
+
+                    <stop
+                        offset="100%"
+                        stop-color="#145A32"
+                    />
+                </linearGradient>
+
+                <linearGradient
+                    id="nhGold"
+                    x1="0%"
+                    y1="0%"
+                    x2="100%"
+                    y2="100%"
+                >
+                    <stop
+                        offset="0%"
+                        stop-color="#F4C542"
+                    />
+
+                    <stop
+                        offset="100%"
+                        stop-color="#C99A1A"
+                    />
+                </linearGradient>
+
+            </defs>
+
+
+            <!-- =================================================
+                 LOGO EMBLEM
+                 ================================================= -->
+
+            <rect
+                x="12"
+                y="12"
+                width="166"
+                height="166"
+                rx="42"
+                fill="url(#nhGreen)"
+            />
+
+
+            <!-- =================================================
+                 WATER / NILE
+                 ================================================= -->
+
+            <path
+                d="
+                    M32 132
+                    C58 119, 80 145, 105 132
+                    C130 119, 148 141, 160 132
+                "
+                fill="none"
+                stroke="#42A5F5"
+                stroke-width="8"
+                stroke-linecap="round"
+            />
+
+            <path
+                d="
+                    M32 149
+                    C58 136, 80 162, 105 149
+                    C130 136, 148 158, 160 149
+                "
+                fill="none"
+                stroke="#90CAF9"
+                stroke-width="5"
+                stroke-linecap="round"
+            />
+
+
+            <!-- =================================================
+                 HARVEST STEM
+                 ================================================= -->
+
+            <path
+                d="
+                    M95 129
+                    C94 103, 94 80, 96 53
+                "
+                fill="none"
+                stroke="#AED581"
+                stroke-width="7"
+                stroke-linecap="round"
+            />
+
+
+            <!-- =================================================
+                 LEFT LEAF
+                 ================================================= -->
+
+            <path
+                d="
+                    M96 88
+                    C70 86, 51 70, 47 49
+                    C69 50, 91 62, 96 88
+                    Z
+                "
+                fill="#81C784"
+            />
+
+
+            <!-- =================================================
+                 RIGHT LEAF
+                 ================================================= -->
+
+            <path
+                d="
+                    M96 76
+                    C112 50, 134 43, 153 46
+                    C147 68, 128 82, 96 76
+                    Z
+                "
+                fill="#A5D66A"
+            />
+
+
+            <!-- =================================================
+                 GRAIN
+                 ================================================= -->
+
+            <ellipse
+                cx="78"
+                cy="62"
+                rx="8"
+                ry="14"
+                transform="rotate(-25 78 62)"
+                fill="url(#nhGold)"
+            />
+
+            <ellipse
+                cx="73"
+                cy="76"
+                rx="8"
+                ry="14"
+                transform="rotate(-25 73 76)"
+                fill="url(#nhGold)"
+            />
+
+            <ellipse
+                cx="116"
+                cy="54"
+                rx="8"
+                ry="14"
+                transform="rotate(25 116 54)"
+                fill="url(#nhGold)"
+            />
+
+            <ellipse
+                cx="122"
+                cy="67"
+                rx="8"
+                ry="14"
+                transform="rotate(25 122 67)"
+                fill="url(#nhGold)"
+            />
+
+
+            <!-- =================================================
+                 GOLD HARVEST LINE
+                 ================================================= -->
+
+            <path
+                d="
+                    M38 115
+                    C67 102, 117 102, 153 115
+                "
+                fill="none"
+                stroke="#F4C542"
+                stroke-width="4"
+                stroke-linecap="round"
+            />
+
+
+            <!-- =================================================
+                 COMPANY NAME
+                 ================================================= -->
+
+            <text
+                x="202"
+                y="78"
+                font-family="Arial, Helvetica, sans-serif"
+                font-size="42"
+                font-weight="700"
+                fill="#1B5E20"
+                letter-spacing="1"
+            >
+                NILE HARVEST
+            </text>
+
+            <text
+                x="204"
+                y="113"
+                font-family="Arial, Helvetica, sans-serif"
+                font-size="25"
+                font-weight="600"
+                fill="#4E342E"
+                letter-spacing="3"
+            >
+                FOODS LTD.
+            </text>
+
+
+            <!-- =================================================
+                 TAGLINE
+                 ================================================= -->
+
+            <text
+                x="205"
+                y="143"
+                font-family="Arial, Helvetica, sans-serif"
+                font-size="13"
+                fill="#1976D2"
+                letter-spacing="1.5"
+            >
+                HARVEST • PROCESS • DELIVER
+            </text>
+
+        </svg>
+    </div>
+    """
 
     st.markdown(
-        f"""
-        <div class="{logo_class}">
-
-            <svg
-                viewBox="0 0 200 200"
-                xmlns="http://www.w3.org/2000/svg"
-                role="img"
-                aria-label="Esan ERP"
-            >
-
-                <!-- =================================================
-                     MAIN GREEN EMBLEM
-                     ================================================= -->
-
-                <rect
-                    x="7"
-                    y="7"
-                    width="186"
-                    height="186"
-                    rx="48"
-                    fill="#2E7D32"
-                />
-
-                <!-- =================================================
-                     INNER GREEN GLOW
-                     ================================================= -->
-
-                <rect
-                    x="18"
-                    y="18"
-                    width="164"
-                    height="164"
-                    rx="40"
-                    fill="#388E3C"
-                    opacity="0.45"
-                />
-
-                <!-- =================================================
-                     SOIL
-                     ================================================= -->
-
-                <path
-                    d="
-                        M8 143
-                        C42 132 69 132 100 143
-                        C132 154 157 153 192 139
-                        L192 192
-                        L8 192
-                        Z
-                    "
-                    fill="#4E342E"
-                />
-
-                <!-- =================================================
-                     STEM
-                     ================================================= -->
-
-                <path
-                    d="
-                        M100 146
-                        C99 130 99 111 100 88
-                    "
-                    stroke="#AED581"
-                    stroke-width="8"
-                    stroke-linecap="round"
-                    fill="none"
-                />
-
-                <!-- =================================================
-                     LEFT LEAF
-                     ================================================= -->
-
-                <path
-                    d="
-                        M98 108
-                        C78 105 58 94 51 74
-                        C72 71 91 82 100 99
-                        Z
-                    "
-                    fill="#81C784"
-                />
-
-                <!-- =================================================
-                     RIGHT LEAF
-                     ================================================= -->
-
-                <path
-                    d="
-                        M102 98
-                        C113 76 133 64 154 68
-                        C151 89 133 103 104 105
-                        Z
-                    "
-                    fill="#A5D66A"
-                />
-
-                <!-- =================================================
-                     CENTRAL GRAIN
-                     ================================================= -->
-
-                <ellipse
-                    cx="100"
-                    cy="61"
-                    rx="8"
-                    ry="11"
-                    fill="#DCE775"
-                />
-
-                <!-- =================================================
-                     SMALL GRAIN DETAILS
-                     ================================================= -->
-
-                <circle
-                    cx="75"
-                    cy="129"
-                    r="3"
-                    fill="#795548"
-                    opacity="0.8"
-                />
-
-                <circle
-                    cx="91"
-                    cy="137"
-                    r="3"
-                    fill="#795548"
-                    opacity="0.8"
-                />
-
-                <circle
-                    cx="119"
-                    cy="139"
-                    r="3"
-                    fill="#795548"
-                    opacity="0.8"
-                />
-
-                <circle
-                    cx="138"
-                    cy="132"
-                    r="3"
-                    fill="#795548"
-                    opacity="0.8"
-                />
-
-            </svg>
-
-        </div>
-        """,
+        logo_html,
         unsafe_allow_html=True,
     )
 
 
-# ==================================================
+# ============================================================
 # SAFE IMPORT SYSTEM
-# ==================================================
+# ============================================================
 
 module_errors = []
 
 
 def safe_import(module_path, function_name):
-    """Safely import a module function."""
+    """
+    Safely import a module function.
+
+    Failed modules do not crash the entire ERP application.
+    """
 
     try:
 
@@ -343,19 +526,14 @@ def safe_import(module_path, function_name):
         )
 
         if hasattr(module, function_name):
-
-            return getattr(
-                module,
-                function_name,
-            )
+            return getattr(module, function_name)
 
         error = (
-            f"{module_path}: missing function "
-            f"'{function_name}'"
+            f"{module_path}: "
+            f"missing function '{function_name}'"
         )
 
         module_errors.append(error)
-
         logging.error(error)
 
         return None
@@ -370,15 +548,16 @@ def safe_import(module_path, function_name):
         module_errors.append(error)
 
         logging.exception(
-            f"Failed loading {module_path}"
+            "Failed loading %s",
+            module_path,
         )
 
         return None
 
 
-# ==================================================
+# ============================================================
 # ADMIN CREATION
-# ==================================================
+# ============================================================
 
 try:
 
@@ -390,9 +569,7 @@ except ImportError:
 
         admin = (
             db.query(User)
-            .filter(
-                User.username == "admin"
-            )
+            .filter(User.username == "admin")
             .first()
         )
 
@@ -404,9 +581,7 @@ except ImportError:
                 username="admin",
                 full_name="System Administrator",
                 email="admin@nileharvest.com",
-                password_hash=hash_password(
-                    "admin123"
-                ),
+                password_hash=hash_password("admin123"),
                 role="Administrator",
                 active=True,
             )
@@ -415,9 +590,9 @@ except ImportError:
             db.commit()
 
 
-# ==================================================
+# ============================================================
 # SEED DATA
-# ==================================================
+# ============================================================
 
 try:
 
@@ -428,14 +603,19 @@ except ImportError:
     load_seed_data = None
 
 
-# ==================================================
+# ============================================================
 # MODULE REGISTRY
-# ==================================================
+# ============================================================
 
 dashboard_home = safe_import(
     "modules.dashboard.home",
     "dashboard_home",
 )
+
+
+# ------------------------------------------------------------
+# PROCUREMENT
+# ------------------------------------------------------------
 
 procurement_dashboard = safe_import(
     "modules.procurement.dashboard",
@@ -457,6 +637,11 @@ procurement_purchase_orders = safe_import(
     "purchase_orders_page",
 )
 
+
+# ------------------------------------------------------------
+# WAREHOUSE
+# ------------------------------------------------------------
+
 warehouse_dashboard = safe_import(
     "modules.warehouse.dashboard",
     "warehouse_dashboard",
@@ -467,6 +652,11 @@ warehouse_inventory = safe_import(
     "inventory_page",
 )
 
+
+# ------------------------------------------------------------
+# PRODUCTION
+# ------------------------------------------------------------
+
 milling_dashboard = safe_import(
     "modules.milling.dashboard",
     "milling_dashboard",
@@ -476,6 +666,11 @@ packaging_dashboard = safe_import(
     "modules.packaging.dashboard",
     "packaging_dashboard",
 )
+
+
+# ------------------------------------------------------------
+# SALES & DISTRIBUTION
+# ------------------------------------------------------------
 
 sales_dashboard = safe_import(
     "modules.sales.dashboard",
@@ -512,10 +707,20 @@ sales_payments = safe_import(
     "payments_page",
 )
 
+
+# ------------------------------------------------------------
+# FINANCE
+# ------------------------------------------------------------
+
 finance_dashboard = safe_import(
     "modules.finance.dashboard",
     "finance_dashboard",
 )
+
+
+# ------------------------------------------------------------
+# REPORTS
+# ------------------------------------------------------------
 
 reports_dashboard = safe_import(
     "modules.reports.dashboard",
@@ -523,9 +728,9 @@ reports_dashboard = safe_import(
 )
 
 
-# ==================================================
+# ============================================================
 # FALLBACK PAGE
-# ==================================================
+# ============================================================
 
 def _fallback_page(title):
 
@@ -560,9 +765,9 @@ warehouse_inventory = (
 )
 
 
-# ==================================================
+# ============================================================
 # DATABASE INITIALIZATION
-# ==================================================
+# ============================================================
 
 def initialize_database():
 
@@ -575,9 +780,9 @@ def initialize_database():
         )
 
         missing_tables = [
-            t
-            for t in Base.metadata.tables
-            if t not in existing_tables
+            table_name
+            for table_name in Base.metadata.tables
+            if table_name not in existing_tables
         ]
 
         if missing_tables:
@@ -629,23 +834,26 @@ def initialize_database():
 initialize_database()
 
 
-# ==================================================
+# ============================================================
 # SESSION MANAGEMENT
-# ==================================================
+# ============================================================
 
 if "logged_in" not in st.session_state:
 
     st.session_state.logged_in = False
+
     st.session_state.username = None
+
     st.session_state.role = None
+
     st.session_state.current_page = (
         "🏠 Overview"
     )
 
 
-# ==================================================
+# ============================================================
 # LOGIN FUNCTION
-# ==================================================
+# ============================================================
 
 def login(username, password):
 
@@ -671,10 +879,14 @@ def login(username, password):
         ):
 
             st.session_state.logged_in = True
+
             st.session_state.username = (
                 user.username
             )
-            st.session_state.role = user.role
+
+            st.session_state.role = (
+                user.role
+            )
 
             return True
 
@@ -685,30 +897,36 @@ def login(username, password):
         db.close()
 
 
-# ==================================================
+# ============================================================
 # LOGIN SCREEN
-# ==================================================
+# ============================================================
 
 if not st.session_state.logged_in:
 
     st.markdown(
-        """
-        <div class="login-page">
-            <div class="login-container">
-        """,
+        '<div class="login-page">',
         unsafe_allow_html=True,
     )
-
-    # NEW SVG LOGO
-    render_esan_logo("normal")
 
     st.markdown(
-        """
-            </div>
-        </div>
-        """,
+        '<div class="login-container">',
         unsafe_allow_html=True,
     )
+
+    # NEW NILE HARVEST LOGO
+    render_nile_harvest_logo(
+        location="login"
+    )
+
+    st.markdown(
+        "</div></div>",
+        unsafe_allow_html=True,
+    )
+
+
+    # --------------------------------------------------------
+    # LOGIN FORM
+    # --------------------------------------------------------
 
     col1, col2, col3 = st.columns(
         [1, 2, 1]
@@ -753,16 +971,26 @@ if not st.session_state.logged_in:
     st.stop()
 
 
-# ==================================================
+# ============================================================
 # SIDEBAR
-# ==================================================
+# ============================================================
 
 with st.sidebar:
 
-    # NEW SVG LOGO
-    render_esan_logo("sidebar")
+    # --------------------------------------------------------
+    # NEW NILE HARVEST LOGO
+    # --------------------------------------------------------
+
+    render_nile_harvest_logo(
+        location="sidebar"
+    )
 
     st.divider()
+
+
+    # --------------------------------------------------------
+    # NAVIGATION BUTTON
+    # --------------------------------------------------------
 
     def nav_button(label):
 
@@ -771,11 +999,23 @@ with st.sidebar:
             use_container_width=True,
         ):
 
-            st.session_state.current_page = label
+            st.session_state.current_page = (
+                label
+            )
+
+
+    # --------------------------------------------------------
+    # OVERVIEW
+    # --------------------------------------------------------
 
     nav_button(
         "🏠 Overview"
     )
+
+
+    # --------------------------------------------------------
+    # OPERATIONS
+    # --------------------------------------------------------
 
     st.markdown(
         "**OPERATIONS**"
@@ -797,6 +1037,11 @@ with st.sidebar:
         "📦 Packaging"
     )
 
+
+    # --------------------------------------------------------
+    # COMMERCIAL
+    # --------------------------------------------------------
+
     st.markdown(
         "**COMMERCIAL**"
     )
@@ -804,6 +1049,11 @@ with st.sidebar:
     nav_button(
         "🚚 Sales & Distribution"
     )
+
+
+    # --------------------------------------------------------
+    # FINANCE
+    # --------------------------------------------------------
 
     st.markdown(
         "**FINANCE**"
@@ -813,6 +1063,11 @@ with st.sidebar:
         "💰 Finance"
     )
 
+
+    # --------------------------------------------------------
+    # REPORTING
+    # --------------------------------------------------------
+
     st.markdown(
         "**REPORTING**"
     )
@@ -821,10 +1076,24 @@ with st.sidebar:
         "📊 Reports"
     )
 
+
+    # --------------------------------------------------------
+    # USER PANEL
+    # --------------------------------------------------------
+
     st.divider()
 
     st.markdown(
-        "### 👤 User Panel"
+        """
+        <div class="user-panel">
+
+            <div class="user-panel-title">
+                👤 User Panel
+            </div>
+
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     st.write(
@@ -835,14 +1104,22 @@ with st.sidebar:
         f"Role: **{st.session_state.role}**"
     )
 
+
+    # --------------------------------------------------------
+    # LOGOUT
+    # --------------------------------------------------------
+
     if st.button(
         "🚪 Logout",
         use_container_width=True,
     ):
 
         st.session_state.logged_in = False
+
         st.session_state.username = None
+
         st.session_state.role = None
+
         st.session_state.current_page = (
             "🏠 Overview"
         )
@@ -850,16 +1127,22 @@ with st.sidebar:
         st.rerun()
 
 
-# ==================================================
+# ============================================================
 # CURRENT PAGE
-# ==================================================
+# ============================================================
 
-menu = st.session_state.current_page
+menu = (
+    st.session_state.current_page
+)
 
 
-# ==================================================
+# ============================================================
 # ERP ROUTER
-# ==================================================
+# ============================================================
+
+# ------------------------------------------------------------
+# OVERVIEW
+# ------------------------------------------------------------
 
 if menu == "🏠 Overview":
 
@@ -873,6 +1156,10 @@ if menu == "🏠 Overview":
             "Overview dashboard could not be loaded."
         )
 
+
+# ------------------------------------------------------------
+# PROCUREMENT
+# ------------------------------------------------------------
 
 elif menu == "🌾 Procurement":
 
@@ -916,6 +1203,10 @@ elif menu == "🌾 Procurement":
         procurement_purchases()
 
 
+# ------------------------------------------------------------
+# WAREHOUSE
+# ------------------------------------------------------------
+
 elif menu == "📦 Warehouse":
 
     st.header(
@@ -948,6 +1239,10 @@ elif menu == "📦 Warehouse":
         warehouse_inventory()
 
 
+# ------------------------------------------------------------
+# MILLING
+# ------------------------------------------------------------
+
 elif menu == "🏭 Milling":
 
     if milling_dashboard:
@@ -960,6 +1255,10 @@ elif menu == "🏭 Milling":
             "Milling module unavailable."
         )
 
+
+# ------------------------------------------------------------
+# PACKAGING
+# ------------------------------------------------------------
 
 elif menu == "📦 Packaging":
 
@@ -974,9 +1273,9 @@ elif menu == "📦 Packaging":
         )
 
 
-# ==================================================
+# ------------------------------------------------------------
 # SALES & DISTRIBUTION
-# ==================================================
+# ------------------------------------------------------------
 
 elif menu == "🚚 Sales & Distribution":
 
@@ -1020,6 +1319,7 @@ elif menu == "🚚 Sales & Distribution":
 
         "Payments":
             sales_payments,
+
     }
 
     page_func = sales_pages.get(
@@ -1037,9 +1337,9 @@ elif menu == "🚚 Sales & Distribution":
         )
 
 
-# ==================================================
+# ------------------------------------------------------------
 # FINANCE
-# ==================================================
+# ------------------------------------------------------------
 
 elif menu == "💰 Finance":
 
@@ -1054,9 +1354,9 @@ elif menu == "💰 Finance":
         )
 
 
-# ==================================================
+# ------------------------------------------------------------
 # REPORTS
-# ==================================================
+# ------------------------------------------------------------
 
 elif menu == "📊 Reports":
 
@@ -1071,9 +1371,9 @@ elif menu == "📊 Reports":
         )
 
 
-# ==================================================
+# ============================================================
 # MODULE LOADING INFORMATION
-# ==================================================
+# ============================================================
 
 if module_errors:
 
@@ -1092,13 +1392,13 @@ if module_errors:
             )
 
 
-# ==================================================
+# ============================================================
 # FOOTER
-# ==================================================
+# ============================================================
 
 st.divider()
 
 st.caption(
     f"© {COMPANY_NAME} | "
-    f"Enterprise Resource Planning Platform"
+    "Enterprise Resource Planning Platform"
 )
