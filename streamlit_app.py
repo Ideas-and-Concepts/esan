@@ -29,9 +29,7 @@ except ImportError:
     SessionLocal = None
 
 # --- models ---
-try:
-    from models import User
-except ImportError:
+
     # Minimal User stub for demo mode
     class User:
         username = "admin"
