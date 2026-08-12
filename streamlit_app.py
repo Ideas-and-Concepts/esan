@@ -5,27 +5,28 @@ Enterprise Resource Planning System
 
 Version 1.4.0 Alpha
 Full Repository Integration
+
+Main Modules:
+- Overview
+- Procurement
+- Warehouse
+- Milling
+- Packaging
+- Sales & Distribution
+- Finance
+- Reports
+- Administration
 """
 
 import logging
-import os
 
 import streamlit as st
-from sqlalchemy import (
-    inspect,
-    text,
-    MetaData,
-    Table,
-    Column,
-    Integer,
-    String,
-    Boolean,
-    DateTime,
-)
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import inspect
 
 from config import COMPANY_NAME, VERSION
 from database import Base, engine, SessionLocal
+from models import User
+from auth import verify_password
 
 
 # ============================================================
@@ -44,192 +45,159 @@ logging.basicConfig(
 # ============================================================
 
 st.set_page_config(
-    page_title="Esan ERP",
-    page_icon="🌾",
+    page_title="Nile Harvest ERP",
+    page_icon="🌱",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 
 # ============================================================
-# SESSION STATE
-# ============================================================
-
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-
-if "username" not in st.session_state:
-    st.session_state.username = None
-
-if "role" not in st.session_state:
-    st.session_state.role = None
-
-if "current_page" not in st.session_state:
-    st.session_state.current_page = "🏠 Overview"
-
-
-# ============================================================
-# ESAN UI
+# GLOBAL UI
 # ============================================================
 
 st.markdown(
     """
     <style>
 
-    /* =====================================================
-       HIDE STREAMLIT DEFAULT ELEMENTS
-       ===================================================== */
-
     #MainMenu {
-        visibility: hidden;
-    }
-
-    header {
-        visibility: hidden;
+        display: none;
     }
 
     footer {
-        visibility: hidden;
+        display: none;
     }
 
-    /* =====================================================
-       MAIN CONTENT
-       ===================================================== */
+    header {
+        display: none;
+    }
 
     .block-container {
         padding-top: 1.5rem;
         padding-bottom: 2rem;
     }
 
-    /* =====================================================
-       LOGIN PAGE
-       ===================================================== */
+    div[data-testid="stSidebar"] {
+        border-right: 1px solid #ddd;
+    }
 
-    .esan-login-page {
-        min-height: 35vh;
+    /* ======================================================
+       LOGIN
+       ====================================================== */
+
+    .login-page {
+        min-height: 82vh;
         display: flex;
         align-items: center;
         justify-content: center;
+        padding: 20px;
+    }
+
+    .login-container {
+        width: 420px;
+        max-width: 100%;
         text-align: center;
-        margin-bottom: 0.5rem;
     }
 
-    .esan-login-brand {
-        text-align: center;
-        margin-bottom: 10px;
+    /* ======================================================
+       LOGO
+       ====================================================== */
+
+    .logo {
+        width: 112px;
+        height: 112px;
+        margin: 0 auto 18px auto;
+        border-radius: 32px;
+        background: linear-gradient(
+            145deg,
+            #2e7d32,
+            #1b5e20
+        );
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        box-shadow:
+            0 18px 45px
+            rgba(20, 90, 55, 0.25);
     }
 
-    .esan-login-brand .esan-name {
-        font-size: 68px;
-        font-weight: 900;
-        letter-spacing: 8px;
-        line-height: 1;
-        color: #2e7d32;
-        text-shadow:
-            0 3px 12px rgba(46, 125, 50, 0.20);
+    .logo::before {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        width: 100%;
+        height: 28px;
+        background: #4e342e;
+        border-radius: 0 0 28px 28px;
     }
 
-    .esan-login-brand .esan-subtitle {
-        margin-top: 12px;
-        font-size: 13px;
-        letter-spacing: 2px;
-        font-weight: 600;
-        opacity: 0.70;
-        text-transform: uppercase;
+    .logo-stem {
+        position: absolute;
+        bottom: 28px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 6px;
+        height: 40px;
+        background: #aed581;
+        border-radius: 3px 3px 0 0;
     }
 
-    .esan-login-form {
-        max-width: 440px;
-        margin: auto;
+    .logo-leaf {
+        position: absolute;
+        bottom: 52px;
+        width: 18px;
+        height: 18px;
+        background: #81c784;
+        border-radius: 50%;
     }
 
-    /* =====================================================
+    .logo-leaf.left {
+        left: 24px;
+        transform: rotate(-30deg);
+    }
+
+    .logo-leaf.right {
+        right: 24px;
+        transform: rotate(30deg);
+    }
+
+    /* ======================================================
        INPUTS
-       ===================================================== */
+       ====================================================== */
 
     div[data-testid="stTextInput"] label {
         font-weight: 600;
     }
 
     div[data-testid="stTextInput"] input {
-        min-height: 46px;
         border-radius: 10px;
+        min-height: 45px;
+        padding-left: 14px;
     }
 
-    /* =====================================================
-       BUTTONS
-       ===================================================== */
-
     div[data-testid="stButton"] > button {
-        min-height: 44px;
         border-radius: 10px;
+        min-height: 44px;
         font-weight: 700;
     }
 
-    /* =====================================================
-       SIDEBAR
-       ===================================================== */
+    /* ======================================================
+       SECTION HEADERS
+       ====================================================== */
 
-    div[data-testid="stSidebar"] {
-        border-right: 1px solid rgba(128, 128, 128, 0.25);
+    .erp-section {
+        padding: 0.5rem 0 0.75rem 0;
     }
 
-    .sidebar-esan {
-        width: 100%;
-        text-align: center;
-        padding: 8px 0 4px 0;
+    .erp-title {
+        font-size: 1.8rem;
+        font-weight: 750;
     }
 
-    .sidebar-esan-name {
-        font-size: 34px;
-        font-weight: 900;
-        letter-spacing: 5px;
-        color: #2e7d32;
-        line-height: 1;
-    }
-
-    .sidebar-esan-subtitle {
-        margin-top: 7px;
-        font-size: 9px;
-        letter-spacing: 1.5px;
-        opacity: 0.65;
-        font-weight: 600;
-    }
-
-    /* =====================================================
-       SIDEBAR NAVIGATION
-       ===================================================== */
-
-    div[data-testid="stSidebar"]
-    div[data-testid="stButton"] > button {
-        text-align: left;
-        border-radius: 9px;
-        margin-bottom: 3px;
-    }
-
-    /* =====================================================
-       SECTION HEADINGS
-       ===================================================== */
-
-    div[data-testid="stSidebar"] p {
-        margin-bottom: 4px;
-    }
-
-    /* =====================================================
-       MOBILE
-       ===================================================== */
-
-    @media (max-width: 768px) {
-
-        .esan-login-brand .esan-name {
-            font-size: 52px;
-            letter-spacing: 5px;
-        }
-
-        .esan-login-brand .esan-subtitle {
-            font-size: 10px;
-        }
-
+    .erp-subtitle {
+        color: #777;
+        font-size: 0.95rem;
     }
 
     </style>
@@ -249,8 +217,8 @@ def safe_import(module_path, function_name):
     """
     Safely import a module function.
 
-    A broken optional module will not crash
-    the entire ERP application.
+    A failed optional module should not prevent
+    the entire ERP application from loading.
     """
 
     try:
@@ -260,26 +228,21 @@ def safe_import(module_path, function_name):
             fromlist=[function_name],
         )
 
-        function = getattr(
-            module,
-            function_name,
-            None,
-        )
-
-        if function is None:
-
-            error = (
-                f"{module_path}: "
-                f"missing function '{function_name}'"
+        if hasattr(module, function_name):
+            return getattr(
+                module,
+                function_name,
             )
 
-            module_errors.append(error)
+        error = (
+            f"{module_path}: missing function "
+            f"'{function_name}'"
+        )
 
-            logging.error(error)
+        module_errors.append(error)
+        logging.error(error)
 
-            return None
-
-        return function
+        return None
 
     except Exception as exc:
 
@@ -291,7 +254,7 @@ def safe_import(module_path, function_name):
         module_errors.append(error)
 
         logging.exception(
-            "Failed loading module %s",
+            "Failed loading %s",
             module_path,
         )
 
@@ -299,496 +262,64 @@ def safe_import(module_path, function_name):
 
 
 # ============================================================
-# PASSWORD SYSTEM
+# ADMIN CREATION
 # ============================================================
 
-def verify_user_password(password, password_hash):
-    """
-    Uses the existing Esan auth system when available.
+try:
 
-    Falls back to bcrypt when necessary.
-    """
+    from services.user_service import create_admin
 
-    if not password_hash:
-        return False
+except ImportError:
 
-    # --------------------------------------------------------
-    # Existing Esan authentication
-    # --------------------------------------------------------
+    def create_admin(db):
 
-    try:
-
-        from auth import verify_password
-
-        return bool(
-            verify_password(
-                password,
-                password_hash,
+        admin = (
+            db.query(User)
+            .filter(
+                User.username == "admin"
             )
+            .first()
         )
 
-    except Exception as exc:
+        if not admin:
 
-        logging.warning(
-            "auth.verify_password unavailable: %s",
-            exc,
-        )
+            from auth import hash_password
 
-    # --------------------------------------------------------
-    # bcrypt fallback
-    # --------------------------------------------------------
-
-    try:
-
-        import bcrypt
-
-        return bool(
-            bcrypt.checkpw(
-                password.encode("utf-8"),
-                password_hash.encode("utf-8"),
-            )
-        )
-
-    except Exception as exc:
-
-        logging.warning(
-            "bcrypt fallback failed: %s",
-            exc,
-        )
-
-    return False
-
-
-def create_password_hash(password):
-    """
-    Creates a password hash using the existing
-    Esan auth system or bcrypt.
-    """
-
-    try:
-
-        from auth import hash_password
-
-        return hash_password(password)
-
-    except Exception:
-
-        pass
-
-    try:
-
-        import bcrypt
-
-        return bcrypt.hashpw(
-            password.encode("utf-8"),
-            bcrypt.gensalt(),
-        ).decode("utf-8")
-
-    except Exception as exc:
-
-        logging.error(
-            "Unable to create password hash: %s",
-            exc,
-        )
-
-        return None
-
-
-# ============================================================
-# DATABASE TABLE COMPATIBILITY
-# ============================================================
-
-def ensure_users_table():
-    """
-    Ensures a basic users table exists.
-
-    This deliberately does NOT import models.User.
-    Therefore a broken models.py will not prevent login.
-    """
-
-    try:
-
-        inspector = inspect(engine)
-
-        tables = inspector.get_table_names()
-
-        if "users" in tables:
-            return True
-
-        metadata = MetaData()
-
-        Table(
-            "users",
-            metadata,
-            Column(
-                "id",
-                Integer,
-                primary_key=True,
-            ),
-            Column(
-                "username",
-                String(100),
-                unique=True,
-                nullable=False,
-            ),
-            Column(
-                "full_name",
-                String(200),
-                nullable=True,
-            ),
-            Column(
-                "email",
-                String(200),
-                nullable=True,
-            ),
-            Column(
-                "password_hash",
-                String(255),
-                nullable=False,
-            ),
-            Column(
-                "role",
-                String(100),
-                nullable=True,
-            ),
-            Column(
-                "active",
-                Boolean,
-                default=True,
-            ),
-            Column(
-                "created_at",
-                DateTime,
-                nullable=True,
-            ),
-        )
-
-        metadata.create_all(
-            bind=engine,
-            checkfirst=True,
-        )
-
-        logging.info(
-            "Created users table."
-        )
-
-        return True
-
-    except Exception as exc:
-
-        logging.exception(
-            "Unable to ensure users table."
-        )
-
-        return False
-
-
-# ============================================================
-# ADMIN USER
-# ============================================================
-
-def ensure_admin_user():
-    """
-    Creates the default administrator only when
-    an admin account does not already exist.
-
-    Default credentials:
-
-        Username: admin
-        Password: admin123
-    """
-
-    try:
-
-        ensure_users_table()
-
-        db = SessionLocal()
-
-        try:
-
-            result = db.execute(
-                text(
-                    """
-                    SELECT id
-                    FROM users
-                    WHERE username = :username
-                    LIMIT 1
-                    """
+            admin = User(
+                username="admin",
+                full_name="System Administrator",
+                email="admin@nileharvest.com",
+                password_hash=hash_password(
+                    "admin123"
                 ),
-                {
-                    "username": "admin"
-                },
+                role="Administrator",
+                active=True,
             )
 
-            admin = result.fetchone()
-
-            if admin:
-
-                return True
-
-            password_hash = create_password_hash(
-                "admin123"
-            )
-
-            if not password_hash:
-
-                logging.error(
-                    "Could not create admin password hash."
-                )
-
-                return False
-
-            db.execute(
-                text(
-                    """
-                    INSERT INTO users
-                    (
-                        username,
-                        full_name,
-                        email,
-                        password_hash,
-                        role,
-                        active
-                    )
-                    VALUES
-                    (
-                        :username,
-                        :full_name,
-                        :email,
-                        :password_hash,
-                        :role,
-                        :active
-                    )
-                    """
-                ),
-                {
-                    "username": "admin",
-                    "full_name": "System Administrator",
-                    "email": "admin@nileharvest.com",
-                    "password_hash": password_hash,
-                    "role": "Administrator",
-                    "active": True,
-                },
-            )
-
+            db.add(admin)
             db.commit()
 
-            logging.info(
-                "Default administrator created."
-            )
-
-            return True
-
-        finally:
-
-            db.close()
-
-    except Exception as exc:
-
-        logging.exception(
-            "Admin initialization failed: %s",
-            exc,
-        )
-
-        return False
-
 
 # ============================================================
-# LOGIN
+# SEED DATA
 # ============================================================
 
-def login(username, password):
-    """
-    Authenticate directly against the users table.
+try:
 
-    No models.User import is required.
-    """
+    from seed.seed_data import load_seed_data
 
-    username = (username or "").strip()
+except ImportError:
 
-    if not username or not password:
-        return False
-
-    try:
-
-        ensure_users_table()
-
-        db = SessionLocal()
-
-        try:
-
-            result = db.execute(
-                text(
-                    """
-                    SELECT
-                        username,
-                        password_hash,
-                        role,
-                        active
-                    FROM users
-                    WHERE username = :username
-                    LIMIT 1
-                    """
-                ),
-                {
-                    "username": username
-                },
-            )
-
-            user = result.mappings().first()
-
-            if not user:
-
-                return False
-
-            active = user.get("active")
-
-            if active in (
-                False,
-                0,
-                "0",
-                "false",
-                "False",
-            ):
-                return False
-
-            valid = verify_user_password(
-                password,
-                user.get("password_hash"),
-            )
-
-            if not valid:
-
-                return False
-
-            st.session_state.logged_in = True
-
-            st.session_state.username = (
-                user.get("username")
-                or username
-            )
-
-            st.session_state.role = (
-                user.get("role")
-                or "User"
-            )
-
-            return True
-
-        finally:
-
-            db.close()
-
-    except Exception as exc:
-
-        logging.exception(
-            "Login error: %s",
-            exc,
-        )
-
-        return False
-
-
-# ============================================================
-# DATABASE INITIALIZATION
-# ============================================================
-
-def initialize_database():
-
-    try:
-
-        # ----------------------------------------------------
-        # Ensure database connection
-        # ----------------------------------------------------
-
-        with engine.connect() as connection:
-
-            connection.execute(
-                text("SELECT 1")
-            )
-
-        # ----------------------------------------------------
-        # Try normal model metadata creation.
-        #
-        # Importantly, this does NOT import models here.
-        # ----------------------------------------------------
-
-        try:
-
-            Base.metadata.create_all(
-                bind=engine
-            )
-
-        except Exception as exc:
-
-            logging.warning(
-                "Normal metadata initialization skipped: %s",
-                exc,
-            )
-
-        # ----------------------------------------------------
-        # Ensure users table independently.
-        # ----------------------------------------------------
-
-        ensure_users_table()
-
-        # ----------------------------------------------------
-        # Ensure admin.
-        # ----------------------------------------------------
-
-        ensure_admin_user()
-
-        # ----------------------------------------------------
-        # Seed data
-        # ----------------------------------------------------
-
-        try:
-
-            from seed.seed_data import load_seed_data
-
-            if callable(load_seed_data):
-
-                try:
-
-                    load_seed_data()
-
-                except Exception as exc:
-
-                    logging.warning(
-                        "Seed data failed: %s",
-                        exc,
-                    )
-
-        except ImportError:
-
-            pass
-
-        except Exception as exc:
-
-            logging.warning(
-                "Seed system unavailable: %s",
-                exc,
-            )
-
-    except Exception as exc:
-
-        logging.exception(
-            "Database initialization failed: %s",
-            exc,
-        )
-
-        st.error(
-            "Database connection could not be initialized. "
-            "Please check esan_erp.log."
-        )
-
-
-initialize_database()
+    load_seed_data = None
 
 
 # ============================================================
 # MODULE REGISTRY
 # ============================================================
+
+# ------------------------------------------------------------
+# OVERVIEW
+# ------------------------------------------------------------
 
 dashboard_home = safe_import(
     "modules.dashboard.home",
@@ -796,9 +327,9 @@ dashboard_home = safe_import(
 )
 
 
-# ============================================================
+# ------------------------------------------------------------
 # PROCUREMENT
-# ============================================================
+# ------------------------------------------------------------
 
 procurement_dashboard = safe_import(
     "modules.procurement.dashboard",
@@ -821,9 +352,9 @@ procurement_purchase_orders = safe_import(
 )
 
 
-# ============================================================
+# ------------------------------------------------------------
 # WAREHOUSE
-# ============================================================
+# ------------------------------------------------------------
 
 warehouse_dashboard = safe_import(
     "modules.warehouse.dashboard",
@@ -836,14 +367,19 @@ warehouse_inventory = safe_import(
 )
 
 
-# ============================================================
-# PRODUCTION
-# ============================================================
+# ------------------------------------------------------------
+# MILLING
+# ------------------------------------------------------------
 
 milling_dashboard = safe_import(
     "modules.milling.dashboard",
     "milling_dashboard",
 )
+
+
+# ------------------------------------------------------------
+# PACKAGING
+# ------------------------------------------------------------
 
 packaging_dashboard = safe_import(
     "modules.packaging.dashboard",
@@ -851,9 +387,9 @@ packaging_dashboard = safe_import(
 )
 
 
-# ============================================================
+# ------------------------------------------------------------
 # SALES & DISTRIBUTION
-# ============================================================
+# ------------------------------------------------------------
 
 sales_dashboard = safe_import(
     "modules.sales.dashboard",
@@ -891,9 +427,9 @@ sales_payments = safe_import(
 )
 
 
-# ============================================================
+# ------------------------------------------------------------
 # FINANCE
-# ============================================================
+# ------------------------------------------------------------
 
 finance_dashboard = safe_import(
     "modules.finance.dashboard",
@@ -901,9 +437,9 @@ finance_dashboard = safe_import(
 )
 
 
-# ============================================================
+# ------------------------------------------------------------
 # REPORTS
-# ============================================================
+# ------------------------------------------------------------
 
 reports_dashboard = safe_import(
     "modules.reports.dashboard",
@@ -911,8 +447,18 @@ reports_dashboard = safe_import(
 )
 
 
+# ------------------------------------------------------------
+# ADMINISTRATION
+# ------------------------------------------------------------
+
+administration_dashboard = safe_import(
+    "modules.admin.dashboard",
+    "admin_dashboard",
+)
+
+
 # ============================================================
-# FALLBACK PAGES
+# FALLBACK PAGE
 # ============================================================
 
 def fallback_page(title):
@@ -921,6 +467,12 @@ def fallback_page(title):
 
         st.info(
             f"{title} is currently unavailable."
+        )
+
+        st.caption(
+            "The module could not be loaded. "
+            "Check the Module Loading Information "
+            "section at the bottom of the application."
         )
 
     return render
@@ -946,22 +498,175 @@ warehouse_inventory = (
     or fallback_page("Inventory")
 )
 
+administration_dashboard = (
+    administration_dashboard
+    or fallback_page("Administration")
+)
+
 
 # ============================================================
-# LOGIN PAGE
+# DATABASE INITIALIZATION
+# ============================================================
+
+def initialize_database():
+
+    try:
+
+        inspector = inspect(engine)
+
+        existing_tables = (
+            inspector.get_table_names()
+        )
+
+        missing_tables = [
+            table_name
+            for table_name
+            in Base.metadata.tables
+            if table_name not in existing_tables
+        ]
+
+        if missing_tables:
+
+            logging.info(
+                "Creating missing tables: %s",
+                missing_tables,
+            )
+
+        Base.metadata.create_all(
+            bind=engine
+        )
+
+        db = SessionLocal()
+
+        try:
+
+            create_admin(db)
+
+        finally:
+
+            db.close()
+
+        if load_seed_data:
+
+            try:
+
+                load_seed_data()
+
+            except Exception as exc:
+
+                logging.warning(
+                    "Seed data failed: %s",
+                    exc,
+                )
+
+    except Exception as exc:
+
+        logging.exception(
+            "Database initialization failed"
+        )
+
+        st.error(
+            "Database initialization failed."
+        )
+
+        st.caption(
+            "Check esan_erp.log for details."
+        )
+
+
+initialize_database()
+
+
+# ============================================================
+# SESSION STATE
+# ============================================================
+
+if "logged_in" not in st.session_state:
+
+    st.session_state.logged_in = False
+    st.session_state.username = None
+    st.session_state.role = None
+    st.session_state.current_page = (
+        "🏠 Overview"
+    )
+
+
+# ============================================================
+# LOGIN
+# ============================================================
+
+def login(username, password):
+
+    db = SessionLocal()
+
+    try:
+
+        user = (
+            db.query(User)
+            .filter(
+                User.username == username
+            )
+            .first()
+        )
+
+        if (
+            user
+            and user.active
+            and verify_password(
+                password,
+                user.password_hash,
+            )
+        ):
+
+            st.session_state.logged_in = True
+            st.session_state.username = (
+                user.username
+            )
+            st.session_state.role = user.role
+
+            logging.info(
+                "User logged in: %s",
+                user.username,
+            )
+
+            return True
+
+        logging.warning(
+            "Failed login attempt: %s",
+            username,
+        )
+
+        return False
+
+    finally:
+
+        db.close()
+
+
+# ============================================================
+# LOGIN SCREEN
 # ============================================================
 
 if not st.session_state.logged_in:
 
     st.markdown(
         """
-        <div class="esan-login-page">
-            <div class="esan-login-brand">
-                <div class="esan-name">ESAN</div>
-                <div class="esan-subtitle">
-                    Enterprise Resource Planning
+        <div class="login-page">
+
+            <div class="login-container">
+
+                <div class="logo">
+
+                    <div class="logo-stem"></div>
+
+                    <div class="logo-leaf left"></div>
+
+                    <div class="logo-leaf right"></div>
+
                 </div>
+
             </div>
+
         </div>
         """,
         unsafe_allow_html=True,
@@ -976,23 +681,19 @@ if not st.session_state.logged_in:
         username = st.text_input(
             "Username",
             placeholder="Enter your username",
-            key="login_username",
         )
 
         password = st.text_input(
             "Password",
             type="password",
             placeholder="Enter your password",
-            key="login_password",
         )
 
-        login_clicked = st.button(
+        if st.button(
             "Login",
             use_container_width=True,
             type="primary",
-        )
-
-        if login_clicked:
+        ):
 
             if login(
                 username,
@@ -1000,7 +701,7 @@ if not st.session_state.logged_in:
             ):
 
                 st.success(
-                    "Login successful."
+                    "Login successful"
                 )
 
                 st.rerun()
@@ -1008,7 +709,7 @@ if not st.session_state.logged_in:
             else:
 
                 st.error(
-                    "Invalid username or password."
+                    "Invalid username or password"
                 )
 
     st.stop()
@@ -1021,19 +722,31 @@ if not st.session_state.logged_in:
 with st.sidebar:
 
     # --------------------------------------------------------
-    # ESAN BRAND
+    # LOGO
     # --------------------------------------------------------
 
     st.markdown(
         """
-        <div class="sidebar-esan">
-            <div class="sidebar-esan-name">
-                ESAN
+        <div style="
+            text-align:center;
+            margin-bottom:1rem;
+        ">
+
+            <div class="logo"
+                 style="
+                    margin:0 auto;
+                    width:88px;
+                    height:88px;
+                 ">
+
+                <div class="logo-stem"></div>
+
+                <div class="logo-leaf left"></div>
+
+                <div class="logo-leaf right"></div>
+
             </div>
 
-            <div class="sidebar-esan-subtitle">
-                ERP PLATFORM
-            </div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1042,7 +755,7 @@ with st.sidebar:
     st.divider()
 
     # --------------------------------------------------------
-    # NAVIGATION FUNCTION
+    # NAVIGATION BUTTON
     # --------------------------------------------------------
 
     def nav_button(label):
@@ -1052,18 +765,15 @@ with st.sidebar:
             use_container_width=True,
         ):
 
-            st.session_state.current_page = label
-
-            st.rerun()
-
+            st.session_state.current_page = (
+                label
+            )
 
     # --------------------------------------------------------
     # OVERVIEW
     # --------------------------------------------------------
 
-    nav_button(
-        "🏠 Overview"
-    )
+    nav_button("🏠 Overview")
 
     # --------------------------------------------------------
     # OPERATIONS
@@ -1073,21 +783,10 @@ with st.sidebar:
         "**OPERATIONS**"
     )
 
-    nav_button(
-        "🌾 Procurement"
-    )
-
-    nav_button(
-        "📦 Warehouse"
-    )
-
-    nav_button(
-        "🏭 Milling"
-    )
-
-    nav_button(
-        "📦 Packaging"
-    )
+    nav_button("🌾 Procurement")
+    nav_button("📦 Warehouse")
+    nav_button("🏭 Milling")
+    nav_button("📦 Packaging")
 
     # --------------------------------------------------------
     # COMMERCIAL
@@ -1109,9 +808,7 @@ with st.sidebar:
         "**FINANCE**"
     )
 
-    nav_button(
-        "💰 Finance"
-    )
+    nav_button("💰 Finance")
 
     # --------------------------------------------------------
     # REPORTING
@@ -1121,9 +818,28 @@ with st.sidebar:
         "**REPORTING**"
     )
 
-    nav_button(
-        "📊 Reports"
-    )
+    nav_button("📊 Reports")
+
+    # --------------------------------------------------------
+    # ADMINISTRATION
+    # --------------------------------------------------------
+
+    if (
+        st.session_state.role
+        in [
+            "Administrator",
+            "Admin",
+            "admin",
+        ]
+    ):
+
+        st.markdown(
+            "**ADMINISTRATION**"
+        )
+
+        nav_button(
+            "🔐 Administration"
+        )
 
     st.divider()
 
@@ -1136,11 +852,13 @@ with st.sidebar:
     )
 
     st.write(
-        f"User: **{st.session_state.username}**"
+        f"User: "
+        f"**{st.session_state.username}**"
     )
 
     st.write(
-        f"Role: **{st.session_state.role}**"
+        f"Role: "
+        f"**{st.session_state.role}**"
     )
 
     if st.button(
@@ -1148,12 +866,14 @@ with st.sidebar:
         use_container_width=True,
     ):
 
+        logging.info(
+            "User logged out: %s",
+            st.session_state.username,
+        )
+
         st.session_state.logged_in = False
-
         st.session_state.username = None
-
         st.session_state.role = None
-
         st.session_state.current_page = (
             "🏠 Overview"
         )
@@ -1204,17 +924,13 @@ elif menu == "🌾 Procurement":
             "Purchases",
         ],
         horizontal=True,
-        key="procurement_navigation",
     )
 
     if procurement_menu == "Dashboard":
 
         if procurement_dashboard:
-
             procurement_dashboard()
-
         else:
-
             st.warning(
                 "Procurement dashboard unavailable."
             )
@@ -1249,17 +965,13 @@ elif menu == "📦 Warehouse":
             "Inventory",
         ],
         horizontal=True,
-        key="warehouse_navigation",
     )
 
     if warehouse_menu == "Dashboard":
 
         if warehouse_dashboard:
-
             warehouse_dashboard()
-
         else:
-
             st.warning(
                 "Warehouse dashboard unavailable."
             )
@@ -1313,6 +1025,11 @@ elif menu == "🚚 Sales & Distribution":
         "🚚 Sales & Distribution"
     )
 
+    st.caption(
+        "Customer → Quotation → Sales Order → "
+        "Stock Reservation → Delivery → Invoice → Payment"
+    )
+
     sales_menu = st.radio(
         "Sales Module",
         [
@@ -1325,7 +1042,6 @@ elif menu == "🚚 Sales & Distribution":
             "Payments",
         ],
         horizontal=True,
-        key="sales_navigation",
     )
 
     sales_pages = {
@@ -1373,6 +1089,15 @@ elif menu == "🚚 Sales & Distribution":
 
 elif menu == "💰 Finance":
 
+    st.header(
+        "💰 Finance"
+    )
+
+    st.caption(
+        "Accounts Receivable → Cash / Bank → "
+        "General Ledger"
+    )
+
     if finance_dashboard:
 
         finance_dashboard()
@@ -1402,6 +1127,37 @@ elif menu == "📊 Reports":
 
 
 # ============================================================
+# ADMINISTRATION
+# ============================================================
+
+elif menu == "🔐 Administration":
+
+    if (
+        st.session_state.role
+        not in [
+            "Administrator",
+            "Admin",
+            "admin",
+        ]
+    ):
+
+        st.error(
+            "You do not have permission "
+            "to access Administration."
+        )
+
+    elif administration_dashboard:
+
+        administration_dashboard()
+
+    else:
+
+        st.warning(
+            "Administration module unavailable."
+        )
+
+
+# ============================================================
 # MODULE LOADING INFORMATION
 # ============================================================
 
@@ -1412,7 +1168,8 @@ if module_errors:
     ):
 
         st.warning(
-            "Some optional ERP modules could not be loaded."
+            "Some optional modules could not "
+            "be loaded."
         )
 
         for error in module_errors:
@@ -1430,6 +1187,6 @@ st.divider()
 
 st.caption(
     f"© {COMPANY_NAME} | "
-    f"Enterprise Resource Planning Platform | "
-    f"Version {VERSION}"
+    f"Esan ERP {VERSION} | "
+    f"Enterprise Resource Planning Platform"
 )
