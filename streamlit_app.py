@@ -8,12 +8,9 @@ Full Repository Integration
 """
 
 import logging
-import streamlit as st
-from sqlalchemy import inspect
+import importlib
 
-from config import COMPANY_NAME, VERSION
-from database import Base, engine, SessionLocal
-from auth import verify_password
+import streamlit as st
 
 
 # ============================================================
@@ -40,38 +37,184 @@ st.set_page_config(
 
 
 # ============================================================
-# GLOBAL VARIABLES
+# GLOBAL ERROR COLLECTION
 # ============================================================
 
 module_errors = []
-database_errors = []
-
-User = None
+system_errors = []
 
 
 # ============================================================
-# LOAD USER MODEL SAFELY
+# SAFE CONFIG IMPORT
 # ============================================================
+
+COMPANY_NAME = "Nile Harvest Foods Ltd."
+VERSION = "1.4.0 Alpha"
 
 try:
-    import models
+    config_module = importlib.import_module("config")
 
-    User = getattr(models, "User", None)
+    COMPANY_NAME = getattr(
+        config_module,
+        "COMPANY_NAME",
+        COMPANY_NAME,
+    )
 
-    if User is None:
-        module_errors.append(
-            "models: User model was not found."
+    VERSION = getattr(
+        config_module,
+        "VERSION",
+        VERSION,
+    )
+
+except Exception as exc:
+
+    logging.warning(
+        "Config module could not be loaded: %s",
+        exc,
+    )
+
+
+# ============================================================
+# SAFE DATABASE IMPORT
+# ============================================================
+
+Base = None
+engine = None
+SessionLocal = None
+
+try:
+
+    database_module = importlib.import_module(
+        "database"
+    )
+
+    Base = getattr(
+        database_module,
+        "Base",
+        None,
+    )
+
+    engine = getattr(
+        database_module,
+        "engine",
+        None,
+    )
+
+    SessionLocal = getattr(
+        database_module,
+        "SessionLocal",
+        None,
+    )
+
+    if Base is None:
+        system_errors.append(
+            "database.py: Base was not found."
+        )
+
+    if engine is None:
+        system_errors.append(
+            "database.py: engine was not found."
+        )
+
+    if SessionLocal is None:
+        system_errors.append(
+            "database.py: SessionLocal was not found."
         )
 
 except Exception as exc:
+
     error = (
-        f"models: {type(exc).__name__}: {exc}"
+        f"database.py: "
+        f"{type(exc).__name__}: {exc}"
     )
 
-    module_errors.append(error)
+    system_errors.append(error)
 
     logging.exception(
-        "Unable to load models module"
+        "Database module failed to load."
+    )
+
+
+# ============================================================
+# SAFE AUTH IMPORT
+# ============================================================
+
+verify_password = None
+hash_password = None
+
+try:
+
+    auth_module = importlib.import_module(
+        "auth"
+    )
+
+    verify_password = getattr(
+        auth_module,
+        "verify_password",
+        None,
+    )
+
+    hash_password = getattr(
+        auth_module,
+        "hash_password",
+        None,
+    )
+
+    if verify_password is None:
+
+        system_errors.append(
+            "auth.py: verify_password was not found."
+        )
+
+except Exception as exc:
+
+    error = (
+        f"auth.py: "
+        f"{type(exc).__name__}: {exc}"
+    )
+
+    system_errors.append(error)
+
+    logging.exception(
+        "Auth module failed to load."
+    )
+
+
+# ============================================================
+# SAFE USER MODEL IMPORT
+# ============================================================
+
+User = None
+
+try:
+
+    models_module = importlib.import_module(
+        "models"
+    )
+
+    User = getattr(
+        models_module,
+        "User",
+        None,
+    )
+
+    if User is None:
+
+        system_errors.append(
+            "models.py: User model was not found."
+        )
+
+except Exception as exc:
+
+    error = (
+        f"models.py: "
+        f"{type(exc).__name__}: {exc}"
+    )
+
+    system_errors.append(error)
+
+    logging.exception(
+        "Models module failed to load."
     )
 
 
@@ -82,6 +225,10 @@ except Exception as exc:
 st.markdown(
     """
     <style>
+
+    /* ======================================================
+       HIDE STREAMLIT DEFAULT UI
+       ====================================================== */
 
     #MainMenu {
         display: none;
@@ -95,21 +242,29 @@ st.markdown(
         display: none;
     }
 
+    /* ======================================================
+       MAIN CONTENT
+       ====================================================== */
+
     .block-container {
         padding-top: 1.5rem;
         padding-bottom: 2rem;
     }
 
+    /* ======================================================
+       SIDEBAR
+       ====================================================== */
+
     div[data-testid="stSidebar"] {
-        border-right: 1px solid #ddd;
+        border-right: 1px solid rgba(128, 128, 128, 0.25);
     }
 
     /* ======================================================
-       LOGIN
+       LOGIN PAGE
        ====================================================== */
 
     .login-page {
-        min-height: 82vh;
+        min-height: 38vh;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -131,49 +286,89 @@ st.markdown(
         height: 112px;
         margin: 0 auto 18px auto;
         border-radius: 32px;
-        background: linear-gradient(
-            145deg,
-            #2e7d32,
-            #1b5e20
-        );
+
+        background:
+            linear-gradient(
+                145deg,
+                #2e7d32,
+                #1b5e20
+            );
+
         display: flex;
         align-items: center;
         justify-content: center;
+
         position: relative;
+
         box-shadow:
             0 18px 45px
             rgba(20, 90, 55, 0.25);
+
+        overflow: hidden;
     }
+
+    /* ======================================================
+       SOIL
+       ====================================================== */
 
     .logo::before {
         content: "";
+
         position: absolute;
-        bottom: 0;
+
         left: 0;
+        bottom: 0;
+
         width: 100%;
         height: 28px;
+
         background: #4e342e;
-        border-radius: 0 0 28px 28px;
+
+        border-radius:
+            0 0 28px 28px;
     }
+
+    /* ======================================================
+       STEM
+       ====================================================== */
 
     .logo-stem {
         position: absolute;
+
         bottom: 28px;
         left: 50%;
-        transform: translateX(-50%);
+
+        transform:
+            translateX(-50%);
+
         width: 6px;
         height: 40px;
+
         background: #aed581;
-        border-radius: 3px 3px 0 0;
+
+        border-radius:
+            3px 3px 0 0;
+
+        z-index: 2;
     }
+
+    /* ======================================================
+       LEAVES
+       ====================================================== */
 
     .logo-leaf {
         position: absolute;
+
         bottom: 52px;
+
         width: 18px;
         height: 18px;
+
         background: #81c784;
+
         border-radius: 50%;
+
+        z-index: 3;
     }
 
     .logo-leaf.left {
@@ -200,10 +395,26 @@ st.markdown(
         padding-left: 14px;
     }
 
+    /* ======================================================
+       BUTTONS
+       ====================================================== */
+
     div[data-testid="stButton"] > button {
         border-radius: 10px;
-        min-height: 46px;
+        min-height: 44px;
         font-weight: 700;
+    }
+
+    /* ======================================================
+       SIDEBAR BUTTONS
+       ====================================================== */
+
+    div[data-testid="stSidebar"]
+    div[data-testid="stButton"]
+    > button {
+
+        text-align: left;
+        border-radius: 9px;
     }
 
     </style>
@@ -213,38 +424,46 @@ st.markdown(
 
 
 # ============================================================
-# SAFE MODULE IMPORT
+# SAFE MODULE IMPORT SYSTEM
 # ============================================================
 
-def safe_import(module_path, function_name):
+def safe_import(
+    module_path,
+    function_name,
+):
     """
     Safely import a module function.
 
-    A failed optional module will not crash
-    the entire ERP application.
+    If a module is broken or unavailable,
+    the ERP continues running.
     """
 
     try:
-        module = __import__(
-            module_path,
-            fromlist=[function_name],
+
+        module = importlib.import_module(
+            module_path
         )
 
-        if hasattr(module, function_name):
-            return getattr(
-                module,
-                function_name,
+        function = getattr(
+            module,
+            function_name,
+            None,
+        )
+
+        if function is None:
+
+            error = (
+                f"{module_path}: missing function "
+                f"'{function_name}'"
             )
 
-        error = (
-            f"{module_path}: missing function "
-            f"'{function_name}'"
-        )
+            module_errors.append(error)
 
-        module_errors.append(error)
-        logging.error(error)
+            logging.error(error)
 
-        return None
+            return None
+
+        return function
 
     except Exception as exc:
 
@@ -256,7 +475,7 @@ def safe_import(module_path, function_name):
         module_errors.append(error)
 
         logging.exception(
-            "Failed loading %s",
+            "Failed loading module %s",
             module_path,
         )
 
@@ -264,29 +483,44 @@ def safe_import(module_path, function_name):
 
 
 # ============================================================
-# ADMIN CREATION
+# ADMIN CREATION SERVICE
 # ============================================================
 
-create_admin = None
+create_admin_service = None
 
 try:
-    from services.user_service import create_admin
+
+    user_service = importlib.import_module(
+        "services.user_service"
+    )
+
+    create_admin_service = getattr(
+        user_service,
+        "create_admin",
+        None,
+    )
 
 except Exception as exc:
 
     logging.warning(
-        "services.user_service.create_admin unavailable: %s",
+        "User service unavailable: %s",
         exc,
     )
 
 
+# ============================================================
+# CREATE DEFAULT ADMINISTRATOR
+# ============================================================
+
 def ensure_admin_user(db):
     """
-    Creates the default administrator if possible.
+    Create the default administrator if one does
+    not already exist.
 
-    This function is intentionally defensive because
-    different versions of the User model may have
-    different fields.
+    Default credentials:
+
+        Username: admin
+        Password: admin123
     """
 
     if User is None:
@@ -295,44 +529,58 @@ def ensure_admin_user(db):
         )
 
     # --------------------------------------------------------
-    # Use project's create_admin service if available
+    # Use existing service first
     # --------------------------------------------------------
 
-    if create_admin is not None:
+    if create_admin_service is not None:
 
         try:
-            create_admin(db)
+
+            create_admin_service(db)
+
             return
+
         except Exception as exc:
+
             logging.warning(
-                "create_admin service failed: %s",
+                "Existing create_admin service failed: %s",
                 exc,
             )
 
     # --------------------------------------------------------
-    # Check existing admin
+    # Check for existing admin
     # --------------------------------------------------------
 
-    admin = (
-        db.query(User)
-        .filter(
-            User.username == "admin"
-        )
-        .first()
-    )
+    try:
 
-    if admin:
+        admin = (
+            db.query(User)
+            .filter(
+                User.username == "admin"
+            )
+            .first()
+        )
+
+    except Exception as exc:
+
+        logging.exception(
+            "Could not query User model: %s",
+            exc,
+        )
+
+        raise
+
+    if admin is not None:
         return
 
     # --------------------------------------------------------
     # Password hashing
     # --------------------------------------------------------
 
-    try:
-        from auth import hash_password
-    except Exception as exc:
+    if hash_password is None:
+
         raise RuntimeError(
-            f"Unable to import hash_password: {exc}"
+            "hash_password is unavailable."
         )
 
     password_hash = hash_password(
@@ -340,13 +588,19 @@ def ensure_admin_user(db):
     )
 
     # --------------------------------------------------------
-    # Build user using only fields that exist
+    # Detect actual User columns
     # --------------------------------------------------------
 
-    user_columns = {
-        column.name
-        for column in User.__table__.columns
-    }
+    try:
+
+        user_columns = {
+            column.name
+            for column in User.__table__.columns
+        }
+
+    except Exception:
+
+        user_columns = set()
 
     values = {}
 
@@ -369,10 +623,14 @@ def ensure_admin_user(db):
         )
 
     if "password_hash" in user_columns:
-        values["password_hash"] = password_hash
+        values["password_hash"] = (
+            password_hash
+        )
 
-    if "password" in user_columns:
-        values["password"] = password_hash
+    elif "password" in user_columns:
+        values["password"] = (
+            password_hash
+        )
 
     if "role" in user_columns:
         values["role"] = "Administrator"
@@ -380,13 +638,20 @@ def ensure_admin_user(db):
     if "active" in user_columns:
         values["active"] = True
 
+    if not values.get("username"):
+
+        raise RuntimeError(
+            "User model does not contain "
+            "a username field."
+        )
+
     admin = User(**values)
 
     db.add(admin)
     db.commit()
 
     logging.info(
-        "Default administrator account created."
+        "Default administrator created."
     )
 
 
@@ -397,7 +662,16 @@ def ensure_admin_user(db):
 load_seed_data = None
 
 try:
-    from seed.seed_data import load_seed_data
+
+    seed_module = importlib.import_module(
+        "seed.seed_data"
+    )
+
+    load_seed_data = getattr(
+        seed_module,
+        "load_seed_data",
+        None,
+    )
 
 except Exception as exc:
 
@@ -482,7 +756,7 @@ packaging_dashboard = safe_import(
 
 
 # ------------------------------------------------------------
-# SALES & DISTRIBUTION
+# SALES
 # ------------------------------------------------------------
 
 sales_dashboard = safe_import(
@@ -541,6 +815,16 @@ reports_dashboard = safe_import(
 )
 
 
+# ------------------------------------------------------------
+# ADMINISTRATION
+# ------------------------------------------------------------
+
+administration_dashboard = safe_import(
+    "modules.admin.dashboard",
+    "admin_dashboard",
+)
+
+
 # ============================================================
 # FALLBACK PAGE
 # ============================================================
@@ -550,8 +834,13 @@ def fallback_page(title):
     def render():
 
         st.info(
-            f"{title} – "
-            "This section is currently being prepared."
+            f"{title} is currently unavailable."
+        )
+
+        st.caption(
+            "The module could not be loaded. "
+            "Check Module Loading Information "
+            "below."
         )
 
     return render
@@ -577,6 +866,11 @@ warehouse_inventory = (
     or fallback_page("Inventory")
 )
 
+administration_dashboard = (
+    administration_dashboard
+    or fallback_page("Administration")
+)
+
 
 # ============================================================
 # DATABASE INITIALIZATION
@@ -584,60 +878,65 @@ warehouse_inventory = (
 
 def initialize_database():
 
-    try:
+    if engine is None:
+        return
 
-        if engine is None:
-            raise RuntimeError(
-                "Database engine is unavailable."
-            )
+    try:
 
         # ----------------------------------------------------
         # Inspect database
         # ----------------------------------------------------
 
-        try:
+        if Base is not None:
 
-            inspector = inspect(engine)
+            try:
 
-            existing_tables = (
-                inspector.get_table_names()
-            )
-
-            missing_tables = [
-                table_name
-                for table_name
-                in Base.metadata.tables
-                if table_name
-                not in existing_tables
-            ]
-
-            if missing_tables:
-
-                logging.info(
-                    "Missing database tables: %s",
-                    missing_tables,
+                inspector = inspect(
+                    engine
                 )
 
-        except Exception as exc:
+                existing_tables = (
+                    inspector.get_table_names()
+                )
 
-            logging.warning(
-                "Database inspection failed: %s",
-                exc,
+                missing_tables = [
+                    table_name
+                    for table_name
+                    in Base.metadata.tables
+                    if table_name
+                    not in existing_tables
+                ]
+
+                if missing_tables:
+
+                    logging.info(
+                        "Missing database tables: %s",
+                        missing_tables,
+                    )
+
+            except Exception as exc:
+
+                logging.warning(
+                    "Database inspection failed: %s",
+                    exc,
+                )
+
+            # ------------------------------------------------
+            # Create missing tables
+            # ------------------------------------------------
+
+            Base.metadata.create_all(
+                bind=engine
             )
-
-        # ----------------------------------------------------
-        # Create missing tables
-        # ----------------------------------------------------
-
-        Base.metadata.create_all(
-            bind=engine
-        )
 
         # ----------------------------------------------------
         # Create administrator
         # ----------------------------------------------------
 
-        if User is not None:
+        if (
+            SessionLocal is not None
+            and User is not None
+        ):
 
             db = SessionLocal()
 
@@ -645,21 +944,27 @@ def initialize_database():
 
                 ensure_admin_user(db)
 
+            except Exception as exc:
+
+                logging.exception(
+                    "Admin initialization failed: %s",
+                    exc,
+                )
+
+                system_errors.append(
+                    "Administrator initialization: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+
             finally:
 
                 db.close()
-
-        else:
-
-            database_errors.append(
-                "User model could not be loaded."
-            )
 
         # ----------------------------------------------------
         # Seed data
         # ----------------------------------------------------
 
-        if load_seed_data:
+        if load_seed_data is not None:
 
             try:
 
@@ -675,14 +980,14 @@ def initialize_database():
     except Exception as exc:
 
         error = (
-            f"Database initialization failed: "
+            "Database initialization failed: "
             f"{type(exc).__name__}: {exc}"
         )
 
-        database_errors.append(error)
+        system_errors.append(error)
 
         logging.exception(
-            "Database initialization failed"
+            "Database initialization failed."
         )
 
 
@@ -690,20 +995,23 @@ initialize_database()
 
 
 # ============================================================
-# SESSION MANAGEMENT
+# SESSION STATE
 # ============================================================
 
 if "logged_in" not in st.session_state:
 
     st.session_state.logged_in = False
 
+
 if "username" not in st.session_state:
 
     st.session_state.username = None
 
+
 if "role" not in st.session_state:
 
     st.session_state.role = None
+
 
 if "current_page" not in st.session_state:
 
@@ -718,16 +1026,19 @@ if "current_page" not in st.session_state:
 
 def login(username, password):
 
-    if not username or not password:
+    if not username:
+        return False
+
+    if not password:
         return False
 
     if User is None:
+        return False
 
-        logging.error(
-            "Login failed because User model "
-            "is unavailable."
-        )
+    if SessionLocal is None:
+        return False
 
+    if verify_password is None:
         return False
 
     db = SessionLocal()
@@ -737,7 +1048,8 @@ def login(username, password):
         user = (
             db.query(User)
             .filter(
-                User.username == username.strip()
+                User.username
+                == username.strip()
             )
             .first()
         )
@@ -745,15 +1057,12 @@ def login(username, password):
         if user is None:
 
             logging.warning(
-                "Login failed. User not found: %s",
+                "Login failed. "
+                "Unknown username: %s",
                 username,
             )
 
             return False
-
-        # ----------------------------------------------------
-        # Active status
-        # ----------------------------------------------------
 
         active = getattr(
             user,
@@ -769,10 +1078,6 @@ def login(username, password):
             )
 
             return False
-
-        # ----------------------------------------------------
-        # Password hash
-        # ----------------------------------------------------
 
         password_hash = getattr(
             user,
@@ -791,33 +1096,31 @@ def login(username, password):
         if not password_hash:
 
             logging.error(
-                "User %s has no password hash.",
+                "No password hash for user: %s",
                 username,
             )
 
             return False
 
-        # ----------------------------------------------------
-        # Verify password
-        # ----------------------------------------------------
-
         try:
 
-            valid_password = verify_password(
-                password,
-                password_hash,
+            password_valid = (
+                verify_password(
+                    password,
+                    password_hash,
+                )
             )
 
         except Exception as exc:
 
             logging.exception(
-                "Password verification failed: %s",
+                "Password verification error: %s",
                 exc,
             )
 
             return False
 
-        if not valid_password:
+        if not password_valid:
 
             logging.warning(
                 "Invalid password for user: %s",
@@ -845,7 +1148,7 @@ def login(username, password):
         )
 
         logging.info(
-            "User logged in successfully: %s",
+            "Successful login: %s",
             username,
         )
 
@@ -866,14 +1169,10 @@ def login(username, password):
 
 
 # ============================================================
-# LOGIN SCREEN
+# LOGIN PAGE
 # ============================================================
 
 if not st.session_state.logged_in:
-
-    # --------------------------------------------------------
-    # Centered logo
-    # --------------------------------------------------------
 
     st.markdown(
         """
@@ -911,21 +1210,22 @@ if not st.session_state.logged_in:
         username = st.text_input(
             "Username",
             placeholder="Enter your username",
+            key="login_username",
         )
 
         password = st.text_input(
             "Password",
             type="password",
             placeholder="Enter your password",
+            key="login_password",
         )
 
-        login_clicked = st.button(
+        if st.button(
             "Login",
             use_container_width=True,
             type="primary",
-        )
-
-        if login_clicked:
+            key="login_button",
+        ):
 
             if login(
                 username,
@@ -943,10 +1243,22 @@ if not st.session_state.logged_in:
                 if User is None:
 
                     st.error(
-                        "Login system is unavailable "
-                        "because the User model could not "
-                        "be loaded. Check the module "
-                        "loading information below."
+                        "Login system could not "
+                        "load the User model."
+                    )
+
+                elif SessionLocal is None:
+
+                    st.error(
+                        "Database connection is "
+                        "not available."
+                    )
+
+                elif verify_password is None:
+
+                    st.error(
+                        "Password verification "
+                        "system is unavailable."
                     )
 
                 else:
@@ -956,34 +1268,34 @@ if not st.session_state.logged_in:
                     )
 
     # --------------------------------------------------------
-    # Diagnostic information
+    # Diagnostics
     # --------------------------------------------------------
 
-    if module_errors or database_errors:
+    if system_errors or module_errors:
 
         with st.expander(
             "⚠️ System Diagnostics"
         ):
 
-            if module_errors:
+            if system_errors:
 
                 st.warning(
-                    "Module loading information:"
+                    "System information:"
                 )
 
-                for error in module_errors:
+                for error in system_errors:
 
                     st.write(
                         f"• {error}"
                     )
 
-            if database_errors:
+            if module_errors:
 
                 st.warning(
-                    "Database information:"
+                    "Module information:"
                 )
 
-                for error in database_errors:
+                for error in module_errors:
 
                     st.write(
                         f"• {error}"
@@ -1005,15 +1317,18 @@ with st.sidebar:
     st.markdown(
         """
         <div style="
+            width:100%;
             text-align:center;
-            margin-bottom:1rem;
+            margin-top:5px;
+            margin-bottom:15px;
         ">
 
             <div class="logo"
                  style="
-                    margin:0 auto;
                     width:88px;
                     height:88px;
+                    margin:0 auto;
+                    border-radius:25px;
                  ">
 
                 <div class="logo-stem"></div>
@@ -1032,7 +1347,7 @@ with st.sidebar:
     st.divider()
 
     # --------------------------------------------------------
-    # Navigation
+    # Navigation function
     # --------------------------------------------------------
 
     def nav_button(label):
@@ -1040,6 +1355,7 @@ with st.sidebar:
         if st.button(
             label,
             use_container_width=True,
+            key=f"nav_{label}",
         ):
 
             st.session_state.current_page = (
@@ -1117,6 +1433,24 @@ with st.sidebar:
     )
 
     # --------------------------------------------------------
+    # Administration
+    # --------------------------------------------------------
+
+    if st.session_state.role in [
+        "Administrator",
+        "Admin",
+        "admin",
+    ]:
+
+        st.markdown(
+            "**ADMINISTRATION**"
+        )
+
+        nav_button(
+            "🔐 Administration"
+        )
+
+    # --------------------------------------------------------
     # User panel
     # --------------------------------------------------------
 
@@ -1127,16 +1461,19 @@ with st.sidebar:
     )
 
     st.write(
-        f"User: **{st.session_state.username}**"
+        f"User: "
+        f"**{st.session_state.username}**"
     )
 
     st.write(
-        f"Role: **{st.session_state.role}**"
+        f"Role: "
+        f"**{st.session_state.role}**"
     )
 
     if st.button(
         "🚪 Logout",
         use_container_width=True,
+        key="logout_button",
     ):
 
         logging.info(
@@ -1145,8 +1482,11 @@ with st.sidebar:
         )
 
         st.session_state.logged_in = False
+
         st.session_state.username = None
+
         st.session_state.role = None
+
         st.session_state.current_page = (
             "🏠 Overview"
         )
@@ -1197,6 +1537,7 @@ elif menu == "🌾 Procurement":
             "Purchases",
         ],
         horizontal=True,
+        key="procurement_navigation",
     )
 
     if procurement_menu == "Dashboard":
@@ -1241,6 +1582,7 @@ elif menu == "📦 Warehouse":
             "Inventory",
         ],
         horizontal=True,
+        key="warehouse_navigation",
     )
 
     if warehouse_menu == "Dashboard":
@@ -1304,6 +1646,11 @@ elif menu == "🚚 Sales & Distribution":
         "🚚 Sales & Distribution"
     )
 
+    st.caption(
+        "Customer → Quotation → Sales Order → "
+        "Delivery → Invoice → Payment"
+    )
+
     sales_menu = st.radio(
         "Sales Module",
         [
@@ -1316,6 +1663,7 @@ elif menu == "🚚 Sales & Distribution":
             "Payments",
         ],
         horizontal=True,
+        key="sales_navigation",
     )
 
     sales_pages = {
@@ -1349,6 +1697,15 @@ elif menu == "🚚 Sales & Distribution":
 
 elif menu == "💰 Finance":
 
+    st.header(
+        "💰 Finance"
+    )
+
+    st.caption(
+        "Accounts Receivable → Cash / Bank → "
+        "General Ledger"
+    )
+
     if finance_dashboard:
 
         finance_dashboard()
@@ -1378,6 +1735,34 @@ elif menu == "📊 Reports":
 
 
 # ============================================================
+# ADMINISTRATION
+# ============================================================
+
+elif menu == "🔐 Administration":
+
+    if st.session_state.role not in [
+        "Administrator",
+        "Admin",
+        "admin",
+    ]:
+
+        st.error(
+            "You do not have permission "
+            "to access Administration."
+        )
+
+    elif administration_dashboard:
+
+        administration_dashboard()
+
+    else:
+
+        st.warning(
+            "Administration module unavailable."
+        )
+
+
+# ============================================================
 # MODULE LOADING INFORMATION
 # ============================================================
 
@@ -1400,6 +1785,23 @@ if module_errors:
 
 
 # ============================================================
+# SYSTEM INFORMATION
+# ============================================================
+
+if system_errors:
+
+    with st.expander(
+        "⚠️ System Information"
+    ):
+
+        for error in system_errors:
+
+            st.write(
+                f"• {error}"
+            )
+
+
+# ============================================================
 # FOOTER
 # ============================================================
 
@@ -1407,6 +1809,6 @@ st.divider()
 
 st.caption(
     f"© {COMPANY_NAME} | "
-    f"Enterprise Resource Planning Platform | "
-    f"Version {VERSION}"
+    f"Esan ERP {VERSION} | "
+    f"Enterprise Resource Planning Platform"
 )
