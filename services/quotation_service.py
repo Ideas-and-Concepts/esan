@@ -50,9 +50,16 @@ def _order_number(order_id):
 
 def _recalculate_item_total(item):
     """Calculate and update an item's total."""
-    quantity = _to_float(getattr(item, "quantity", 0))
-    unit_price = _to_float(getattr(item, "unit_price", 0))
+    quantity = _to_float(
+        getattr(item, "quantity", 0)
+    )
+
+    unit_price = _to_float(
+        getattr(item, "unit_price", 0)
+    )
+
     item.total = quantity * unit_price
+
     return item.total
 
 
@@ -62,6 +69,7 @@ def _recalculate_item_total(item):
 
 def get_all_quotations(db):
     """Return all quotations, newest first."""
+
     return (
         db.query(Quotation)
         .order_by(Quotation.id.desc())
@@ -71,19 +79,30 @@ def get_all_quotations(db):
 
 def get_quotation(db, quotation_id):
     """Return one quotation by ID."""
+
     return (
         db.query(Quotation)
-        .filter(Quotation.id == quotation_id)
+        .filter(
+            Quotation.id == quotation_id
+        )
         .first()
     )
 
 
-def get_customer_quotations(db, customer_id):
+def get_customer_quotations(
+    db,
+    customer_id,
+):
     """Return quotations belonging to a customer."""
+
     return (
         db.query(Quotation)
-        .filter(Quotation.customer_id == customer_id)
-        .order_by(Quotation.id.desc())
+        .filter(
+            Quotation.customer_id == customer_id
+        )
+        .order_by(
+            Quotation.id.desc()
+        )
         .all()
     )
 
@@ -92,25 +111,85 @@ def get_customer_quotations(db, customer_id):
 # QUOTATION ITEMS
 # ==========================================================
 
-def get_quotation_items(db, quotation_id):
+def get_quotation_items(
+    db,
+    quotation_id,
+):
     """Return all items belonging to a quotation."""
+
     return (
         db.query(QuotationItem)
         .filter(
-            QuotationItem.quotation_id == quotation_id
+            QuotationItem.quotation_id
+            == quotation_id
         )
-        .order_by(QuotationItem.id.asc())
+        .order_by(
+            QuotationItem.id.asc()
+        )
         .all()
     )
 
 
-def get_quotation_item(db, item_id):
+def get_quotation_item(
+    db,
+    item_id,
+):
     """Return one quotation item."""
+
     return (
         db.query(QuotationItem)
-        .filter(QuotationItem.id == item_id)
+        .filter(
+            QuotationItem.id == item_id
+        )
         .first()
     )
+
+
+# ==========================================================
+# CALCULATE QUOTATION TOTAL
+# ==========================================================
+
+def calculate_quotation_total(
+    db,
+    quotation_id,
+    commit=True,
+):
+    """
+    Calculate the quotation total from its items.
+
+    Updates quotation.total_amount and returns
+    the calculated total.
+    """
+
+    quotation = get_quotation(
+        db,
+        quotation_id,
+    )
+
+    if not quotation:
+        return 0.0
+
+    items = get_quotation_items(
+        db,
+        quotation_id,
+    )
+
+    total = 0.0
+
+    for item in items:
+        total += _recalculate_item_total(
+            item
+        )
+
+    quotation.total_amount = total
+
+    if commit:
+        db.commit()
+        db.refresh(quotation)
+    else:
+        db.flush()
+
+    return total
 
 
 # ==========================================================
@@ -127,23 +206,30 @@ def create_quotation(
     """
     Create a new quotation.
 
-    quotation_number is generated after the database assigns
-    the quotation ID, using the canonical Q-00001 format.
+    quotation_number is generated after the database
+    assigns the quotation ID.
     """
 
     customer = (
         db.query(Customer)
-        .filter(Customer.id == customer_id)
+        .filter(
+            Customer.id == customer_id
+        )
         .first()
     )
 
     if not customer:
-        raise ValueError("Customer not found.")
+        raise ValueError(
+            "Customer not found."
+        )
 
     quotation = Quotation(
         quotation_number="TEMP",
         customer_id=customer_id,
-        quotation_date=quotation_date or date.today(),
+        quotation_date=(
+            quotation_date
+            or date.today()
+        ),
         valid_until=valid_until,
         status="Draft",
         total_amount=0.0,
@@ -151,13 +237,17 @@ def create_quotation(
     )
 
     db.add(quotation)
+
     db.flush()
 
-    quotation.quotation_number = _quotation_number(
-        quotation.id
+    quotation.quotation_number = (
+        _quotation_number(
+            quotation.id
+        )
     )
 
     db.commit()
+
     db.refresh(quotation)
 
     return quotation
@@ -177,12 +267,17 @@ def update_quotation(
 ):
     """Update quotation header information."""
 
-    quotation = get_quotation(db, quotation_id)
+    quotation = get_quotation(
+        db,
+        quotation_id,
+    )
 
     if not quotation:
         return None
 
-    if _status(quotation.status) in {
+    if _status(
+        quotation.status
+    ) in {
         "cancelled",
         "converted",
         "approved",
@@ -195,24 +290,36 @@ def update_quotation(
 
         customer = (
             db.query(Customer)
-            .filter(Customer.id == customer_id)
+            .filter(
+                Customer.id
+                == customer_id
+            )
             .first()
         )
 
         if not customer:
-            raise ValueError("Customer not found.")
+            raise ValueError(
+                "Customer not found."
+            )
 
-        quotation.customer_id = customer_id
+        quotation.customer_id = (
+            customer_id
+        )
 
     if quotation_date is not None:
-        quotation.quotation_date = quotation_date
+        quotation.quotation_date = (
+            quotation_date
+        )
 
     if valid_until is not None:
-        quotation.valid_until = valid_until
+        quotation.valid_until = (
+            valid_until
+        )
 
     quotation.notes = notes
 
     db.commit()
+
     db.refresh(quotation)
 
     return quotation
@@ -231,27 +338,43 @@ def add_quotation_item(
 ):
     """Add a product to a draft quotation."""
 
-    quotation = get_quotation(db, quotation_id)
+    quotation = get_quotation(
+        db,
+        quotation_id,
+    )
 
     if not quotation:
-        raise ValueError("Quotation not found.")
+        raise ValueError(
+            "Quotation not found."
+        )
 
-    if _status(quotation.status) != "draft":
+    if _status(
+        quotation.status
+    ) != "draft":
         raise ValueError(
             "Items can only be added to Draft quotations."
         )
 
     product = (
         db.query(Product)
-        .filter(Product.id == product_id)
+        .filter(
+            Product.id == product_id
+        )
         .first()
     )
 
     if not product:
-        raise ValueError("Product not found.")
+        raise ValueError(
+            "Product not found."
+        )
 
-    quantity = _to_float(quantity)
-    unit_price = _to_float(unit_price)
+    quantity = _to_float(
+        quantity
+    )
+
+    unit_price = _to_float(
+        unit_price
+    )
 
     if quantity <= 0:
         raise ValueError(
@@ -283,6 +406,7 @@ def add_quotation_item(
     )
 
     db.commit()
+
     db.refresh(item)
 
     return item
@@ -300,7 +424,10 @@ def update_quotation_item(
 ):
     """Update an existing quotation item."""
 
-    item = get_quotation_item(db, item_id)
+    item = get_quotation_item(
+        db,
+        item_id,
+    )
 
     if not item:
         return None
@@ -311,15 +438,24 @@ def update_quotation_item(
     )
 
     if not quotation:
-        raise ValueError("Quotation not found.")
+        raise ValueError(
+            "Quotation not found."
+        )
 
-    if _status(quotation.status) != "draft":
+    if _status(
+        quotation.status
+    ) != "draft":
         raise ValueError(
             "Items can only be edited on Draft quotations."
         )
 
-    quantity = _to_float(quantity)
-    unit_price = _to_float(unit_price)
+    quantity = _to_float(
+        quantity
+    )
+
+    unit_price = _to_float(
+        unit_price
+    )
 
     if quantity <= 0:
         raise ValueError(
@@ -332,8 +468,12 @@ def update_quotation_item(
         )
 
     item.quantity = quantity
+
     item.unit_price = unit_price
-    item.total = quantity * unit_price
+
+    item.total = (
+        quantity * unit_price
+    )
 
     db.flush()
 
@@ -344,6 +484,7 @@ def update_quotation_item(
     )
 
     db.commit()
+
     db.refresh(item)
 
     return item
@@ -353,10 +494,16 @@ def update_quotation_item(
 # DELETE QUOTATION ITEM
 # ==========================================================
 
-def delete_quotation_item(db, item_id):
+def delete_quotation_item(
+    db,
+    item_id,
+):
     """Delete an item from a draft quotation."""
 
-    item = get_quotation_item(db, item_id)
+    item = get_quotation_item(
+        db,
+        item_id,
+    )
 
     if not item:
         return False
@@ -367,9 +514,13 @@ def delete_quotation_item(db, item_id):
     )
 
     if not quotation:
-        raise ValueError("Quotation not found.")
+        raise ValueError(
+            "Quotation not found."
+        )
 
-    if _status(quotation.status) != "draft":
+    if _status(
+        quotation.status
+    ) != "draft":
         raise ValueError(
             "Items can only be deleted from Draft quotations."
         )
@@ -377,6 +528,7 @@ def delete_quotation_item(db, item_id):
     quotation_id = quotation.id
 
     db.delete(item)
+
     db.flush()
 
     calculate_quotation_total(
@@ -391,60 +543,28 @@ def delete_quotation_item(db, item_id):
 
 
 # ==========================================================
-# CALCULATE QUOTATION TOTAL
+# CANCEL QUOTATION
 # ==========================================================
 
-def calculate_quotation_total(
+def cancel_quotation(
     db,
     quotation_id,
-    commit=True,
 ):
-    """
-    Calculate the total of all quotation items.
+    """Cancel a quotation."""
 
-    The quotation.total_amount field is updated and the
-    calculated total is returned.
-    """
-
-    quotation = get_quotation(db, quotation_id)
-
-    if not quotation:
-        return 0.0
-
-    items = get_quotation_items(
+    quotation = get_quotation(
         db,
         quotation_id,
     )
 
-    total = 0.0
-
-    for item in items:
-        total += _recalculate_item_total(item)
-
-    quotation.total_amount = total
-
-    if commit:
-        db.commit()
-        db.refresh(quotation)
-    else:
-        db.flush()
-
-    return total
-
-
-# ==========================================================
-# CANCEL QUOTATION
-# ==========================================================
-
-def cancel_quotation(db, quotation_id):
-    """Cancel a quotation."""
-
-    quotation = get_quotation(db, quotation_id)
-
     if not quotation:
-        raise ValueError("Quotation not found.")
+        raise ValueError(
+            "Quotation not found."
+        )
 
-    current_status = _status(quotation.status)
+    current_status = _status(
+        quotation.status
+    )
 
     if current_status == "converted":
         raise ValueError(
@@ -457,6 +577,7 @@ def cancel_quotation(db, quotation_id):
     quotation.status = "Cancelled"
 
     db.commit()
+
     db.refresh(quotation)
 
     return quotation
@@ -473,8 +594,10 @@ def convert_quotation_to_sales_order(
     """
     Convert a quotation into a Sales Order.
 
-    The quotation must contain at least one item and must
-    not already be cancelled or converted.
+    A quotation can only be converted once.
+
+    Every QuotationItem produces exactly one
+    SalesOrderItem.
     """
 
     quotation = get_quotation(
@@ -483,9 +606,13 @@ def convert_quotation_to_sales_order(
     )
 
     if not quotation:
-        raise ValueError("Quotation not found.")
+        raise ValueError(
+            "Quotation not found."
+        )
 
-    current_status = _status(quotation.status)
+    current_status = _status(
+        quotation.status
+    )
 
     if current_status == "cancelled":
         raise ValueError(
@@ -510,24 +637,31 @@ def convert_quotation_to_sales_order(
     customer = (
         db.query(Customer)
         .filter(
-            Customer.id == quotation.customer_id
+            Customer.id
+            == quotation.customer_id
         )
         .first()
     )
 
     if not customer:
         raise ValueError(
-            "Customer associated with quotation was not found."
+            "Customer associated with quotation "
+            "was not found."
         )
 
-    # Ensure the quotation total is current.
-    quotation_total = calculate_quotation_total(
-        db,
-        quotation_id,
-        commit=False,
+    # Ensure quotation total is current.
+    quotation_total = (
+        calculate_quotation_total(
+            db,
+            quotation_id,
+            commit=False,
+        )
     )
 
-    # Create the Sales Order using canonical fields.
+    # ------------------------------------------------------
+    # CREATE SALES ORDER
+    # ------------------------------------------------------
+
     sales_order = SalesOrder(
         order_number="TEMP",
         customer_id=quotation.customer_id,
@@ -539,18 +673,25 @@ def convert_quotation_to_sales_order(
     )
 
     db.add(sales_order)
+
     db.flush()
 
-    sales_order.order_number = _order_number(
-        sales_order.id
+    sales_order.order_number = (
+        _order_number(
+            sales_order.id
+        )
     )
 
-    # Copy quotation items into Sales Order items.
+    # ------------------------------------------------------
+    # COPY QUOTATION ITEMS
+    # ------------------------------------------------------
+
     for quotation_item in items:
 
         product = None
 
         if quotation_item.product_id is not None:
+
             product = (
                 db.query(Product)
                 .filter(
@@ -582,7 +723,7 @@ def convert_quotation_to_sales_order(
             quotation_item.unit_price
         )
 
-        SalesOrderItem(
+        sales_order_item = SalesOrderItem(
             sales_order=sales_order,
             product_id=quotation_item.product_id,
             product_name=product_name,
@@ -593,23 +734,20 @@ def convert_quotation_to_sales_order(
             delivered_quantity=0.0,
         )
 
-        db.add(
-            SalesOrderItem(
-                sales_order_id=sales_order.id,
-                product_id=quotation_item.product_id,
-                product_name=product_name,
-                quantity=quantity,
-                unit_price=unit_price,
-                total=quantity * unit_price,
-                reserved_quantity=0.0,
-                delivered_quantity=0.0,
-            )
-        )
+        db.add(sales_order_item)
+
+    # ------------------------------------------------------
+    # MARK QUOTATION CONVERTED
+    # ------------------------------------------------------
 
     quotation.status = "Converted"
 
+    db.flush()
+
     db.commit()
+
     db.refresh(sales_order)
+
     db.refresh(quotation)
 
     return sales_order
