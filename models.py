@@ -1018,17 +1018,15 @@ class SalesOrder(Base):
 
     invoices = relationship(
         "Invoice",
-        back_populates="sales_order",
-    )
-
+        
 
 # ============================================================
-# SALES ORDER ITEM
+# SALES ORDER
 # ============================================================
 
-class SalesOrderItem(Base):
+class SalesOrder(Base):
 
-    __tablename__ = "sales_order_items"
+    __tablename__ = "sales_orders"
 
     id = Column(
         Integer,
@@ -1036,62 +1034,78 @@ class SalesOrderItem(Base):
         index=True,
     )
 
-    sales_order_id = Column(
+    order_number = Column(
+        String(50),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+
+    customer_id = Column(
         Integer,
-        ForeignKey("sales_orders.id"),
+        ForeignKey("customers.id"),
         nullable=False,
     )
 
-    product_id = Column(
+    quotation_id = Column(
         Integer,
-        ForeignKey("products.id"),
+        ForeignKey("quotations.id"),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
+
+    order_date = Column(
+        Date,
+        default=date.today,
+    )
+
+    status = Column(
+        String(100),
+        default="Draft",
+    )
+
+    total_amount = Column(
+        Float,
+        default=0.0,
+    )
+
+    notes = Column(
+        Text,
         nullable=True,
     )
 
-    product_name = Column(
-        String(200),
-        nullable=False,
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
     )
 
-    quantity = Column(
-        Float,
-        default=0.0,
+    customer = relationship(
+        "Customer",
+        back_populates="sales_orders",
     )
 
-    unit_price = Column(
-        Float,
-        default=0.0,
+    quotation = relationship(
+        "Quotation",
+        back_populates="sales_orders",
     )
 
-    total = Column(
-        Float,
-        default=0.0,
+    items = relationship(
+        "SalesOrderItem",
+        back_populates="sales_order",
+        cascade="all, delete-orphan",
     )
 
-    reserved_quantity = Column(
-        Float,
-        default=0.0,
+    deliveries = relationship(
+        "Delivery",
+        back_populates="sales_order",
+        cascade="all, delete-orphan",
     )
 
-    delivered_quantity = Column(
-        Float,
-        default=0.0,
+    invoices = relationship(
+        "Invoice",
+        back_populates="sales_order",
     )
-
-    sales_order = relationship(
-        "SalesOrder",
-        back_populates="items",
-    )
-
-    product = relationship(
-        "Product",
-    )
-
-    delivery_items = relationship(
-        "DeliveryItem",
-        back_populates="sales_order_item",
-    )
-
 
 # ============================================================
 # DELIVERY
