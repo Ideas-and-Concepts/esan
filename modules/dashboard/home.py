@@ -1,120 +1,445 @@
 """
 Esan ERP
-Main Dashboard / Overview
+Overview Dashboard
 
 Nile Harvest Foods Ltd.
 """
 
 import streamlit as st
 
-from services.dashboard_service import get_kpis
+from modules.dashboard.services import get_dashboard_summary
 
 
 def dashboard_home():
     """
-    Render the main Esan ERP Overview dashboard.
+    Render the Esan ERP Overview Dashboard.
+
+    Dashboard data is provided by:
+        modules.dashboard.services.get_dashboard_summary()
+
+    The dashboard is intentionally defensive so that a missing
+    database table or unavailable service does not crash Streamlit.
     """
 
-    st.title("🏠 Overview")
+    st.title("🏠 Esan ERP Overview")
+
     st.caption(
-        "Nile Harvest Foods Ltd. | Enterprise Milling & Packaging Management System"
+        "Nile Harvest Foods Ltd. | Enterprise Resource Planning Dashboard"
     )
 
+    # ========================================================
+    # LOAD DASHBOARD DATA
+    # ========================================================
+
     try:
-        kpis = get_kpis()
+        summary = get_dashboard_summary()
 
-    except Exception as e:
-        st.error("Unable to load dashboard information.")
-        st.exception(e)
-        return
+    except Exception as exc:
+        st.error("Unable to load the Overview Dashboard.")
+        st.caption(
+            "The dashboard service encountered an error. "
+            "Check esan_erp.log for details."
+        )
 
-    # ==================================================
-    # SALES & CUSTOMER KPIs
-    # ==================================================
+        # Keep Streamlit running instead of crashing.
+        summary = {}
+
+    if not isinstance(summary, dict):
+        summary = {}
+
+    # ========================================================
+    # SAFE SECTION HELPER
+    # ========================================================
+
+    def section(name):
+        value = summary.get(name, {})
+
+        if isinstance(value, dict):
+            return value
+
+        return {}
+
+    # ========================================================
+    # DASHBOARD SECTIONS
+    # ========================================================
+
+    sales = section("sales")
+    procurement = section("procurement")
+    inventory = section("inventory")
+    production = section("production")
+    receivables = section("receivables")
+
+    alerts = summary.get("alerts", [])
+    recent_activity = summary.get(
+        "recent_activity",
+        [],
+    )
+
+    if not isinstance(alerts, list):
+        alerts = []
+
+    if not isinstance(recent_activity, list):
+        recent_activity = []
+
+    # ========================================================
+    # KPI CARDS
+    # ========================================================
 
     st.subheader("📊 Business Overview")
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    # --------------------------------------------------------
+    # SALES
+    # --------------------------------------------------------
 
     with col1:
+
         st.metric(
-            "Customers",
-            f"{kpis['customers']:,}",
+            "Sales",
+            sales.get(
+                "total",
+                sales.get(
+                    "total_sales",
+                    0,
+                ),
+            ),
         )
+
+    # --------------------------------------------------------
+    # PROCUREMENT
+    # --------------------------------------------------------
 
     with col2:
+
         st.metric(
-            "Sales Orders",
-            f"{kpis['orders']:,}",
+            "Procurement",
+            procurement.get(
+                "total",
+                procurement.get(
+                    "total_procurement",
+                    0,
+                ),
+            ),
         )
 
+    # --------------------------------------------------------
+    # INVENTORY
+    # --------------------------------------------------------
+
     with col3:
+
         st.metric(
-            "Invoiced",
-            f"UGX {kpis['invoiced']:,.0f}",
+            "Inventory",
+            inventory.get(
+                "total",
+                inventory.get(
+                    "total_inventory",
+                    0,
+                ),
+            ),
         )
+
+    # --------------------------------------------------------
+    # PRODUCTION
+    # --------------------------------------------------------
 
     with col4:
+
         st.metric(
-            "Collected",
-            f"UGX {kpis['collected']:,.0f}",
+            "Production",
+            production.get(
+                "total",
+                production.get(
+                    "total_production",
+                    0,
+                ),
+            ),
         )
+
+    # --------------------------------------------------------
+    # RECEIVABLES
+    # --------------------------------------------------------
+
+    with col5:
+
+        st.metric(
+            "Receivables",
+            receivables.get(
+                "total",
+                receivables.get(
+                    "total_receivables",
+                    0,
+                ),
+            ),
+        )
+
+    # ========================================================
+    # SALES / PROCUREMENT
+    # ========================================================
 
     st.divider()
 
-    # ==================================================
-    # OPERATIONS KPIs
-    # ==================================================
+    col1, col2 = st.columns(2)
 
-    st.subheader("🏭 Operations")
-
-    col1, col2, col3, col4 = st.columns(4)
+    # --------------------------------------------------------
+    # SALES
+    # --------------------------------------------------------
 
     with col1:
-        st.metric(
-            "Products",
-            f"{kpis['products']:,}",
+
+        st.subheader("🚚 Sales")
+
+        st.write(
+            f"Orders: **{sales.get('orders', 0)}**"
         )
+
+        st.write(
+            f"Customers: **{sales.get('customers', 0)}**"
+        )
+
+        st.write(
+            f"Invoices: **{sales.get('invoices', 0)}**"
+        )
+
+        st.write(
+            f"Payments: **{sales.get('payments', 0)}**"
+        )
+
+    # --------------------------------------------------------
+    # PROCUREMENT
+    # --------------------------------------------------------
 
     with col2:
-        st.metric(
-            "Stock",
-            f"{kpis['stock_kg']:,.1f} Kg",
+
+        st.subheader("🌾 Procurement")
+
+        st.write(
+            f"Suppliers: **{procurement.get('suppliers', 0)}**"
         )
 
-    with col3:
-        st.metric(
-            "Milling Batches",
-            f"{kpis['milling_batches']:,}",
+        st.write(
+            f"Purchase Orders: "
+            f"**{procurement.get('purchase_orders', 0)}**"
         )
 
-    with col4:
-        st.metric(
-            "Packaging Batches",
-            f"{kpis['packaging_batches']:,}",
+        st.write(
+            f"Purchases: "
+            f"**{procurement.get('purchases', 0)}**"
         )
+
+    # ========================================================
+    # INVENTORY / PRODUCTION
+    # ========================================================
 
     st.divider()
 
-    # ==================================================
-    # FACTORY STATUS
-    # ==================================================
+    col1, col2 = st.columns(2)
 
-    st.subheader("🏭 Factory Status")
-
-    col1, col2, col3 = st.columns(3)
+    # --------------------------------------------------------
+    # INVENTORY
+    # --------------------------------------------------------
 
     with col1:
-        st.success("🟢 Milling Line 1\n\nRunning")
+
+        st.subheader("📦 Inventory")
+
+        st.write(
+            f"Products: **{inventory.get('products', 0)}**"
+        )
+
+        st.write(
+            f"Stock Quantity: "
+            f"**{inventory.get('quantity', 0)}**"
+        )
+
+        st.write(
+            f"Low Stock Items: "
+            f"**{inventory.get('low_stock', 0)}**"
+        )
+
+    # --------------------------------------------------------
+    # PRODUCTION
+    # --------------------------------------------------------
 
     with col2:
-        st.success("🟢 Warehouse\n\nOperational")
 
-    with col3:
-        st.info("🔵 Packaging Line\n\nScheduled Maintenance")
+        st.subheader("🏭 Production")
+
+        st.write(
+            f"Milling Batches: "
+            f"**{production.get('milling_batches', 0)}**"
+        )
+
+        st.write(
+            f"Packaging Batches: "
+            f"**{production.get('packaging_batches', 0)}**"
+        )
+
+        st.write(
+            f"Production Quantity: "
+            f"**{production.get('quantity', 0)}**"
+        )
+
+    # ========================================================
+    # RECEIVABLES
+    # ========================================================
 
     st.divider()
 
-    st.caption(
-        "Esan ERP | Nile Harvest Foods Ltd."
+    st.subheader("💰 Receivables")
+
+    receivable_col1, receivable_col2, receivable_col3 = (
+        st.columns(3)
     )
+
+    with receivable_col1:
+
+        st.metric(
+            "Outstanding",
+            receivables.get(
+                "outstanding",
+                receivables.get(
+                    "total",
+                    0,
+                ),
+            ),
+        )
+
+    with receivable_col2:
+
+        st.metric(
+            "Invoices",
+            receivables.get(
+                "invoices",
+                0,
+            ),
+        )
+
+    with receivable_col3:
+
+        st.metric(
+            "Overdue",
+            receivables.get(
+                "overdue",
+                0,
+            ),
+        )
+
+    # ========================================================
+    # ALERTS
+    # ========================================================
+
+    st.divider()
+
+    st.subheader("⚠️ Alerts")
+
+    if alerts:
+
+        for alert in alerts:
+
+            if isinstance(alert, dict):
+
+                message = alert.get(
+                    "message",
+                    alert.get(
+                        "title",
+                        "Dashboard alert",
+                    ),
+                )
+
+                level = alert.get(
+                    "level",
+                    "info",
+                )
+
+                if level == "error":
+
+                    st.error(message)
+
+                elif level == "warning":
+
+                    st.warning(message)
+
+                elif level == "success":
+
+                    st.success(message)
+
+                else:
+
+                    st.info(message)
+
+            else:
+
+                st.info(str(alert))
+
+    else:
+
+        st.success(
+            "No critical alerts at the moment."
+        )
+
+    # ========================================================
+    # RECENT ACTIVITY
+    # ========================================================
+
+    st.divider()
+
+    st.subheader("🕒 Recent Activity")
+
+    if recent_activity:
+
+        for activity in recent_activity:
+
+            if isinstance(activity, dict):
+
+                activity_type = activity.get(
+                    "type",
+                    "Activity",
+                )
+
+                description = activity.get(
+                    "description",
+                    activity.get(
+                        "message",
+                        "",
+                    ),
+                )
+
+                timestamp = activity.get(
+                    "timestamp",
+                    "",
+                )
+
+                st.markdown(
+                    f"**{activity_type}**  \n"
+                    f"{description}"
+                )
+
+                if timestamp:
+
+                    st.caption(
+                        str(timestamp)
+                    )
+
+                st.divider()
+
+            else:
+
+                st.write(
+                    str(activity)
+                )
+
+    else:
+
+        st.info(
+            "No recent activity available."
+        )
+
+
+# ============================================================
+# DIRECT EXECUTION SUPPORT
+# ============================================================
+
+if __name__ == "__main__":
+    dashboard_home()
