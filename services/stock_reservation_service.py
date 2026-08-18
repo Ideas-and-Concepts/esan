@@ -2,19 +2,29 @@
 Esan ERP
 Stock Reservation Service
 
-Reserves inventory for Sales Orders atomically.
+Production-grade stock reservation for Sales Orders.
+
+Rules:
+- Product.quantity = physical on-hand stock.
+- Existing SalesOrderItem.reserved_quantity represents
+  stock already committed to sales orders.
+- Available stock =
+      Product.quantity
+      - reservations belonging to OTHER sales-order lines.
+- Product rows are locked with SELECT FOR UPDATE.
+- All requested lines are validated before any reservation
+  is committed.
+- Any insufficient-stock failure rolls back the entire
+  reservation transaction.
 
 Nile Harvest Foods Ltd.
 Enterprise Milling & Packaging Management System
 """
 
+from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 
-from models import (
-    Product,
-    SalesOrder,
-    SalesOrderItem,
-)
+from models import Product, SalesOrder, SalesOrderItem
 
 
 # ============================================================
@@ -29,67 +39,123 @@ def _to_float(value, default=0.0):
         return default
 
 
-def _status(value):
-    """Normalize a status value."""
+def _normalize_status(value):
+    """Normalize a sales-order status."""
     return str(value or "").strip().lower()
-
-
-# ============================================================
-# GET SALES ORDER
-# ============================================================
-
-def get_sales_order(db, sales_order_id):
-    """Return a Sales Order by ID."""
-
-    return (
-        db.query(SalesOrder)
-        .filter(
-            SalesOrder.id == sales_order_id
-        )
-        .first()
-    )
-
-
-# ============================================================
-# GET SALES ORDER ITEMS
-# ============================================================
-
-def get_sales_order_items(db, sales_order_id):
-    """Return Sales Order items in stable order."""
-
-    return (
-        db.query(SalesOrderItem)
-        .filter(
-            SalesOrderItem.sales_order_id
-            == sales_order_id
-        )
-        .order_by(
-            SalesOrderItem.id.asc()
-        )
-        .all()
-    )
 
 
 # ============================================================
 # AVAILABLE STOCK
 # ============================================================
 
-def get_available_stock(product):
+def get_reserved_quantity(
+    db,
+    product_id,
+    exclude_sales_order_id=None,
+):
     """
-    Return stock available for new reservations.
+    Return stock already reserved for a product.
 
-    Product.quantity represents physical/on-hand stock.
+    Reservations belonging to the supplied sales order are
+    excluded when exclude_sales_order_id is provided.
 
-    Product does not currently contain a global
-    reserved_quantity column, so existing reservations are
-    calculated from SalesOrderItem.reserved_quantity.
+    This is important when re-reserving an existing order.
     """
 
-    quantity = _to_float(
-        getattr(product, "quantity", 0.0)
+    query = (
+        db.query(
+            func.coalesce(
+                func.sum(
+                    SalesOrderItem.reserved_quantity
+                ),
+                0.0,
+            )
+        )
+        .join(
+            SalesOrder,
+            SalesOrder.id
+            == SalesOrderItem.sales_order_id,
+        )
+        .filter(
+            SalesOrderItem.product_id == product_id
+        )
     )
 
-    return quantity
+    if exclude_sales_order_id is not None:
+        query = query.filter(
+            SalesOrderItem.sales_order_id
+            != exclude_sales_order_id
+        )
+
+    return _to_float(
+        query.scalar(),
+        0.0,
+    )
+
+
+def get_available_stock(
+    db,
+    product_id,
+    exclude_sales_order_id=None,
+):
+    """
+    Return currently available stock.
+
+    Available stock is:
+
+        Product.quantity - committed reservations
+
+    Reservations belonging to the current order may be
+    excluded to allow safe re-reservation.
+    """
+
+    product = (
+        db.query(Product)
+        .filter(Product.id == product_id)
+        .first()
+    )
+
+    if not product:
+        raise ValueError(
+            f"Product {product_id} not found."
+        )
+
+    on_hand = _to_float(
+        product.quantity,
+        0.0,
+    )
+
+    reserved = get_reserved_quantity(
+        db,
+        product_id,
+        exclude_sales_order_id=exclude_sales_order_id,
+    )
+
+    return max(
+        0.0,
+        on_hand - reserved,
+    )
+
+
+# ============================================================
+# LOCK PRODUCT
+# ============================================================
+
+def _lock_product(db, product_id):
+    """
+    Lock a product row for the duration of the transaction.
+
+    On databases supporting row-level locking, SELECT FOR UPDATE
+    prevents concurrent reservation transactions from changing
+    the same product stock between validation and commit.
+    """
+
+    return (
+        db.query(Product)
+        .filter(Product.id == product_id)
+        .with_for_update()
+        .first()
+    )
 
 
 # ============================================================
@@ -101,31 +167,31 @@ def reserve_sales_order_stock(
     sales_order_id,
 ):
     """
-    Reserve stock for every item on a Sales Order.
+    Reserve stock for every line on a Sales Order.
 
     The operation is atomic:
 
-        - Product rows are locked with FOR UPDATE.
-        - Every line is validated first.
-        - No line is permanently changed until every
-          line has sufficient stock.
-        - Any failure rolls back the entire transaction.
+    1. Load the Sales Order.
+    2. Load its lines.
+    3. Lock every affected Product row.
+    4. Calculate reservations from OTHER orders.
+    5. Validate every requested quantity.
+    6. Only after every line passes, update reservations.
+    7. Commit once.
+
+    If any line does not have enough available stock,
+    the entire transaction is rolled back.
 
     Returns:
         SalesOrder
-
-    Raises:
-        ValueError:
-            If the order does not exist, has no items,
-            has invalid quantities, or insufficient stock.
-
-        SQLAlchemyError:
-            Database errors are rolled back and re-raised.
     """
 
-    sales_order = get_sales_order(
-        db,
-        sales_order_id,
+    sales_order = (
+        db.query(SalesOrder)
+        .filter(
+            SalesOrder.id == sales_order_id
+        )
+        .first()
     )
 
     if not sales_order:
@@ -133,27 +199,30 @@ def reserve_sales_order_stock(
             "Sales Order not found."
         )
 
-    status = _status(
-        getattr(
-            sales_order,
-            "status",
-            None,
-        )
+    status = _normalize_status(
+        sales_order.status
     )
 
     if status in {
         "cancelled",
+        "cancelled",
         "completed",
-        "delivered",
     }:
         raise ValueError(
-            "Stock cannot be reserved for a "
-            f"Sales Order with status '{sales_order.status}'."
+            f"Sales Order cannot be reserved while "
+            f"its status is '{sales_order.status}'."
         )
 
-    items = get_sales_order_items(
-        db,
-        sales_order_id,
+    items = (
+        db.query(SalesOrderItem)
+        .filter(
+            SalesOrderItem.sales_order_id
+            == sales_order_id
+        )
+        .order_by(
+            SalesOrderItem.id.asc()
+        )
+        .all()
     )
 
     if not items:
@@ -165,26 +234,69 @@ def reserve_sales_order_stock(
     try:
 
         # ----------------------------------------------------
-        # Phase 1
-        # Lock and validate every product.
+        # Determine affected products.
+        # ----------------------------------------------------
+
+        product_ids = sorted(
+            {
+                item.product_id
+                for item in items
+                if item.product_id is not None
+            }
+        )
+
+        if not product_ids:
+            raise ValueError(
+                "Sales Order contains no products "
+                "eligible for stock reservation."
+            )
+
+        # ----------------------------------------------------
+        # Lock ALL affected product rows before validation.
         #
-        # Nothing is modified yet.
+        # Sorting IDs gives concurrent transactions a
+        # consistent lock order and reduces deadlock risk.
         # ----------------------------------------------------
 
         locked_products = {}
 
+        for product_id in product_ids:
+
+            product = _lock_product(
+                db,
+                product_id,
+            )
+
+            if not product:
+                raise ValueError(
+                    f"Product {product_id} not found."
+                )
+
+            locked_products[
+                product_id
+            ] = product
+
+        # ----------------------------------------------------
+        # Validate every line before modifying anything.
+        #
+        # Multiple lines can reference the same product, so
+        # validation must account for the requested quantity
+        # across the entire order.
+        # ----------------------------------------------------
+
+        requested_by_product = {}
+
         for item in items:
 
-            product_id = item.product_id
-
-            if product_id is None:
+            if item.product_id is None:
                 raise ValueError(
                     f"Sales Order Item {item.id} "
                     "has no product."
                 )
 
             quantity = _to_float(
-                item.quantity
+                item.quantity,
+                0.0,
             )
 
             if quantity <= 0:
@@ -193,128 +305,116 @@ def reserve_sales_order_stock(
                     "has an invalid quantity."
                 )
 
-            # Lock the Product row.
-            product = (
-                db.query(Product)
-                .filter(
-                    Product.id == product_id
+            requested_by_product[
+                item.product_id
+            ] = (
+                requested_by_product.get(
+                    item.product_id,
+                    0.0,
                 )
-                .with_for_update()
-                .first()
+                + quantity
             )
 
-            if not product:
-                raise ValueError(
-                    f"Product {product_id} "
-                    "was not found."
+        # ----------------------------------------------------
+        # Check available stock for every product.
+        # ----------------------------------------------------
+
+        availability = {}
+
+        for product_id, requested_quantity in (
+            requested_by_product.items()
+        ):
+
+            product = locked_products[
+                product_id
+            ]
+
+            on_hand = _to_float(
+                product.quantity,
+                0.0,
+            )
+
+            reserved_by_other_orders = (
+                get_reserved_quantity(
+                    db,
+                    product_id,
+                    exclude_sales_order_id=sales_order_id,
+                )
+            )
+
+            available = (
+                on_hand
+                - reserved_by_other_orders
+            )
+
+            availability[
+                product_id
+            ] = available
+
+            if requested_quantity > available:
+
+                product_name = (
+                    product.name
+                    or f"Product {product_id}"
                 )
 
-            locked_products[
-                product_id
-            ] = product
+                raise ValueError(
+                    f"Insufficient stock for "
+                    f"{product_name}. "
+                    f"Requested: {requested_quantity:g}, "
+                    f"Available: {max(available, 0.0):g}."
+                )
 
         # ----------------------------------------------------
-        # Phase 2
-        # Validate all requested quantities.
+        # Every line passed validation.
+        #
+        # Now update reservations.
         # ----------------------------------------------------
-
-        reservations = []
 
         for item in items:
 
-            product = locked_products[
-                item.product_id
-            ]
-
-            requested = _to_float(
-                item.quantity
+            quantity = _to_float(
+                item.quantity,
+                0.0,
             )
 
-            already_reserved = _to_float(
-                getattr(
-                    item,
-                    "reserved_quantity",
-                    0.0,
-                )
-            )
+            item.reserved_quantity = quantity
 
-            remaining_to_reserve = (
-                requested
-                - already_reserved
-            )
-
-            # Already completely reserved.
-            if remaining_to_reserve <= 0:
-                reservations.append(
-                    {
-                        "item": item,
-                        "product": product,
-                        "quantity": 0.0,
-                    }
-                )
-                continue
-
-            available = get_available_stock(
-                product
-            )
-
-            if remaining_to_reserve > available:
-                raise ValueError(
-                    f"Insufficient stock for "
-                    f"'{product.name}'. "
-                    f"Required: {remaining_to_reserve:g}, "
-                    f"Available: {available:g}."
-                )
-
-            reservations.append(
-                {
-                    "item": item,
-                    "product": product,
-                    "quantity": remaining_to_reserve,
-                }
-            )
+            # A newly reserved order has not yet been delivered.
+            #
+            # Do not overwrite delivered_quantity if the service
+            # is being used for re-reservation.
+            if item.delivered_quantity is None:
+                item.delivered_quantity = 0.0
 
         # ----------------------------------------------------
-        # Phase 3
-        # Apply reservations only after every line passed.
+        # Flush all changes before committing.
         # ----------------------------------------------------
-
-        for reservation in reservations:
-
-            item = reservation["item"]
-            quantity = reservation["quantity"]
-
-            if quantity <= 0:
-                continue
-
-            current_reserved = _to_float(
-                getattr(
-                    item,
-                    "reserved_quantity",
-                    0.0,
-                )
-            )
-
-            item.reserved_quantity = (
-                current_reserved
-                + quantity
-            )
 
         db.flush()
 
         # ----------------------------------------------------
-        # Phase 4
-        # Commit the complete reservation atomically.
+        # Optional order-state transition.
+        #
+        # Keep Draft/Confirmed workflows intact. If the order
+        # is Draft, reservation changes it to Reserved.
         # ----------------------------------------------------
+
+        if status == "draft":
+            sales_order.status = "Reserved"
 
         db.commit()
 
-        db.refresh(sales_order)
+        db.refresh(
+            sales_order
+        )
 
         return sales_order
 
     except Exception:
-        # Any failure means no partial reservation survives.
+        # Critical:
+        # If ANY line fails, none of the reservation updates
+        # should survive.
         db.rollback()
         raise
 
@@ -328,17 +428,19 @@ def release_sales_order_stock(
     sales_order_id,
 ):
     """
-    Release reservations belonging to a Sales Order.
+    Release all reservations belonging to a Sales Order.
 
-    This does not change physical stock.
-
-    It simply reduces each SalesOrderItem's
-    reserved_quantity back toward zero.
+    This does NOT reduce Product.quantity because reservations
+    are commitments against existing physical stock, not stock
+    movements.
     """
 
-    sales_order = get_sales_order(
-        db,
-        sales_order_id,
+    sales_order = (
+        db.query(SalesOrder)
+        .filter(
+            SalesOrder.id == sales_order_id
+        )
+        .first()
     )
 
     if not sales_order:
@@ -346,29 +448,54 @@ def release_sales_order_stock(
             "Sales Order not found."
         )
 
-    items = get_sales_order_items(
-        db,
-        sales_order_id,
+    items = (
+        db.query(SalesOrderItem)
+        .filter(
+            SalesOrderItem.sales_order_id
+            == sales_order_id
+        )
+        .with_for_update()
+        .all()
     )
 
     try:
 
-        for item in items:
+        product_ids = sorted(
+            {
+                item.product_id
+                for item in items
+                if item.product_id is not None
+            }
+        )
 
-            reserved = _to_float(
-                getattr(
-                    item,
-                    "reserved_quantity",
-                    0.0,
-                )
+        # Lock product rows consistently.
+        for product_id in product_ids:
+
+            product = _lock_product(
+                db,
+                product_id,
             )
 
-            if reserved > 0:
-                item.reserved_quantity = 0.0
+            if not product:
+                raise ValueError(
+                    f"Product {product_id} not found."
+                )
+
+        for item in items:
+            item.reserved_quantity = 0.0
+
+        db.flush()
+
+        if _normalize_status(
+            sales_order.status
+        ) == "reserved":
+            sales_order.status = "Draft"
 
         db.commit()
 
-        db.refresh(sales_order)
+        db.refresh(
+            sales_order
+        )
 
         return sales_order
 
@@ -387,11 +514,33 @@ def get_sales_order_reservation_summary(
 ):
     """
     Return reservation information for a Sales Order.
+
+    Useful for the Sales Order UI and warehouse module.
     """
 
-    items = get_sales_order_items(
-        db,
-        sales_order_id,
+    sales_order = (
+        db.query(SalesOrder)
+        .filter(
+            SalesOrder.id == sales_order_id
+        )
+        .first()
+    )
+
+    if not sales_order:
+        raise ValueError(
+            "Sales Order not found."
+        )
+
+    items = (
+        db.query(SalesOrderItem)
+        .filter(
+            SalesOrderItem.sales_order_id
+            == sales_order_id
+        )
+        .order_by(
+            SalesOrderItem.id.asc()
+        )
+        .all()
     )
 
     result = []
@@ -406,40 +555,43 @@ def get_sales_order_reservation_summary(
             .first()
         )
 
-        quantity = _to_float(
-            item.quantity
+        reserved = _to_float(
+            item.reserved_quantity,
+            0.0,
         )
 
-        reserved = _to_float(
-            getattr(
-                item,
-                "reserved_quantity",
-                0.0,
-            )
+        delivered = _to_float(
+            item.delivered_quantity,
+            0.0,
+        )
+
+        ordered = _to_float(
+            item.quantity,
+            0.0,
         )
 
         result.append(
             {
-                "item_id": item.id,
+                "sales_order_item_id": item.id,
                 "product_id": item.product_id,
                 "product_name": (
                     item.product_name
-                    if getattr(
-                        item,
-                        "product_name",
-                        None,
-                    )
+                    if item.product_name
                     else (
                         product.name
                         if product
                         else "Unknown Product"
                     )
                 ),
-                "ordered_quantity": quantity,
+                "ordered_quantity": ordered,
                 "reserved_quantity": reserved,
+                "delivered_quantity": delivered,
                 "remaining_quantity": max(
-                    quantity - reserved,
                     0.0,
+                    ordered - delivered,
+                ),
+                "reservation_complete": (
+                    reserved >= ordered
                 ),
             }
         )
