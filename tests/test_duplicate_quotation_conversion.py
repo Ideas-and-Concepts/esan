@@ -3,6 +3,7 @@
 import pytest
 
 from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import sessionmaker
 
 from database import Base
@@ -31,6 +32,10 @@ def db():
     """
     Create a completely isolated in-memory SQLite database
     for each test.
+
+    StaticPool ensures every session operation uses the same
+    SQLite connection, so the in-memory database remains
+    available throughout the entire test.
     """
 
     engine = create_engine(
@@ -38,6 +43,7 @@ def db():
         connect_args={
             "check_same_thread": False,
         },
+        poolclass=StaticPool,
     )
 
     # Create every table defined by the Esan SQLAlchemy models.
