@@ -23,14 +23,11 @@ from models import (
 )
 
 
-# ==========================================================
+# ============================================================
 # HELPERS
-# ==========================================================
+# ============================================================
 
 def _to_float(value, default=0.0):
-    """
-    Safely convert a value to float.
-    """
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -38,59 +35,32 @@ def _to_float(value, default=0.0):
 
 
 def _status(value):
-    """
-    Return a normalized status.
-    """
-    return str(value or "Draft").strip().lower()
+    return str(
+        value or "Draft"
+    ).strip().lower()
 
 
 def _quotation_number(quotation_id):
-    """
-    Generate canonical quotation number.
-
-    Example:
-        1 -> Q-00001
-    """
     return f"Q-{int(quotation_id):05d}"
 
 
 def _order_number(order_id):
-    """
-    Generate canonical sales order number.
-
-    Example:
-        1 -> SO-00001
-    """
     return f"SO-{int(order_id):05d}"
 
 
-def _recalculate_item_total(item):
-    """
-    Calculate and update a quotation item's total.
-    """
-    quantity = _to_float(
-        getattr(item, "quantity", 0)
+def _item_total(quantity, unit_price):
+    return (
+        _to_float(quantity)
+        * _to_float(unit_price)
     )
 
-    unit_price = _to_float(
-        getattr(item, "unit_price", 0)
-    )
 
-    total = quantity * unit_price
-
-    item.total = total
-
-    return total
-
-
-# ==========================================================
-# QUOTATIONS
-# ==========================================================
+# ============================================================
+# QUOTATION LOOKUPS
+# ============================================================
 
 def get_all_quotations(db):
-    """
-    Return all quotations, newest first.
-    """
+
     return (
         db.query(Quotation)
         .order_by(
@@ -100,10 +70,11 @@ def get_all_quotations(db):
     )
 
 
-def get_quotation(db, quotation_id):
-    """
-    Return one quotation by ID.
-    """
+def get_quotation(
+    db,
+    quotation_id,
+):
+
     return (
         db.query(Quotation)
         .filter(
@@ -117,9 +88,7 @@ def get_customer_quotations(
     db,
     customer_id,
 ):
-    """
-    Return quotations belonging to a customer.
-    """
+
     return (
         db.query(Quotation)
         .filter(
@@ -133,17 +102,15 @@ def get_customer_quotations(
     )
 
 
-# ==========================================================
-# QUOTATION ITEMS
-# ==========================================================
+# ============================================================
+# ITEM LOOKUPS
+# ============================================================
 
 def get_quotation_items(
     db,
     quotation_id,
 ):
-    """
-    Return all items belonging to a quotation.
-    """
+
     return (
         db.query(QuotationItem)
         .filter(
@@ -161,9 +128,7 @@ def get_quotation_item(
     db,
     item_id,
 ):
-    """
-    Return one quotation item.
-    """
+
     return (
         db.query(QuotationItem)
         .filter(
@@ -173,9 +138,9 @@ def get_quotation_item(
     )
 
 
-# ==========================================================
+# ============================================================
 # CREATE QUOTATION
-# ==========================================================
+# ============================================================
 
 def create_quotation(
     db,
@@ -184,16 +149,6 @@ def create_quotation(
     valid_until=None,
     notes=None,
 ):
-    """
-    Create a new quotation.
-
-    The database first assigns the quotation ID.
-    The canonical quotation number is then generated:
-
-        Q-00001
-        Q-00002
-        Q-00003
-    """
 
     customer = (
         db.query(Customer)
@@ -223,7 +178,6 @@ def create_quotation(
 
     db.add(quotation)
 
-    # Obtain database-generated ID.
     db.flush()
 
     quotation.quotation_number = (
@@ -239,9 +193,9 @@ def create_quotation(
     return quotation
 
 
-# ==========================================================
+# ============================================================
 # UPDATE QUOTATION
-# ==========================================================
+# ============================================================
 
 def update_quotation(
     db,
@@ -251,9 +205,6 @@ def update_quotation(
     valid_until=None,
     notes=None,
 ):
-    """
-    Update quotation header information.
-    """
 
     quotation = get_quotation(
         db,
@@ -263,11 +214,14 @@ def update_quotation(
     if not quotation:
         return None
 
-    if _status(quotation.status) in {
+    if _status(
+        quotation.status
+    ) in {
         "cancelled",
         "converted",
         "approved",
     }:
+
         raise ValueError(
             "This quotation can no longer be edited."
         )
@@ -277,7 +231,8 @@ def update_quotation(
         customer = (
             db.query(Customer)
             .filter(
-                Customer.id == customer_id
+                Customer.id
+                == customer_id
             )
             .first()
         )
@@ -310,9 +265,9 @@ def update_quotation(
     return quotation
 
 
-# ==========================================================
-# ADD QUOTATION ITEM
-# ==========================================================
+# ============================================================
+# ADD ITEM
+# ============================================================
 
 def add_quotation_item(
     db,
@@ -321,9 +276,6 @@ def add_quotation_item(
     quantity,
     unit_price,
 ):
-    """
-    Add a product to a Draft quotation.
-    """
 
     quotation = get_quotation(
         db,
@@ -335,7 +287,10 @@ def add_quotation_item(
             "Quotation not found."
         )
 
-    if _status(quotation.status) != "draft":
+    if _status(
+        quotation.status
+    ) != "draft":
+
         raise ValueError(
             "Items can only be added to Draft quotations."
         )
@@ -371,17 +326,16 @@ def add_quotation_item(
             "Unit price cannot be negative."
         )
 
-    total = (
-        quantity * unit_price
-    )
-
     item = QuotationItem(
         quotation_id=quotation_id,
         product_id=product_id,
         product_name=product.name,
         quantity=quantity,
         unit_price=unit_price,
-        total=total,
+        total=_item_total(
+            quantity,
+            unit_price,
+        ),
     )
 
     db.add(item)
@@ -401,9 +355,9 @@ def add_quotation_item(
     return item
 
 
-# ==========================================================
-# UPDATE QUOTATION ITEM
-# ==========================================================
+# ============================================================
+# UPDATE ITEM
+# ============================================================
 
 def update_quotation_item(
     db,
@@ -411,9 +365,6 @@ def update_quotation_item(
     quantity,
     unit_price,
 ):
-    """
-    Update an existing quotation item.
-    """
 
     item = get_quotation_item(
         db,
@@ -433,7 +384,10 @@ def update_quotation_item(
             "Quotation not found."
         )
 
-    if _status(quotation.status) != "draft":
+    if _status(
+        quotation.status
+    ) != "draft":
+
         raise ValueError(
             "Items can only be edited on Draft quotations."
         )
@@ -457,11 +411,10 @@ def update_quotation_item(
         )
 
     item.quantity = quantity
-
     item.unit_price = unit_price
-
-    item.total = (
-        quantity * unit_price
+    item.total = _item_total(
+        quantity,
+        unit_price,
     )
 
     db.flush()
@@ -479,17 +432,14 @@ def update_quotation_item(
     return item
 
 
-# ==========================================================
-# DELETE QUOTATION ITEM
-# ==========================================================
+# ============================================================
+# DELETE ITEM
+# ============================================================
 
 def delete_quotation_item(
     db,
     item_id,
 ):
-    """
-    Delete an item from a Draft quotation.
-    """
 
     item = get_quotation_item(
         db,
@@ -509,7 +459,10 @@ def delete_quotation_item(
             "Quotation not found."
         )
 
-    if _status(quotation.status) != "draft":
+    if _status(
+        quotation.status
+    ) != "draft":
+
         raise ValueError(
             "Items can only be deleted from Draft quotations."
         )
@@ -531,26 +484,15 @@ def delete_quotation_item(
     return True
 
 
-# ==========================================================
-# CALCULATE QUOTATION TOTAL
-# ==========================================================
+# ============================================================
+# TOTAL
+# ============================================================
 
 def calculate_quotation_total(
     db,
     quotation_id,
     commit=True,
 ):
-    """
-    Calculate the quotation total from its items.
-
-    Updates:
-
-        Quotation.total_amount
-
-    and each:
-
-        QuotationItem.total
-    """
 
     quotation = get_quotation(
         db,
@@ -569,13 +511,12 @@ def calculate_quotation_total(
 
     for item in items:
 
-        item_total = (
-            _recalculate_item_total(
-                item
-            )
+        item.total = _item_total(
+            item.quantity,
+            item.unit_price,
         )
 
-        total += item_total
+        total += item.total
 
     quotation.total_amount = total
 
@@ -594,17 +535,14 @@ def calculate_quotation_total(
     return total
 
 
-# ==========================================================
-# CANCEL QUOTATION
-# ==========================================================
+# ============================================================
+# CANCEL
+# ============================================================
 
 def cancel_quotation(
     db,
     quotation_id,
 ):
-    """
-    Cancel a quotation.
-    """
 
     quotation = get_quotation(
         db,
@@ -621,6 +559,7 @@ def cancel_quotation(
     )
 
     if current_status == "converted":
+
         raise ValueError(
             "A converted quotation cannot be cancelled."
         )
@@ -637,29 +576,14 @@ def cancel_quotation(
     return quotation
 
 
-# ==========================================================
-# CONVERT QUOTATION TO SALES ORDER
-# ==========================================================
+# ============================================================
+# CONVERT TO SALES ORDER
+# ============================================================
 
 def convert_quotation_to_sales_order(
     db,
     quotation_id,
 ):
-    """
-    Convert a quotation into exactly one Sales Order.
-
-    Rules:
-
-    1. Quotation must exist.
-    2. Quotation cannot be cancelled.
-    3. Quotation cannot already be converted.
-    4. Quotation must contain at least one item.
-    5. Only one SalesOrder may reference the quotation.
-    6. Exactly one SalesOrderItem is created for every
-       QuotationItem.
-    7. Quotation status becomes Converted.
-    8. Database IntegrityError is handled safely.
-    """
 
     quotation = get_quotation(
         db,
@@ -675,10 +599,6 @@ def convert_quotation_to_sales_order(
         quotation.status
     )
 
-    # ------------------------------------------------------
-    # Status protection
-    # ------------------------------------------------------
-
     if current_status == "cancelled":
 
         raise ValueError(
@@ -691,9 +611,9 @@ def convert_quotation_to_sales_order(
             "This quotation has already been converted."
         )
 
-    # ------------------------------------------------------
+    # --------------------------------------------------------
     # Application-level duplicate protection
-    # ------------------------------------------------------
+    # --------------------------------------------------------
 
     existing_order = (
         db.query(SalesOrder)
@@ -706,7 +626,6 @@ def convert_quotation_to_sales_order(
 
     if existing_order:
 
-        # Synchronize the quotation state if necessary.
         quotation.status = "Converted"
 
         db.commit()
@@ -717,24 +636,26 @@ def convert_quotation_to_sales_order(
             f"{existing_order.order_number}."
         )
 
-    # ------------------------------------------------------
-    # Load quotation items
-    # ------------------------------------------------------
+    # --------------------------------------------------------
+    # Get items
+    # --------------------------------------------------------
 
-    items = get_quotation_items(
-        db,
-        quotation_id,
+    quotation_items = (
+        get_quotation_items(
+            db,
+            quotation_id,
+        )
     )
 
-    if not items:
+    if not quotation_items:
 
         raise ValueError(
             "Cannot convert a quotation with no items."
         )
 
-    # ------------------------------------------------------
+    # --------------------------------------------------------
     # Verify customer
-    # ------------------------------------------------------
+    # --------------------------------------------------------
 
     customer = (
         db.query(Customer)
@@ -754,9 +675,9 @@ def convert_quotation_to_sales_order(
 
     try:
 
-        # --------------------------------------------------
-        # Ensure quotation total is current.
-        # --------------------------------------------------
+        # ----------------------------------------------------
+        # Calculate final quotation total
+        # ----------------------------------------------------
 
         quotation_total = (
             calculate_quotation_total(
@@ -766,9 +687,9 @@ def convert_quotation_to_sales_order(
             )
         )
 
-        # --------------------------------------------------
-        # CREATE ONE SALES ORDER
-        # --------------------------------------------------
+        # ----------------------------------------------------
+        # CREATE SALES ORDER
+        # ----------------------------------------------------
 
         sales_order = SalesOrder(
             order_number="TEMP",
@@ -784,29 +705,26 @@ def convert_quotation_to_sales_order(
             sales_order
         )
 
-        # Generate database ID.
         db.flush()
 
-        # Generate canonical order number.
         sales_order.order_number = (
             _order_number(
                 sales_order.id
             )
         )
 
-        # --------------------------------------------------
-        # CREATE EXACTLY ONE SALES ORDER ITEM
-        # PER QUOTATION ITEM
-        # --------------------------------------------------
+        # ----------------------------------------------------
+        # COPY ITEMS
+        #
+        # Exactly ONE SalesOrderItem for every
+        # QuotationItem.
+        # ----------------------------------------------------
 
-        for quotation_item in items:
+        for quotation_item in quotation_items:
 
             product = None
 
-            if (
-                quotation_item.product_id
-                is not None
-            ):
+            if quotation_item.product_id:
 
                 product = (
                     db.query(Product)
@@ -819,8 +737,7 @@ def convert_quotation_to_sales_order(
 
             product_name = (
                 quotation_item.product_name
-                if quotation_item.product_name
-                else (
+                or (
                     product.name
                     if product
                     else "Unknown Product"
@@ -835,20 +752,16 @@ def convert_quotation_to_sales_order(
                 quotation_item.unit_price
             )
 
-            total = (
-                quantity
-                * unit_price
-            )
-
             sales_order_item = SalesOrderItem(
                 sales_order_id=sales_order.id,
-                product_id=(
-                    quotation_item.product_id
-                ),
+                product_id=quotation_item.product_id,
                 product_name=product_name,
                 quantity=quantity,
                 unit_price=unit_price,
-                total=total,
+                total=_item_total(
+                    quantity,
+                    unit_price,
+                ),
                 reserved_quantity=0.0,
                 delivered_quantity=0.0,
             )
@@ -857,15 +770,15 @@ def convert_quotation_to_sales_order(
                 sales_order_item
             )
 
-        # --------------------------------------------------
-        # Mark quotation as Converted
-        # --------------------------------------------------
+        # ----------------------------------------------------
+        # Convert quotation
+        # ----------------------------------------------------
 
         quotation.status = "Converted"
 
-        # --------------------------------------------------
-        # Commit everything as one transaction
-        # --------------------------------------------------
+        # ----------------------------------------------------
+        # Atomic transaction
+        # ----------------------------------------------------
 
         db.commit()
 
@@ -881,17 +794,13 @@ def convert_quotation_to_sales_order(
 
     except IntegrityError as exc:
 
-        # --------------------------------------------------
-        # ALWAYS rollback a failed transaction before
-        # using the SQLAlchemy session again.
-        # --------------------------------------------------
+        # ----------------------------------------------------
+        # Important:
+        # A failed SQLAlchemy transaction MUST be rolled back
+        # before the session can safely be queried again.
+        # ----------------------------------------------------
 
         db.rollback()
-
-        # --------------------------------------------------
-        # Check whether another SalesOrder already exists
-        # for this quotation.
-        # --------------------------------------------------
 
         existing_order = (
             db.query(SalesOrder)
@@ -903,9 +812,6 @@ def convert_quotation_to_sales_order(
         )
 
         if existing_order:
-
-            # The database has confirmed that this
-            # quotation already has a Sales Order.
 
             quotation = get_quotation(
                 db,
@@ -919,14 +825,10 @@ def convert_quotation_to_sales_order(
                 db.commit()
 
             raise ValueError(
-                "This quotation has already been "
-                "converted to Sales Order "
+                "This quotation has already been converted "
+                f"to Sales Order "
                 f"{existing_order.order_number}."
             ) from exc
 
-        # --------------------------------------------------
-        # An unrelated database constraint failed.
-        # Do not hide the original IntegrityError.
-        # --------------------------------------------------
-
+        # An unrelated integrity problem occurred.
         raise
