@@ -10,6 +10,7 @@ from models import (
     Customer,
     Product,
     Quotation,
+    QuotationItem,
     SalesOrder,
     SalesOrderItem,
 )
