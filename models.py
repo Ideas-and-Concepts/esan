@@ -937,6 +937,13 @@ class SalesOrder(Base):
 
     __tablename__ = "sales_orders"
 
+    __table_args__ = (
+        UniqueConstraint(
+            "quotation_id",
+            name="uq_sales_orders_quotation_id",
+        ),
+    )
+
     id = Column(
         Integer,
         primary_key=True,
@@ -1462,18 +1469,10 @@ class Payment(Base):
 
 
 # ============================================================
-# FINANCE / ACCOUNTING
-# ============================================================
-
-
-# ============================================================
 # ACCOUNT
 # ============================================================
 
 class Account(Base):
-    """
-    Chart of Accounts.
-    """
 
     __tablename__ = "accounts"
 
@@ -1522,9 +1521,6 @@ class Account(Base):
 # ============================================================
 
 class JournalEntry(Base):
-    """
-    General Ledger journal header.
-    """
 
     __tablename__ = "journal_entries"
 
@@ -1593,9 +1589,6 @@ class JournalEntry(Base):
 # ============================================================
 
 class JournalEntryLine(Base):
-    """
-    Individual debit/credit line in a journal entry.
-    """
 
     __tablename__ = "journal_entry_lines"
 
