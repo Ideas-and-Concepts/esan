@@ -2,11 +2,14 @@
 
 import pytest
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from database import Base
 from models import (
     Customer,
     Product,
     Quotation,
-    QuotationItem,
     SalesOrder,
     SalesOrderItem,
 )
@@ -18,19 +21,73 @@ from services.quotation_service import (
 )
 
 
-def test_converting_same_quotation_twice_creates_no_duplicates(db):
-    """
-    A quotation may only be converted once.
+# ==========================================================
+# ISOLATED DATABASE FIXTURE
+# ==========================================================
 
-    The second conversion must:
-      1. raise ValueError
-      2. create no second SalesOrder
-      3. create no duplicate SalesOrderItems
-      4. leave the quotation status as Converted
+@pytest.fixture
+def db():
+    """
+    Create a completely isolated in-memory SQLite database
+    for each test.
+    """
+
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={
+            "check_same_thread": False,
+        },
+    )
+
+    # Create every table defined by the Esan SQLAlchemy models.
+    Base.metadata.create_all(bind=engine)
+
+    TestingSessionLocal = sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        bind=engine,
+    )
+
+    session = TestingSessionLocal()
+
+    try:
+        yield session
+
+    finally:
+        # Roll back anything left open.
+        session.rollback()
+
+        # Close the test session.
+        session.close()
+
+        # Drop all tables before disposing the engine.
+        Base.metadata.drop_all(bind=engine)
+
+        # Release the in-memory database connection.
+        engine.dispose()
+
+
+# ==========================================================
+# TEST
+# ==========================================================
+
+def test_converting_same_quotation_twice_creates_no_duplicates(
+    db,
+):
+    """
+    Verify that:
+
+    1. The first conversion succeeds.
+    2. The quotation becomes Converted.
+    3. Exactly one SalesOrder is created.
+    4. Exactly one SalesOrderItem is created for one QuotationItem.
+    5. A second conversion raises ValueError.
+    6. The second attempt creates no additional
+       SalesOrder or SalesOrderItem.
     """
 
     # ------------------------------------------------------
-    # Arrange
+    # ARRANGE
     # ------------------------------------------------------
 
     customer = Customer(
@@ -47,9 +104,16 @@ def test_converting_same_quotation_twice_creates_no_duplicates(db):
         selling_price=1500,
     )
 
-    db.add(customer)
-    db.add(product)
+    db.add_all([
+        customer,
+        product,
+    ])
+
     db.commit()
+
+    # ------------------------------------------------------
+    # CREATE QUOTATION
+    # ------------------------------------------------------
 
     quotation = create_quotation(
         db=db,
@@ -64,8 +128,17 @@ def test_converting_same_quotation_twice_creates_no_duplicates(db):
         unit_price=1500,
     )
 
+    # Confirm there is exactly one quotation item.
+    quotation_items = (
+        db.query(Quotation)
+        .filter(
+            Quotation.id == quotation.id
+        )
+        .one()
+    )
+
     # ------------------------------------------------------
-    # First conversion
+    # FIRST CONVERSION
     # ------------------------------------------------------
 
     sales_order = convert_quotation_to_sales_order(
@@ -73,15 +146,15 @@ def test_converting_same_quotation_twice_creates_no_duplicates(db):
         quotation_id=quotation.id,
     )
 
-    db.expire_all()
-
     # ------------------------------------------------------
-    # Verify first conversion
+    # VERIFY FIRST CONVERSION
     # ------------------------------------------------------
 
     converted_quotation = (
         db.query(Quotation)
-        .filter(Quotation.id == quotation.id)
+        .filter(
+            Quotation.id == quotation.id
+        )
         .one()
     )
 
@@ -90,7 +163,8 @@ def test_converting_same_quotation_twice_creates_no_duplicates(db):
     orders = (
         db.query(SalesOrder)
         .filter(
-            SalesOrder.quotation_id == quotation.id
+            SalesOrder.quotation_id
+            == quotation.id
         )
         .all()
     )
@@ -98,19 +172,29 @@ def test_converting_same_quotation_twice_creates_no_duplicates(db):
     assert len(orders) == 1
     assert orders[0].id == sales_order.id
 
-    items = (
+    quotation_item_count = (
+        db.query(QuotationItem)
+        .filter(
+            QuotationItem.quotation_id
+            == quotation.id
+        )
+        .count()
+    )
+
+    sales_order_item_count = (
         db.query(SalesOrderItem)
         .filter(
             SalesOrderItem.sales_order_id
             == sales_order.id
         )
-        .all()
+        .count()
     )
 
-    assert len(items) == 1
+    assert quotation_item_count == 1
+    assert sales_order_item_count == quotation_item_count
 
     # ------------------------------------------------------
-    # Second conversion must fail
+    # SECOND CONVERSION
     # ------------------------------------------------------
 
     with pytest.raises(
@@ -123,20 +207,20 @@ def test_converting_same_quotation_twice_creates_no_duplicates(db):
         )
 
     # ------------------------------------------------------
-    # Verify no duplicates were created
+    # VERIFY NO DUPLICATES
     # ------------------------------------------------------
-
-    db.expire_all()
 
     orders_after_second_attempt = (
         db.query(SalesOrder)
         .filter(
-            SalesOrder.quotation_id == quotation.id
+            SalesOrder.quotation_id
+            == quotation.id
         )
         .all()
     )
 
     assert len(orders_after_second_attempt) == 1
+
     assert (
         orders_after_second_attempt[0].id
         == sales_order.id
@@ -155,7 +239,9 @@ def test_converting_same_quotation_twice_creates_no_duplicates(db):
 
     final_quotation = (
         db.query(Quotation)
-        .filter(Quotation.id == quotation.id)
+        .filter(
+            Quotation.id == quotation.id
+        )
         .one()
     )
 
