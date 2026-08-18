@@ -194,3 +194,30 @@ esan/
 │   ├── packaging/
 │   ├── finance/
 │   └── reports/
+
+
+esan/
+│
+├── streamlit_app.py
+├── database.py
+├── models.py
+├── auth.py
+├── config.py
+│
+├── modules/
+│   ├── dashboard/
+│   │   ├── __init__.py
+│   │   ├── home.py
+│   │   └── services.py
+│   │
+│   ├── sales/
+│   ├── procurement/
+│   ├── warehouse/
+│   ├── milling/
+│   ├── packaging/
+│   ├── finance/
+│   └── reports/
+│
+└── tests/
+    ├── __init__.py
+    └── test_dashboard_services.py
