@@ -158,6 +158,84 @@ def get_quotation_item(
 
 
 # ============================================================
+# CALCULATE QUOTATION TOTAL
+# ============================================================
+
+def calculate_quotation_total(
+    db,
+    quotation_id,
+    commit=True,
+):
+    """
+    Calculate the quotation total from its items.
+
+    Each item's total is recalculated from:
+
+        quantity * unit_price
+
+    The calculated amount is stored in
+    Quotation.total_amount.
+
+    Returns:
+        float: quotation total
+    """
+
+    quotation = (
+        db.query(Quotation)
+        .filter(
+            Quotation.id == quotation_id
+        )
+        .first()
+    )
+
+    if not quotation:
+        return 0.0
+
+    items = (
+        db.query(QuotationItem)
+        .filter(
+            QuotationItem.quotation_id
+            == quotation_id
+        )
+        .order_by(
+            QuotationItem.id.asc()
+        )
+        .all()
+    )
+
+    total = 0.0
+
+    for item in items:
+
+        quantity = _to_float(
+            item.quantity,
+            0.0,
+        )
+
+        unit_price = _to_float(
+            item.unit_price,
+            0.0,
+        )
+
+        item_total = (
+            quantity * unit_price
+        )
+
+        item.total = item_total
+
+        total += item_total
+
+    quotation.total_amount = total
+
+    if commit:
+        db.commit()
+        db.refresh(quotation)
+    else:
+        db.flush()
+
+    return total
+
+# ============================================================
 # CREATE QUOTATION
 # ============================================================
 
