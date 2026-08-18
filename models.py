@@ -20,6 +20,7 @@ Modules:
 - Deliveries
 - Invoices
 - Payments
+- Finance / Accounting
 """
 
 from datetime import datetime, date
@@ -32,6 +33,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    Numeric,
     String,
     Text,
 )
@@ -87,6 +89,7 @@ class User(Base):
     active = Column(
         Boolean,
         default=True,
+        nullable=False,
     )
 
     created_at = Column(
@@ -328,9 +331,7 @@ class PurchaseOrder(Base):
 
     supplier_id = Column(
         Integer,
-        ForeignKey(
-            "suppliers.id"
-        ),
+        ForeignKey("suppliers.id"),
         nullable=False,
     )
 
@@ -387,17 +388,13 @@ class PurchaseOrderItem(Base):
 
     purchase_order_id = Column(
         Integer,
-        ForeignKey(
-            "purchase_orders.id"
-        ),
+        ForeignKey("purchase_orders.id"),
         nullable=False,
     )
 
     product_id = Column(
         Integer,
-        ForeignKey(
-            "products.id"
-        ),
+        ForeignKey("products.id"),
         nullable=True,
     )
 
@@ -459,17 +456,13 @@ class Purchase(Base):
 
     supplier_id = Column(
         Integer,
-        ForeignKey(
-            "suppliers.id"
-        ),
+        ForeignKey("suppliers.id"),
         nullable=False,
     )
 
     purchase_order_id = Column(
         Integer,
-        ForeignKey(
-            "purchase_orders.id"
-        ),
+        ForeignKey("purchase_orders.id"),
         nullable=True,
     )
 
@@ -530,17 +523,13 @@ class PurchaseItem(Base):
 
     purchase_id = Column(
         Integer,
-        ForeignKey(
-            "purchases.id"
-        ),
+        ForeignKey("purchases.id"),
         nullable=False,
     )
 
     product_id = Column(
         Integer,
-        ForeignKey(
-            "products.id"
-        ),
+        ForeignKey("products.id"),
         nullable=True,
     )
 
@@ -590,9 +579,7 @@ class StockMovement(Base):
 
     product_id = Column(
         Integer,
-        ForeignKey(
-            "products.id"
-        ),
+        ForeignKey("products.id"),
         nullable=False,
     )
 
@@ -834,9 +821,7 @@ class Quotation(Base):
 
     customer_id = Column(
         Integer,
-        ForeignKey(
-            "customers.id"
-        ),
+        ForeignKey("customers.id"),
         nullable=False,
     )
 
@@ -903,17 +888,13 @@ class QuotationItem(Base):
 
     quotation_id = Column(
         Integer,
-        ForeignKey(
-            "quotations.id"
-        ),
+        ForeignKey("quotations.id"),
         nullable=False,
     )
 
     product_id = Column(
         Integer,
-        ForeignKey(
-            "products.id"
-        ),
+        ForeignKey("products.id"),
         nullable=True,
     )
 
@@ -970,17 +951,13 @@ class SalesOrder(Base):
 
     customer_id = Column(
         Integer,
-        ForeignKey(
-            "customers.id"
-        ),
+        ForeignKey("customers.id"),
         nullable=False,
     )
 
     quotation_id = Column(
         Integer,
-        ForeignKey(
-            "quotations.id"
-        ),
+        ForeignKey("quotations.id"),
         nullable=True,
     )
 
@@ -1053,17 +1030,13 @@ class SalesOrderItem(Base):
 
     sales_order_id = Column(
         Integer,
-        ForeignKey(
-            "sales_orders.id"
-        ),
+        ForeignKey("sales_orders.id"),
         nullable=False,
     )
 
     product_id = Column(
         Integer,
-        ForeignKey(
-            "products.id"
-        ),
+        ForeignKey("products.id"),
         nullable=True,
     )
 
@@ -1135,9 +1108,7 @@ class Delivery(Base):
 
     sales_order_id = Column(
         Integer,
-        ForeignKey(
-            "sales_orders.id"
-        ),
+        ForeignKey("sales_orders.id"),
         nullable=False,
     )
 
@@ -1209,25 +1180,19 @@ class DeliveryItem(Base):
 
     delivery_id = Column(
         Integer,
-        ForeignKey(
-            "deliveries.id"
-        ),
+        ForeignKey("deliveries.id"),
         nullable=False,
     )
 
     sales_order_item_id = Column(
         Integer,
-        ForeignKey(
-            "sales_order_items.id"
-        ),
+        ForeignKey("sales_order_items.id"),
         nullable=True,
     )
 
     product_id = Column(
         Integer,
-        ForeignKey(
-            "products.id"
-        ),
+        ForeignKey("products.id"),
         nullable=True,
     )
 
@@ -1289,17 +1254,13 @@ class Invoice(Base):
 
     customer_id = Column(
         Integer,
-        ForeignKey(
-            "customers.id"
-        ),
+        ForeignKey("customers.id"),
         nullable=False,
     )
 
     sales_order_id = Column(
         Integer,
-        ForeignKey(
-            "sales_orders.id"
-        ),
+        ForeignKey("sales_orders.id"),
         nullable=True,
     )
 
@@ -1391,17 +1352,13 @@ class InvoiceItem(Base):
 
     invoice_id = Column(
         Integer,
-        ForeignKey(
-            "invoices.id"
-        ),
+        ForeignKey("invoices.id"),
         nullable=False,
     )
 
     product_id = Column(
         Integer,
-        ForeignKey(
-            "products.id"
-        ),
+        ForeignKey("products.id"),
         nullable=True,
     )
 
@@ -1458,9 +1415,7 @@ class Payment(Base):
 
     invoice_id = Column(
         Integer,
-        ForeignKey(
-            "invoices.id"
-        ),
+        ForeignKey("invoices.id"),
         nullable=False,
     )
 
@@ -1502,10 +1457,17 @@ class Payment(Base):
     invoice = relationship(
         "Invoice",
         back_populates="payments",
+    )
 
-# ==========================================================
-# FINANCE / ACCOUNTING MODELS
-# ==========================================================
+
+# ============================================================
+# FINANCE / ACCOUNTING
+# ============================================================
+
+
+# ============================================================
+# ACCOUNT
+# ============================================================
 
 class Account(Base):
     """
@@ -1553,6 +1515,10 @@ class Account(Base):
         default=datetime.utcnow,
     )
 
+
+# ============================================================
+# JOURNAL ENTRY
+# ============================================================
 
 class JournalEntry(Base):
     """
@@ -1621,6 +1587,10 @@ class JournalEntry(Base):
     )
 
 
+# ============================================================
+# JOURNAL ENTRY LINE
+# ============================================================
+
 class JournalEntryLine(Base):
     """
     Individual debit/credit line in a journal entry.
@@ -1636,18 +1606,14 @@ class JournalEntryLine(Base):
 
     journal_entry_id = Column(
         Integer,
-        ForeignKey(
-            "journal_entries.id"
-        ),
+        ForeignKey("journal_entries.id"),
         nullable=False,
         index=True,
     )
 
     account_id = Column(
         Integer,
-        ForeignKey(
-            "accounts.id"
-        ),
+        ForeignKey("accounts.id"),
         nullable=False,
         index=True,
     )
@@ -1676,5 +1642,4 @@ class JournalEntryLine(Base):
 
     account = relationship(
         "Account",
-    )
     )
