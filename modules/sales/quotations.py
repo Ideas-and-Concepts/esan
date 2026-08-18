@@ -5,6 +5,7 @@ Sales & Distribution - Quotations
 Quotation management interface.
 
 Nile Harvest Foods Ltd.
+Enterprise Milling & Packaging Management System
 """
 
 import streamlit as st
@@ -33,7 +34,7 @@ from services.quotation_service import (
 # ==========================================================
 
 def _money(value):
-    """Format currency."""
+    """Format currency as UGX."""
     try:
         return f"UGX {float(value):,.0f}"
     except (TypeError, ValueError):
@@ -41,22 +42,62 @@ def _money(value):
 
 
 def _status_badge(status):
-    """Return a readable status."""
+    """Return a readable quotation status."""
     status = status or "Draft"
 
-    if status.lower() == "draft":
+    normalized = str(status).lower()
+
+    if normalized == "draft":
         return "🟡 Draft"
 
-    if status.lower() == "converted":
+    if normalized == "converted":
         return "🟢 Converted"
 
-    if status.lower() == "cancelled":
+    if normalized == "cancelled":
         return "🔴 Cancelled"
 
-    if status.lower() == "approved":
+    if normalized == "approved":
         return "🔵 Approved"
 
-    return status
+    return str(status)
+
+
+def _quotation_label(quotation):
+    """
+    Return the canonical quotation number.
+
+    Falls back to the database ID if an older record
+    does not have quotation_number.
+    """
+
+    quotation_number = getattr(
+        quotation,
+        "quotation_number",
+        None,
+    )
+
+    if quotation_number:
+        return str(quotation_number)
+
+    quotation_id = getattr(
+        quotation,
+        "id",
+        0,
+    )
+
+    return f"QT-{quotation_id:05d}"
+
+
+def _quotation_status(quotation):
+    """Return normalized quotation status."""
+    return (
+        getattr(
+            quotation,
+            "status",
+            None,
+        )
+        or "Draft"
+    ).strip()
 
 
 # ==========================================================
@@ -164,7 +205,8 @@ def quotations_page():
                             )
 
                             st.success(
-                                f"Quotation #{quotation.id} "
+                                f"Quotation "
+                                f"{_quotation_label(quotation)} "
                                 "created successfully."
                             )
 
@@ -215,27 +257,37 @@ def quotations_page():
                         .first()
                     )
 
-                    total = calculate_quotation_total(
-                        db,
-                        quotation.id,
-                    )
+                    total = getattr(
+                        quotation,
+                        "total_amount",
+                        0.0,
+                    ) or 0.0
 
                     rows.append(
                         {
-                            "Quotation": f"Q-{quotation.id:05d}",
-                            "Customer": (
-                                customer.name
-                                if customer
-                                else "Unknown"
-                            ),
-                            "Status": _status_badge(
-                                getattr(
-                                    quotation,
-                                    "status",
-                                    "Draft",
-                                )
-                            ),
-                            "Total": _money(total),
+                            "Quotation":
+                                _quotation_label(
+                                    quotation
+                                ),
+
+                            "Customer":
+                                (
+                                    customer.name
+                                    if customer
+                                    else "Unknown"
+                                ),
+
+                            "Status":
+                                _status_badge(
+                                    getattr(
+                                        quotation,
+                                        "status",
+                                        "Draft",
+                                    )
+                                ),
+
+                            "Total":
+                                _money(total),
                         }
                     )
 
@@ -248,7 +300,7 @@ def quotations_page():
                 st.divider()
 
                 quotation_options = {
-                    f"Q-{q.id:05d}":
+                    _quotation_label(q):
                     q.id
                     for q in quotations
                 }
@@ -278,16 +330,18 @@ def quotations_page():
                     )
 
                     st.markdown(
-                        f"### {selected}"
+                        f"### {_quotation_label(quotation)}"
                     )
 
                     col1, col2, col3 = st.columns(3)
 
                     col1.metric(
                         "Customer",
-                        customer.name
-                        if customer
-                        else "Unknown",
+                        (
+                            customer.name
+                            if customer
+                            else "Unknown"
+                        ),
                     )
 
                     col2.metric(
@@ -302,9 +356,10 @@ def quotations_page():
                     col3.metric(
                         "Total",
                         _money(
-                            calculate_quotation_total(
-                                db,
-                                quotation.id,
+                            getattr(
+                                quotation,
+                                "total_amount",
+                                0,
                             )
                         ),
                     )
@@ -340,17 +395,28 @@ def quotations_page():
                             item_rows.append(
                                 {
                                     "Product":
-                                        product.name
-                                        if product
-                                        else "Unknown",
+                                        (
+                                            item.product_name
+                                            or (
+                                                product.name
+                                                if product
+                                                else "Unknown"
+                                            )
+                                        ),
+
                                     "Quantity":
                                         quantity,
+
                                     "Unit Price":
                                         _money(price),
+
                                     "Total":
                                         _money(
-                                            quantity
-                                            * price
+                                            item.total
+                                            or (
+                                                quantity
+                                                * price
+                                            )
                                         ),
                                 }
                             )
@@ -382,14 +448,7 @@ def quotations_page():
             editable = [
                 q
                 for q in quotations
-                if (
-                    getattr(
-                        q,
-                        "status",
-                        "Draft",
-                    )
-                    or "Draft"
-                ).lower()
+                if _quotation_status(q).lower()
                 == "draft"
             ]
 
@@ -402,7 +461,7 @@ def quotations_page():
             else:
 
                 quotation_options = {
-                    f"Q-{q.id:05d}":
+                    _quotation_label(q):
                     q.id
                     for q in editable
                 }
@@ -430,139 +489,151 @@ def quotations_page():
                     .all()
                 )
 
-                customer_options = {
-                    f"{c.id} - {c.name}":
-                    c.id
-                    for c in customers
-                }
+                if not customers:
 
-                current_customer = next(
-                    (
-                        label
-                        for label, cid
-                        in customer_options.items()
-                        if cid
-                        == quotation.customer_id
-                    ),
-                    list(
-                        customer_options.keys()
-                    )[0],
-                )
-
-                with st.form(
-                    "edit_quotation_form"
-                ):
-
-                    customer_label = st.selectbox(
-                        "Customer",
-                        list(
-                            customer_options.keys()
-                        ),
-                        index=list(
-                            customer_options.keys()
-                        ).index(
-                            current_customer
-                        ),
+                    st.warning(
+                        "No customers are available."
                     )
 
-                    valid_until = st.date_input(
-                        "Valid Until",
-                        value=getattr(
-                            quotation,
-                            "valid_until",
-                            None,
-                        ),
-                    )
+                else:
 
-                    notes = st.text_area(
-                        "Notes",
-                        value=getattr(
-                            quotation,
-                            "notes",
-                            "",
-                        )
-                        or "",
-                    )
-
-                    submitted = st.form_submit_button(
-                        "Save Quotation",
-                        use_container_width=True,
-                        type="primary",
-                    )
-
-                    if submitted:
-
-                        try:
-
-                            update_quotation(
-                                db=db,
-                                quotation_id=quotation_id,
-                                customer_id=customer_options[
-                                    customer_label
-                                ],
-                                valid_until=valid_until,
-                                notes=notes,
-                            )
-
-                            st.success(
-                                "Quotation updated successfully."
-                            )
-
-                            st.rerun()
-
-                        except Exception as e:
-
-                            db.rollback()
-
-                            st.error(
-                                f"Unable to update quotation: {e}"
-                            )
-
-                # ------------------------------------------
-                # ITEMS
-                # ------------------------------------------
-
-                st.divider()
-
-                st.markdown(
-                    "#### Quotation Items"
-                )
-
-                products = (
-                    db.query(Product)
-                    .order_by(Product.name)
-                    .all()
-                )
-
-                if products:
-
-                    product_options = {
-                        f"{p.id} - {p.name}":
-                        p.id
-                        for p in products
+                    customer_options = {
+                        f"{c.id} - {c.name}":
+                        c.id
+                        for c in customers
                     }
 
+                    current_customer = next(
+                        (
+                            label
+                            for label, cid
+                            in customer_options.items()
+                            if cid
+                            == quotation.customer_id
+                        ),
+                        list(
+                            customer_options.keys()
+                        )[0],
+                    )
+
                     with st.form(
-                        "add_quotation_item"
+                        "edit_quotation_form"
                     ):
 
-                        product_label = st.selectbox(
-                            "Product",
+                        customer_label = st.selectbox(
+                            "Customer",
                             list(
-                                product_options.keys()
+                                customer_options.keys()
+                            ),
+                            index=list(
+                                customer_options.keys()
+                            ).index(
+                                current_customer
                             ),
                         )
 
-                        quantity = st.number_input(
-                            "Quantity",
-                            min_value=0.01,
-                            value=1.0,
-                            step=1.0,
+                        existing_valid_until = getattr(
+                            quotation,
+                            "valid_until",
+                            None,
                         )
 
-                        default_price = float(
-                            getattr(
-                                next(
+                        valid_until = st.date_input(
+                            "Valid Until",
+                            value=(
+                                existing_valid_until
+                                or date.today()
+                            ),
+                        )
+
+                        notes = st.text_area(
+                            "Notes",
+                            value=getattr(
+                                quotation,
+                                "notes",
+                                "",
+                            )
+                            or "",
+                        )
+
+                        submitted = st.form_submit_button(
+                            "Save Quotation",
+                            use_container_width=True,
+                            type="primary",
+                        )
+
+                        if submitted:
+
+                            try:
+
+                                update_quotation(
+                                    db=db,
+                                    quotation_id=quotation_id,
+                                    customer_id=customer_options[
+                                        customer_label
+                                    ],
+                                    valid_until=valid_until,
+                                    notes=notes,
+                                )
+
+                                st.success(
+                                    "Quotation updated successfully."
+                                )
+
+                                st.rerun()
+
+                            except Exception as e:
+
+                                db.rollback()
+
+                                st.error(
+                                    f"Unable to update quotation: {e}"
+                                )
+
+                    # ======================================
+                    # ITEMS
+                    # ======================================
+
+                    st.divider()
+
+                    st.markdown(
+                        "#### Quotation Items"
+                    )
+
+                    products = (
+                        db.query(Product)
+                        .order_by(Product.name)
+                        .all()
+                    )
+
+                    if products:
+
+                        product_options = {
+                            f"{p.id} - {p.name}":
+                            p.id
+                            for p in products
+                        }
+
+                        with st.form(
+                            "add_quotation_item"
+                        ):
+
+                            product_label = st.selectbox(
+                                "Product",
+                                list(
+                                    product_options.keys()
+                                ),
+                            )
+
+                            quantity = st.number_input(
+                                "Quantity",
+                                min_value=0.01,
+                                value=1.0,
+                                step=1.0,
+                            )
+
+                            selected_product = next(
+                                (
                                     p
                                     for p in products
                                     if p.id
@@ -570,155 +641,167 @@ def quotations_page():
                                         product_label
                                     ]
                                 ),
-                                "selling_price",
-                                0,
+                                None,
                             )
-                            or 0
-                        )
 
-                        unit_price = st.number_input(
-                            "Unit Price",
-                            min_value=0.0,
-                            value=default_price,
-                            step=100.0,
-                        )
-
-                        add_item = st.form_submit_button(
-                            "Add Item",
-                            use_container_width=True,
-                        )
-
-                        if add_item:
-
-                            try:
-
-                                add_quotation_item(
-                                    db=db,
-                                    quotation_id=quotation_id,
-                                    product_id=product_options[
-                                        product_label
-                                    ],
-                                    quantity=quantity,
-                                    unit_price=unit_price,
+                            default_price = float(
+                                getattr(
+                                    selected_product,
+                                    "selling_price",
+                                    0,
                                 )
+                                or 0
+                            )
 
-                                st.success(
-                                    "Item added."
-                                )
+                            unit_price = st.number_input(
+                                "Unit Price",
+                                min_value=0.0,
+                                value=default_price,
+                                step=100.0,
+                            )
 
-                                st.rerun()
+                            add_item = st.form_submit_button(
+                                "Add Item",
+                                use_container_width=True,
+                            )
 
-                            except Exception as e:
+                            if add_item:
 
-                                db.rollback()
+                                try:
 
-                                st.error(
-                                    f"Unable to add item: {e}"
-                                )
+                                    add_quotation_item(
+                                        db=db,
+                                        quotation_id=quotation_id,
+                                        product_id=product_options[
+                                            product_label
+                                        ],
+                                        quantity=quantity,
+                                        unit_price=unit_price,
+                                    )
 
-                items = get_quotation_items(
-                    db,
-                    quotation_id,
-                )
+                                    st.success(
+                                        "Item added."
+                                    )
 
-                for item in items:
+                                    st.rerun()
 
-                    product = (
-                        db.query(Product)
-                        .filter(
-                            Product.id
-                            == item.product_id
+                                except Exception as e:
+
+                                    db.rollback()
+
+                                    st.error(
+                                        f"Unable to add item: {e}"
+                                    )
+
+                    else:
+
+                        st.info(
+                            "Create a product before adding quotation items."
                         )
-                        .first()
+
+                    items = get_quotation_items(
+                        db,
+                        quotation_id,
                     )
 
-                    st.write(
-                        f"**{product.name if product else 'Unknown'}** "
-                        f"| Qty: {item.quantity} "
-                        f"| Price: {_money(item.unit_price)}"
-                    )
+                    for item in items:
 
-                    c1, c2, c3 = st.columns(
-                        [2, 2, 1]
-                    )
-
-                    with c1:
-
-                        new_quantity = st.number_input(
-                            "Quantity",
-                            min_value=0.01,
-                            value=float(
-                                item.quantity
-                            ),
-                            key=f"qty_{item.id}",
+                        product = (
+                            db.query(Product)
+                            .filter(
+                                Product.id
+                                == item.product_id
+                            )
+                            .first()
                         )
 
-                    with c2:
-
-                        new_price = st.number_input(
-                            "Unit Price",
-                            min_value=0.0,
-                            value=float(
-                                item.unit_price
-                            ),
-                            key=f"price_{item.id}",
+                        st.write(
+                            f"**{item.product_name or (product.name if product else 'Unknown')}** "
+                            f"| Qty: {item.quantity} "
+                            f"| Price: {_money(item.unit_price)}"
                         )
 
-                    with c3:
+                        c1, c2, c3 = st.columns(
+                            [2, 2, 1]
+                        )
 
-                        if st.button(
-                            "Save",
-                            key=f"save_item_{item.id}",
-                        ):
+                        with c1:
 
-                            try:
+                            new_quantity = st.number_input(
+                                "Quantity",
+                                min_value=0.01,
+                                value=float(
+                                    item.quantity or 0
+                                ),
+                                key=f"qty_{item.id}",
+                            )
 
-                                update_quotation_item(
-                                    db=db,
-                                    item_id=item.id,
-                                    quantity=new_quantity,
-                                    unit_price=new_price,
-                                )
+                        with c2:
 
-                                st.success(
-                                    "Item updated."
-                                )
+                            new_price = st.number_input(
+                                "Unit Price",
+                                min_value=0.0,
+                                value=float(
+                                    item.unit_price or 0
+                                ),
+                                key=f"price_{item.id}",
+                            )
 
-                                st.rerun()
+                        with c3:
 
-                            except Exception as e:
+                            if st.button(
+                                "Save",
+                                key=f"save_item_{item.id}",
+                            ):
 
-                                db.rollback()
+                                try:
 
-                                st.error(
-                                    str(e)
-                                )
+                                    update_quotation_item(
+                                        db=db,
+                                        item_id=item.id,
+                                        quantity=new_quantity,
+                                        unit_price=new_price,
+                                    )
 
-                        if st.button(
-                            "Delete",
-                            key=f"delete_item_{item.id}",
-                        ):
+                                    st.success(
+                                        "Item updated."
+                                    )
 
-                            try:
+                                    st.rerun()
 
-                                delete_quotation_item(
-                                    db,
-                                    item.id,
-                                )
+                                except Exception as e:
 
-                                st.success(
-                                    "Item deleted."
-                                )
+                                    db.rollback()
 
-                                st.rerun()
+                                    st.error(
+                                        str(e)
+                                    )
 
-                            except Exception as e:
+                            if st.button(
+                                "Delete",
+                                key=f"delete_item_{item.id}",
+                            ):
 
-                                db.rollback()
+                                try:
 
-                                st.error(
-                                    str(e)
-                                )
+                                    delete_quotation_item(
+                                        db,
+                                        item.id,
+                                    )
+
+                                    st.success(
+                                        "Item deleted."
+                                    )
+
+                                    st.rerun()
+
+                                except Exception as e:
+
+                                    db.rollback()
+
+                                    st.error(
+                                        str(e)
+                                    )
 
         # ==================================================
         # CONVERT
@@ -735,14 +818,7 @@ def quotations_page():
             convertible = [
                 q
                 for q in quotations
-                if (
-                    getattr(
-                        q,
-                        "status",
-                        "Draft",
-                    )
-                    or "Draft"
-                ).lower()
+                if _quotation_status(q).lower()
                 not in {
                     "converted",
                     "cancelled",
@@ -759,7 +835,7 @@ def quotations_page():
             else:
 
                 options = {
-                    f"Q-{q.id:05d}":
+                    _quotation_label(q):
                     q.id
                     for q in convertible
                 }
@@ -774,19 +850,23 @@ def quotations_page():
                     selected
                 ]
 
-                quotation = get_quotation(
-                    db,
-                    quotation_id,
-                )
-
                 items = get_quotation_items(
                     db,
                     quotation_id,
                 )
 
-                total = calculate_quotation_total(
+                quotation = get_quotation(
                     db,
                     quotation_id,
+                )
+
+                total = float(
+                    getattr(
+                        quotation,
+                        "total_amount",
+                        0,
+                    )
+                    or 0
                 )
 
                 st.metric(
@@ -820,14 +900,29 @@ def quotations_page():
 
                         try:
 
-                            order = convert_quotation_to_sales_order(
-                                db,
-                                quotation_id,
+                            order = (
+                                convert_quotation_to_sales_order(
+                                    db,
+                                    quotation_id,
+                                )
                             )
 
+                            order_number = getattr(
+                                order,
+                                "order_number",
+                                None,
+                            )
+
+                            if order_number:
+                                order_reference = order_number
+                            else:
+                                order_reference = (
+                                    f"SO-{order.id:05d}"
+                                )
+
                             st.success(
-                                f"Quotation converted successfully "
-                                f"to Sales Order #{order.id}."
+                                "Quotation converted successfully "
+                                f"to Sales Order {order_reference}."
                             )
 
                             st.rerun()
@@ -855,14 +950,7 @@ def quotations_page():
             cancellable = [
                 q
                 for q in quotations
-                if (
-                    getattr(
-                        q,
-                        "status",
-                        "Draft",
-                    )
-                    or "Draft"
-                ).lower()
+                if _quotation_status(q).lower()
                 not in {
                     "cancelled",
                     "converted",
@@ -878,7 +966,7 @@ def quotations_page():
             else:
 
                 options = {
-                    f"Q-{q.id:05d}":
+                    _quotation_label(q):
                     q.id
                     for q in cancellable
                 }
