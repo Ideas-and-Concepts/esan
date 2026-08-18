@@ -319,3 +319,198 @@ def test_dashboard_summary_is_safe_for_empty_database():
         summary["recent_activity"],
         list,
     )
+
+
+from unittest.mock import MagicMock, patch
+
+from modules.dashboard.services import get_dashboard_summary
+
+
+# ============================================================
+# FIXED TEST DATA
+# ============================================================
+
+FIXED_SALES = {
+    "total_sales": 12500000.0,
+    "sales_orders": 25,
+    "pending_orders": 7,
+    "completed_orders": 18,
+}
+
+FIXED_PROCUREMENT = {
+    "total_procurement": 6800000.0,
+    "purchase_orders": 14,
+    "pending_orders": 4,
+    "completed_orders": 10,
+}
+
+FIXED_INVENTORY = {
+    "total_products": 42,
+    "total_quantity": 18500.0,
+    "low_stock_items": 5,
+    "out_of_stock_items": 2,
+}
+
+FIXED_RECEIVABLES = {
+    "total_invoiced": 15000000.0,
+    "total_paid": 9500000.0,
+    "total_outstanding": 5500000.0,
+    "overdue_amount": 1200000.0,
+}
+
+
+# ============================================================
+# MOCK DATABASE SESSION
+# ============================================================
+
+def make_mock_session():
+
+    session = MagicMock()
+
+    # Prevent the service from actually committing anything.
+    session.commit.return_value = None
+
+    # Prevent accidental database cleanup errors.
+    session.close.return_value = None
+
+    return session
+
+
+# ============================================================
+# DETERMINISTIC DASHBOARD TEST
+# ============================================================
+
+@patch(
+    "modules.dashboard.services.SessionLocal"
+)
+def test_dashboard_summary_with_fixed_database(
+    mock_session_local,
+):
+
+    mock_db = make_mock_session()
+
+    mock_session_local.return_value = mock_db
+
+    # --------------------------------------------------------
+    # Replace individual service functions with fixed values.
+    #
+    # This tests the dashboard contract independently of the
+    # database implementation.
+    # --------------------------------------------------------
+
+    with patch(
+        "modules.dashboard.services.get_sales_summary",
+        return_value=FIXED_SALES,
+    ), patch(
+        "modules.dashboard.services.get_procurement_summary",
+        return_value=FIXED_PROCUREMENT,
+    ), patch(
+        "modules.dashboard.services.get_inventory_summary",
+        return_value=FIXED_INVENTORY,
+    ), patch(
+        "modules.dashboard.services.get_production_summary",
+        return_value={
+            "milling_batches": 8,
+            "packaging_batches": 12,
+            "completed_batches": 15,
+            "active_batches": 5,
+        },
+    ), patch(
+        "modules.dashboard.services.get_receivables_summary",
+        return_value=FIXED_RECEIVABLES,
+    ), patch(
+        "modules.dashboard.services.get_dashboard_alerts",
+        return_value=[],
+    ), patch(
+        "modules.dashboard.services.get_recent_activity",
+        return_value=[],
+    ):
+
+        summary = get_dashboard_summary()
+
+    # ========================================================
+    # VERIFY SALES
+    # ========================================================
+
+    assert summary["sales"] == FIXED_SALES
+
+    assert summary["sales"]["total_sales"] == 12500000.0
+    assert summary["sales"]["sales_orders"] == 25
+    assert summary["sales"]["pending_orders"] == 7
+    assert summary["sales"]["completed_orders"] == 18
+
+    # ========================================================
+    # VERIFY PROCUREMENT
+    # ========================================================
+
+    assert summary["procurement"] == FIXED_PROCUREMENT
+
+    assert (
+        summary["procurement"]["total_procurement"]
+        == 6800000.0
+    )
+
+    assert (
+        summary["procurement"]["purchase_orders"]
+        == 14
+    )
+
+    # ========================================================
+    # VERIFY INVENTORY
+    # ========================================================
+
+    assert summary["inventory"] == FIXED_INVENTORY
+
+    assert (
+        summary["inventory"]["total_products"]
+        == 42
+    )
+
+    assert (
+        summary["inventory"]["total_quantity"]
+        == 18500.0
+    )
+
+    assert (
+        summary["inventory"]["low_stock_items"]
+        == 5
+    )
+
+    assert (
+        summary["inventory"]["out_of_stock_items"]
+        == 2
+    )
+
+    # ========================================================
+    # VERIFY RECEIVABLES
+    # ========================================================
+
+    assert summary["receivables"] == FIXED_RECEIVABLES
+
+    assert (
+        summary["receivables"]["total_invoiced"]
+        == 15000000.0
+    )
+
+    assert (
+        summary["receivables"]["total_paid"]
+        == 9500000.0
+    )
+
+    assert (
+        summary["receivables"]["total_outstanding"]
+        == 5500000.0
+    )
+
+    assert (
+        summary["receivables"]["overdue_amount"]
+        == 1200000.0
+    )
+
+    # ========================================================
+    # VERIFY LIST SECTIONS
+    # ========================================================
+
+    assert summary["alerts"] == []
+
+    assert summary["recent_activity"] == []
