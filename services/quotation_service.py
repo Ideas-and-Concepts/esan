@@ -167,39 +167,31 @@ def calculate_quotation_total(
     commit=True,
 ):
     """
-    Calculate the quotation total from its items.
+    Calculate and persist the quotation total.
 
-    Each item's total is recalculated from:
-
-        quantity * unit_price
-
-    The calculated amount is stored in
-    Quotation.total_amount.
+    Canonical model fields:
+        Quotation.total_amount
+        QuotationItem.total
 
     Returns:
-        float: quotation total
+        float: Calculated quotation total.
     """
 
     quotation = (
         db.query(Quotation)
-        .filter(
-            Quotation.id == quotation_id
-        )
+        .filter(Quotation.id == quotation_id)
         .first()
     )
 
     if not quotation:
-        return 0.0
+        raise ValueError("Quotation not found.")
 
     items = (
         db.query(QuotationItem)
         .filter(
-            QuotationItem.quotation_id
-            == quotation_id
+            QuotationItem.quotation_id == quotation_id
         )
-        .order_by(
-            QuotationItem.id.asc()
-        )
+        .order_by(QuotationItem.id.asc())
         .all()
     )
 
@@ -208,23 +200,21 @@ def calculate_quotation_total(
     for item in items:
 
         quantity = _to_float(
-            item.quantity,
-            0.0,
+            item.quantity
         )
 
         unit_price = _to_float(
-            item.unit_price,
-            0.0,
+            item.unit_price
         )
 
-        item_total = (
-            quantity * unit_price
-        )
+        line_total = quantity * unit_price
 
-        item.total = item_total
+        # QuotationItem canonical persisted total
+        item.total = line_total
 
-        total += item_total
+        total += line_total
 
+    # Quotation canonical persisted total
     quotation.total_amount = total
 
     if commit:
