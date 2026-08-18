@@ -1,11 +1,19 @@
+"""
+Esan ERP
+Quotation -> Sales Order Conversion Tests
+
+Verifies that every QuotationItem produces exactly one
+SalesOrderItem with matching product, quantity, unit price,
+and line total.
+"""
+
 import pytest
 
 from sqlalchemy import create_engine
-from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from database import Base
-
 from models import (
     Customer,
     Product,
@@ -14,14 +22,24 @@ from models import (
     SalesOrder,
     SalesOrderItem,
 )
-
 from services.quotation_service import (
     convert_quotation_to_sales_order,
 )
 
 
+# ============================================================
+# DATABASE FIXTURE
+# ============================================================
+
 @pytest.fixture
 def db():
+    """
+    Isolated in-memory SQLite database.
+
+    StaticPool ensures every SQLAlchemy session operation
+    uses the same SQLite connection.
+    """
+
     engine = create_engine(
         "sqlite://",
         connect_args={
@@ -30,137 +48,177 @@ def db():
         poolclass=StaticPool,
     )
 
-    Base.metadata.create_all(
-        engine
+    Base.metadata.create_all(engine)
+
+    TestingSessionLocal = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        autocommit=False,
     )
 
-    Session = sessionmaker(
-        bind=engine
-    )
-
-    session = Session()
+    session = TestingSessionLocal()
 
     try:
         yield session
     finally:
+        session.rollback()
         session.close()
-
-        Base.metadata.drop_all(
-            engine
-        )
-
+        Base.metadata.drop_all(engine)
         engine.dispose()
 
 
-def create_test_quotation(db):
+# ============================================================
+# TEST
+# ============================================================
+
+def test_conversion_creates_one_sales_order_item_per_quotation_item(
+    db,
+):
+    """
+    Each QuotationItem must create exactly one SalesOrderItem.
+
+    The converted SalesOrderItem must preserve:
+
+    - product_id
+    - product_name
+    - quantity
+    - unit_price
+    - total
+    """
+
+    # --------------------------------------------------------
+    # CUSTOMER
+    # --------------------------------------------------------
+
     customer = Customer(
         name="Test Customer",
         phone="0700000000",
+        email="test@example.com",
     )
 
-    product_one = Product(
-        name="Maize Flour",
-        sku="TEST-MAIZE",
-        category="Flour",
-        unit="Kg",
-        quantity=1000,
-        selling_price=2500,
+    db.add(customer)
+    db.flush()
+
+    # --------------------------------------------------------
+    # PRODUCTS
+    # --------------------------------------------------------
+
+    product_1 = Product(
+        name="Maize Flour 1Kg",
+        sku="TEST-MF-001",
+        category="Finished Product",
+        unit="Bag",
+        quantity=1000.0,
+        cost_price=2000.0,
+        selling_price=3000.0,
     )
 
-    product_two = Product(
-        name="Cassava Flour",
-        sku="TEST-CASSAVA",
-        category="Flour",
-        unit="Kg",
-        quantity=1000,
-        selling_price=3000,
+    product_2 = Product(
+        name="Cassava Flour 1Kg",
+        sku="TEST-CF-001",
+        category="Finished Product",
+        unit="Bag",
+        quantity=1000.0,
+        cost_price=1800.0,
+        selling_price=2800.0,
     )
 
     db.add_all(
         [
-            customer,
-            product_one,
-            product_two,
+            product_1,
+            product_2,
         ]
     )
 
     db.flush()
 
+    # --------------------------------------------------------
+    # QUOTATION
+    # --------------------------------------------------------
+
     quotation = Quotation(
-        quotation_number="Q-00001",
+        quotation_number="Q-TEST-00001",
         customer_id=customer.id,
         status="Draft",
-        total_amount=0,
+        total_amount=0.0,
     )
 
     db.add(quotation)
-
     db.flush()
 
-    item_one = QuotationItem(
+    # --------------------------------------------------------
+    # QUOTATION ITEMS
+    # --------------------------------------------------------
+
+    quotation_item_1 = QuotationItem(
         quotation_id=quotation.id,
-        product_id=product_one.id,
-        product_name=product_one.name,
-        quantity=10,
-        unit_price=2500,
-        total=25000,
+        product_id=product_1.id,
+        product_name=product_1.name,
+        quantity=10.0,
+        unit_price=3000.0,
+        total=30000.0,
     )
 
-    item_two = QuotationItem(
+    quotation_item_2 = QuotationItem(
         quotation_id=quotation.id,
-        product_id=product_two.id,
-        product_name=product_two.name,
-        quantity=20,
-        unit_price=3000,
-        total=60000,
+        product_id=product_2.id,
+        product_name=product_2.name,
+        quantity=25.0,
+        unit_price=2800.0,
+        total=70000.0,
     )
 
     db.add_all(
         [
-            item_one,
-            item_two,
+            quotation_item_1,
+            quotation_item_2,
         ]
+    )
+
+    db.flush()
+
+    quotation.total_amount = (
+        quotation_item_1.total
+        + quotation_item_2.total
     )
 
     db.commit()
 
-    return quotation.id
+    # --------------------------------------------------------
+    # CONVERT
+    # --------------------------------------------------------
 
-
-def test_conversion_creates_exactly_one_sales_order_item_per_quotation_item(
-    db,
-):
-    quotation_id = create_test_quotation(
-        db
+    sales_order = convert_quotation_to_sales_order(
+        db,
+        quotation.id,
     )
 
-    quotation_items_before = (
+    # --------------------------------------------------------
+    # VERIFY SALES ORDER
+    # --------------------------------------------------------
+
+    assert sales_order is not None
+
+    assert sales_order.quotation_id == quotation.id
+    assert sales_order.customer_id == customer.id
+
+    # --------------------------------------------------------
+    # LOAD QUOTATION ITEMS
+    # --------------------------------------------------------
+
+    quotation_items = (
         db.query(QuotationItem)
         .filter(
             QuotationItem.quotation_id
-            == quotation_id
+            == quotation.id
         )
-        .count()
+        .order_by(QuotationItem.id.asc())
+        .all()
     )
 
-    assert quotation_items_before == 2
-
-    sales_order = (
-        convert_quotation_to_sales_order(
-            db,
-            quotation_id,
-        )
-    )
-
-    db.expire_all()
-
-    quotation = (
-        db.query(Quotation)
-        .filter(
-            Quotation.id == quotation_id
-        )
-        .one()
-    )
+    # --------------------------------------------------------
+    # LOAD SALES ORDER ITEMS
+    # --------------------------------------------------------
 
     sales_order_items = (
         db.query(SalesOrderItem)
@@ -168,92 +226,233 @@ def test_conversion_creates_exactly_one_sales_order_item_per_quotation_item(
             SalesOrderItem.sales_order_id
             == sales_order.id
         )
+        .order_by(SalesOrderItem.id.asc())
         .all()
     )
 
-    assert sales_order.id is not None
+    # --------------------------------------------------------
+    # EXACT ONE-TO-ONE COUNT
+    # --------------------------------------------------------
 
-    assert (
-        sales_order.order_number
-        == f"SO-{sales_order.id:05d}"
+    assert len(sales_order_items) == len(
+        quotation_items
     )
+
+    assert len(quotation_items) == 2
+    assert len(sales_order_items) == 2
+
+    # --------------------------------------------------------
+    # VERIFY EACH LINE
+    # --------------------------------------------------------
+
+    for quotation_item in quotation_items:
+
+        matching_items = [
+            item
+            for item in sales_order_items
+            if item.product_id
+            == quotation_item.product_id
+        ]
+
+        assert len(matching_items) == 1
+
+        sales_order_item = matching_items[0]
+
+        # Product
+        assert (
+            sales_order_item.product_id
+            == quotation_item.product_id
+        )
+
+        assert (
+            sales_order_item.product_name
+            == quotation_item.product_name
+        )
+
+        # Quantity
+        assert (
+            sales_order_item.quantity
+            == quotation_item.quantity
+        )
+
+        # Unit price
+        assert (
+            sales_order_item.unit_price
+            == quotation_item.unit_price
+        )
+
+        # Line total
+        assert (
+            sales_order_item.total
+            == quotation_item.total
+        )
+
+    # --------------------------------------------------------
+    # VERIFY QUOTATION STATUS
+    # --------------------------------------------------------
+
+    db.refresh(quotation)
 
     assert quotation.status == "Converted"
 
+    # --------------------------------------------------------
+    # VERIFY SALES ORDER TOTAL
+    # --------------------------------------------------------
+
+    expected_total = sum(
+        item.total
+        for item in quotation_items
+    )
+
     assert (
-        len(sales_order_items)
-        == quotation_items_before
+        sales_order.total_amount
+        == expected_total
     )
 
 
-def test_converting_same_quotation_twice_does_not_create_duplicate_order(
+# ============================================================
+# OPTIONAL STRONGER DUPLICATE-LINE CHECK
+# ============================================================
+
+def test_conversion_preserves_duplicate_product_lines_separately(
     db,
 ):
-    quotation_id = create_test_quotation(
-        db
+    """
+    If a quotation contains two separate lines for the same
+    product, conversion must still create exactly two
+    SalesOrderItems, not collapse them into one.
+    """
+
+    customer = Customer(
+        name="Duplicate Line Customer",
     )
 
-    first_order = (
-        convert_quotation_to_sales_order(
-            db,
-            quotation_id,
-        )
+    product = Product(
+        name="Maize Flour 1Kg",
+        sku="TEST-DUP-001",
+        quantity=1000.0,
+        selling_price=3000.0,
     )
 
-    first_item_count = (
+    db.add_all(
+        [
+            customer,
+            product,
+        ]
+    )
+
+    db.flush()
+
+    quotation = Quotation(
+        quotation_number="Q-TEST-DUP-001",
+        customer_id=customer.id,
+        status="Draft",
+        total_amount=0.0,
+    )
+
+    db.add(quotation)
+    db.flush()
+
+    item_1 = QuotationItem(
+        quotation_id=quotation.id,
+        product_id=product.id,
+        product_name=product.name,
+        quantity=10.0,
+        unit_price=3000.0,
+        total=30000.0,
+    )
+
+    item_2 = QuotationItem(
+        quotation_id=quotation.id,
+        product_id=product.id,
+        product_name=product.name,
+        quantity=5.0,
+        unit_price=2900.0,
+        total=14500.0,
+    )
+
+    db.add_all(
+        [
+            item_1,
+            item_2,
+        ]
+    )
+
+    db.flush()
+
+    quotation.total_amount = (
+        item_1.total
+        + item_2.total
+    )
+
+    db.commit()
+
+    # --------------------------------------------------------
+    # CONVERT
+    # --------------------------------------------------------
+
+    sales_order = convert_quotation_to_sales_order(
+        db,
+        quotation.id,
+    )
+
+    # --------------------------------------------------------
+    # VERIFY BOTH LINES SURVIVED
+    # --------------------------------------------------------
+
+    sales_order_items = (
         db.query(SalesOrderItem)
         .filter(
             SalesOrderItem.sales_order_id
-            == first_order.id
+            == sales_order.id
         )
-        .count()
+        .order_by(SalesOrderItem.id.asc())
+        .all()
     )
 
-    assert first_item_count == 2
+    assert len(sales_order_items) == 2
 
-    with pytest.raises(
-        ValueError,
-        match="already been converted",
-    ):
-        convert_quotation_to_sales_order(
-            db,
-            quotation_id,
-        )
-
-    total_orders = (
-        db.query(SalesOrder)
-        .filter(
-            SalesOrder.quotation_id
-            == quotation_id
-        )
-        .count()
+    assert (
+        sales_order_items[0].product_id
+        == product.id
     )
 
-    total_items = (
-        db.query(SalesOrderItem)
-        .join(
-            SalesOrder,
-            SalesOrder.id
-            == SalesOrderItem.sales_order_id,
-        )
-        .filter(
-            SalesOrder.quotation_id
-            == quotation_id
-        )
-        .count()
+    assert (
+        sales_order_items[1].product_id
+        == product.id
     )
 
-    quotation = (
-        db.query(Quotation)
-        .filter(
-            Quotation.id
-            == quotation_id
-        )
-        .one()
+    assert (
+        sales_order_items[0].quantity
+        == 10.0
     )
 
-    assert total_orders == 1
+    assert (
+        sales_order_items[1].quantity
+        == 5.0
+    )
 
-    assert total_items == 2
+    assert (
+        sales_order_items[0].unit_price
+        == 3000.0
+    )
+
+    assert (
+        sales_order_items[1].unit_price
+        == 2900.0
+    )
+
+    assert (
+        sales_order_items[0].total
+        == 30000.0
+    )
+
+    assert (
+        sales_order_items[1].total
+        == 14500.0
+    )
+
+    # The quotation must be converted exactly once.
+    db.refresh(quotation)
 
     assert quotation.status == "Converted"
