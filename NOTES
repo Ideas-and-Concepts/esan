@@ -171,3 +171,26 @@ modules/
 └── sales/
     ├── invoices.py
     └── payments.py
+
+
+esan/
+│
+├── streamlit_app.py
+├── database.py
+├── models.py
+├── auth.py
+├── config.py
+│
+├── modules/
+│   ├── dashboard/
+│   │   ├── __init__.py
+│   │   ├── home.py
+│   │   └── services.py   ← ADD THE CODE HERE
+│   │
+│   ├── sales/
+│   ├── procurement/
+│   ├── warehouse/
+│   ├── milling/
+│   ├── packaging/
+│   ├── finance/
+│   └── reports/
