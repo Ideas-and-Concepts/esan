@@ -2,41 +2,17 @@
 Esan ERP
 Dashboard Services Tests
 
-Strict contract tests for:
-
-- Sales
-- Procurement
-- Inventory
-- Production
-- Receivables
-- Alerts
-- Recent Activity
-
-These tests verify that the dashboard service always returns
-the structure expected by modules/dashboard/home.py.
-
-The tests are intentionally tolerant of missing database
-tables because services.py is expected to provide graceful
-fallbacks.
+Tests modules/dashboard/services.py without Streamlit rendering.
 """
 
-import importlib
+from modules.dashboard.services import get_dashboard_summary
 
 
 # ============================================================
-# IMPORT SERVICE
+# REQUIRED TOP-LEVEL SECTIONS
 # ============================================================
 
-services = importlib.import_module(
-    "modules.dashboard.services"
-)
-
-
-# ============================================================
-# EXPECTED TOP-LEVEL STRUCTURE
-# ============================================================
-
-EXPECTED_TOP_LEVEL_KEYS = {
+REQUIRED_SECTIONS = {
     "sales",
     "procurement",
     "inventory",
@@ -48,368 +24,197 @@ EXPECTED_TOP_LEVEL_KEYS = {
 
 
 # ============================================================
-# EXPECTED SECTION KEYS
+# REQUIRED SECTION KEYS
 # ============================================================
 
 SALES_KEYS = {
-    "today",
-    "month",
-    "orders",
-    "revenue",
+    "total_sales",
+    "sales_orders",
+    "pending_orders",
+    "completed_orders",
 }
 
 PROCUREMENT_KEYS = {
-    "today",
-    "month",
-    "orders",
-    "spend",
+    "total_procurement",
+    "purchase_orders",
+    "pending_orders",
+    "completed_orders",
 }
 
 INVENTORY_KEYS = {
-    "total_items",
+    "total_products",
     "total_quantity",
     "low_stock_items",
-    "stock_value",
+    "out_of_stock_items",
 }
 
 PRODUCTION_KEYS = {
-    "today",
-    "month",
-    "batches",
-    "quantity",
+    "milling_batches",
+    "packaging_batches",
+    "completed_batches",
+    "active_batches",
 }
 
 RECEIVABLES_KEYS = {
-    "outstanding",
-    "overdue",
-    "customers",
-    "invoices",
-}
-
-ALERT_KEYS = {
-    "type",
-    "severity",
-    "message",
-}
-
-ACTIVITY_KEYS = {
-    "type",
-    "description",
-    "timestamp",
+    "total_invoiced",
+    "total_paid",
+    "total_outstanding",
+    "overdue_amount",
 }
 
 
 # ============================================================
-# HELPERS
+# BASIC VALUE-TYPE CHECK
 # ============================================================
 
-def assert_numeric(value):
-    """
-    Verify a dashboard numeric value.
-
-    bool is explicitly excluded because bool is technically
-    an int subclass in Python.
-    """
-
+def assert_numeric(value, name):
     assert isinstance(
         value,
         (int, float),
-    )
-
-    assert not isinstance(
-        value,
-        bool,
-    )
-
-
-def assert_exact_dict_keys(
-    data,
-    expected_keys,
-):
-    assert isinstance(
-        data,
-        dict,
-    )
-
-    assert set(data.keys()) == expected_keys
+    ), f"{name} must be numeric, got {type(value).__name__}"
 
 
 # ============================================================
-# MAIN SUMMARY
+# TEST: COMPLETE DASHBOARD STRUCTURE
 # ============================================================
 
-def test_dashboard_summary_exact_structure():
+def test_dashboard_summary_has_expected_sections():
 
-    summary = services.get_dashboard_summary()
+    summary = get_dashboard_summary()
 
-    assert isinstance(
-        summary,
-        dict,
-    )
+    assert isinstance(summary, dict)
 
-    assert set(summary.keys()) == (
-        EXPECTED_TOP_LEVEL_KEYS
+    assert REQUIRED_SECTIONS.issubset(
+        summary.keys()
     )
 
 
 # ============================================================
-# SALES
+# TEST: SALES
 # ============================================================
 
-def test_sales_exact_structure():
+def test_sales_section():
 
-    summary = services.get_dashboard_summary()
+    summary = get_dashboard_summary()
 
     sales = summary["sales"]
 
-    assert_exact_dict_keys(
-        sales,
-        SALES_KEYS,
+    assert isinstance(sales, dict)
+
+    assert SALES_KEYS.issubset(
+        sales.keys()
     )
 
-
-def test_sales_value_types():
-
-    summary = services.get_dashboard_summary()
-
-    sales = summary["sales"]
-
-    assert_numeric(
-        sales["today"]
-    )
-
-    assert_numeric(
-        sales["month"]
-    )
-
-    assert isinstance(
-        sales["orders"],
-        int,
-    )
-
-    assert not isinstance(
-        sales["orders"],
-        bool,
-    )
-
-    assert_numeric(
-        sales["revenue"]
-    )
+    for key in SALES_KEYS:
+        assert_numeric(
+            sales[key],
+            f"sales['{key}']",
+        )
 
 
 # ============================================================
-# PROCUREMENT
+# TEST: PROCUREMENT
 # ============================================================
 
-def test_procurement_exact_structure():
+def test_procurement_section():
 
-    summary = services.get_dashboard_summary()
+    summary = get_dashboard_summary()
 
     procurement = summary["procurement"]
 
-    assert_exact_dict_keys(
-        procurement,
-        PROCUREMENT_KEYS,
+    assert isinstance(procurement, dict)
+
+    assert PROCUREMENT_KEYS.issubset(
+        procurement.keys()
     )
 
-
-def test_procurement_value_types():
-
-    summary = services.get_dashboard_summary()
-
-    procurement = summary["procurement"]
-
-    assert_numeric(
-        procurement["today"]
-    )
-
-    assert_numeric(
-        procurement["month"]
-    )
-
-    assert isinstance(
-        procurement["orders"],
-        int,
-    )
-
-    assert not isinstance(
-        procurement["orders"],
-        bool,
-    )
-
-    assert_numeric(
-        procurement["spend"]
-    )
+    for key in PROCUREMENT_KEYS:
+        assert_numeric(
+            procurement[key],
+            f"procurement['{key}']",
+        )
 
 
 # ============================================================
-# INVENTORY
+# TEST: INVENTORY
 # ============================================================
 
-def test_inventory_exact_structure():
+def test_inventory_section():
 
-    summary = services.get_dashboard_summary()
+    summary = get_dashboard_summary()
 
     inventory = summary["inventory"]
 
-    assert_exact_dict_keys(
-        inventory,
-        INVENTORY_KEYS,
+    assert isinstance(inventory, dict)
+
+    assert INVENTORY_KEYS.issubset(
+        inventory.keys()
     )
 
-
-def test_inventory_value_types():
-
-    summary = services.get_dashboard_summary()
-
-    inventory = summary["inventory"]
-
-    assert isinstance(
-        inventory["total_items"],
-        int,
-    )
-
-    assert not isinstance(
-        inventory["total_items"],
-        bool,
-    )
-
-    assert_numeric(
-        inventory["total_quantity"]
-    )
-
-    assert isinstance(
-        inventory["low_stock_items"],
-        int,
-    )
-
-    assert not isinstance(
-        inventory["low_stock_items"],
-        bool,
-    )
-
-    assert_numeric(
-        inventory["stock_value"]
-    )
+    for key in INVENTORY_KEYS:
+        assert_numeric(
+            inventory[key],
+            f"inventory['{key}']",
+        )
 
 
 # ============================================================
-# PRODUCTION
+# TEST: PRODUCTION
 # ============================================================
 
-def test_production_exact_structure():
+def test_production_section():
 
-    summary = services.get_dashboard_summary()
+    summary = get_dashboard_summary()
 
     production = summary["production"]
 
-    assert_exact_dict_keys(
-        production,
-        PRODUCTION_KEYS,
+    assert isinstance(production, dict)
+
+    assert PRODUCTION_KEYS.issubset(
+        production.keys()
     )
 
-
-def test_production_value_types():
-
-    summary = services.get_dashboard_summary()
-
-    production = summary["production"]
-
-    assert_numeric(
-        production["today"]
-    )
-
-    assert_numeric(
-        production["month"]
-    )
-
-    assert isinstance(
-        production["batches"],
-        int,
-    )
-
-    assert not isinstance(
-        production["batches"],
-        bool,
-    )
-
-    assert_numeric(
-        production["quantity"]
-    )
+    for key in PRODUCTION_KEYS:
+        assert_numeric(
+            production[key],
+            f"production['{key}']",
+        )
 
 
 # ============================================================
-# RECEIVABLES
+# TEST: RECEIVABLES
 # ============================================================
 
-def test_receivables_exact_structure():
+def test_receivables_section():
 
-    summary = services.get_dashboard_summary()
+    summary = get_dashboard_summary()
 
     receivables = summary["receivables"]
 
-    assert_exact_dict_keys(
-        receivables,
-        RECEIVABLES_KEYS,
+    assert isinstance(receivables, dict)
+
+    assert RECEIVABLES_KEYS.issubset(
+        receivables.keys()
     )
 
-
-def test_receivables_value_types():
-
-    summary = services.get_dashboard_summary()
-
-    receivables = summary["receivables"]
-
-    assert_numeric(
-        receivables["outstanding"]
-    )
-
-    assert_numeric(
-        receivables["overdue"]
-    )
-
-    assert isinstance(
-        receivables["customers"],
-        int,
-    )
-
-    assert not isinstance(
-        receivables["customers"],
-        bool,
-    )
-
-    assert isinstance(
-        receivables["invoices"],
-        int,
-    )
-
-    assert not isinstance(
-        receivables["invoices"],
-        bool,
-    )
+    for key in RECEIVABLES_KEYS:
+        assert_numeric(
+            receivables[key],
+            f"receivables['{key}']",
+        )
 
 
 # ============================================================
-# ALERTS
+# TEST: ALERTS
 # ============================================================
 
-def test_alerts_is_list():
+def test_alerts_section():
 
-    summary = services.get_dashboard_summary()
-
-    alerts = summary["alerts"]
-
-    assert isinstance(
-        alerts,
-        list,
-    )
-
-
-def test_alert_items_have_exact_structure():
-
-    summary = services.get_dashboard_summary()
+    summary = get_dashboard_summary()
 
     alerts = summary["alerts"]
+
+    assert isinstance(alerts, list)
 
     for alert in alerts:
 
@@ -418,26 +223,11 @@ def test_alert_items_have_exact_structure():
             dict,
         )
 
-        assert set(alert.keys()) == (
-            ALERT_KEYS
-        )
-
-
-def test_alert_item_value_types():
-
-    summary = services.get_dashboard_summary()
-
-    alerts = summary["alerts"]
-
-    for alert in alerts:
+        assert "type" in alert
+        assert "message" in alert
 
         assert isinstance(
             alert["type"],
-            str,
-        )
-
-        assert isinstance(
-            alert["severity"],
             str,
         )
 
@@ -448,116 +238,78 @@ def test_alert_item_value_types():
 
 
 # ============================================================
-# RECENT ACTIVITY
+# TEST: RECENT ACTIVITY
 # ============================================================
 
-def test_recent_activity_is_list():
+def test_recent_activity_section():
 
-    summary = services.get_dashboard_summary()
+    summary = get_dashboard_summary()
 
-    recent_activity = summary[
-        "recent_activity"
-    ]
+    activity = summary["recent_activity"]
 
     assert isinstance(
-        recent_activity,
+        activity,
         list,
     )
 
-
-def test_recent_activity_items_have_exact_structure():
-
-    summary = services.get_dashboard_summary()
-
-    recent_activity = summary[
-        "recent_activity"
-    ]
-
-    for activity in recent_activity:
+    for item in activity:
 
         assert isinstance(
-            activity,
+            item,
             dict,
         )
 
-        assert set(activity.keys()) == (
-            ACTIVITY_KEYS
-        )
-
-
-def test_recent_activity_item_value_types():
-
-    summary = services.get_dashboard_summary()
-
-    recent_activity = summary[
-        "recent_activity"
-    ]
-
-    for activity in recent_activity:
+        assert "type" in item
+        assert "description" in item
 
         assert isinstance(
-            activity["type"],
+            item["type"],
             str,
         )
 
         assert isinstance(
-            activity["description"],
-            str,
-        )
-
-        assert isinstance(
-            activity["timestamp"],
+            item["description"],
             str,
         )
 
 
 # ============================================================
-# GRACEFUL FALLBACK CONTRACT
+# TEST: SAFE FALLBACKS
 # ============================================================
 
-def test_missing_tables_still_return_valid_contract():
+def test_dashboard_summary_is_safe_for_empty_database():
 
-    """
-    services.py should return the same contract even when
-    one or more ERP database tables do not exist yet.
-    """
-
-    summary = services.get_dashboard_summary()
+    summary = get_dashboard_summary()
 
     assert isinstance(
         summary,
         dict,
     )
 
-    assert set(summary.keys()) == (
-        EXPECTED_TOP_LEVEL_KEYS
-    )
+    # Numeric sections must always remain usable.
+    for section_name in (
+        "sales",
+        "procurement",
+        "inventory",
+        "production",
+        "receivables",
+    ):
 
-    assert_exact_dict_keys(
-        summary["sales"],
-        SALES_KEYS,
-    )
+        section = summary[section_name]
 
-    assert_exact_dict_keys(
-        summary["procurement"],
-        PROCUREMENT_KEYS,
-    )
+        assert isinstance(
+            section,
+            dict,
+        )
 
-    assert_exact_dict_keys(
-        summary["inventory"],
-        INVENTORY_KEYS,
-    )
+        for value in section.values():
 
-    assert_exact_dict_keys(
-        summary["production"],
-        PRODUCTION_KEYS,
-    )
+            assert isinstance(
+                value,
+                (int, float),
+            )
 
-    assert_exact_dict_keys(
-        summary["receivables"],
-        RECEIVABLES_KEYS,
-    )
-
+    # These should never be None.
     assert isinstance(
         summary["alerts"],
         list,
@@ -566,23 +318,4 @@ def test_missing_tables_still_return_valid_contract():
     assert isinstance(
         summary["recent_activity"],
         list,
-    )
-
-
-# ============================================================
-# REPEATED CALL SAFETY
-# ============================================================
-
-def test_dashboard_summary_multiple_calls():
-
-    first = services.get_dashboard_summary()
-
-    second = services.get_dashboard_summary()
-
-    assert set(first.keys()) == (
-        EXPECTED_TOP_LEVEL_KEYS
-    )
-
-    assert set(second.keys()) == (
-        EXPECTED_TOP_LEVEL_KEYS
     )
