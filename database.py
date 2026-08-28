@@ -8,7 +8,8 @@ DATABASE_URL = (
     os.getenv("DATABASE_URL")
     or os.getenv("POSTGRES_URL")
     or os.getenv("POSTGRES_PRISMA_URL")
-    or "sqlite:///esan_erp.db"
+    # Vercel's project filesystem is read-only; /tmp is writable.
+    or "sqlite:////tmp/esan_erp.db"
 )
 
 if DATABASE_URL.startswith("postgres://"):
