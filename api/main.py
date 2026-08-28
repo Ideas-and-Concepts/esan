@@ -157,6 +157,21 @@ def dashboard_summary(db: Session = Depends(get_db)):
         "packaging_batches": db.query(PackagingBatch).count(),
     }
 
+@app.get("/api/production")
+def production_summary(db: Session = Depends(get_db)):
+    milling_total = db.query(MillingBatch).count()
+    milling_completed = db.query(MillingBatch).filter(MillingBatch.status == "Completed").count()
+    packaging_total = db.query(PackagingBatch).count()
+    packaging_completed = db.query(PackagingBatch).filter(PackagingBatch.status == "Completed").count()
+    return {
+        "milling_total": milling_total,
+        "milling_completed": milling_completed,
+        "packaging_total": packaging_total,
+        "packaging_completed": packaging_completed,
+        "total_batches": milling_total + packaging_total,
+        "completed_batches": milling_completed + packaging_completed,
+    }
+
 # ---------- Full ERP frontend with floating sidebar ----------
 @app.get("/", response_class=HTMLResponse)
 def erp_frontend():
@@ -252,6 +267,7 @@ def erp_frontend():
                     <div class="nav-group-title">OPERATIONS</div>
                     <button class="nav-btn" data-module="procurement">🌾 Procurement</button>
                     <button class="nav-btn" data-module="warehouse">📦 Warehouse</button>
+                    <button class="nav-btn" data-module="production">🏭 Production</button>
                     <button class="nav-btn" data-module="milling">🏭 Milling</button>
                     <button class="nav-btn" data-module="packaging">📦 Packaging</button>
                 </div>
@@ -360,6 +376,7 @@ def erp_frontend():
                     case 'overview': content.innerHTML = await loadOverview(); break;
                     case 'procurement': content.innerHTML = '<h3>🌾 Procurement</h3><div id="procurement-content">Loading...</div>'; loadSuppliers(); break;
                     case 'warehouse': content.innerHTML = '<h3>📦 Warehouse</h3><div id="warehouse-content">Loading...</div>'; loadProducts(); break;
+                    case 'production': content.innerHTML = '<h3>🏭 Production Overview</h3><div id="production-content">Loading...</div>'; loadProduction(); break;
                     case 'milling': content.innerHTML = '<h3>🏭 Milling</h3><p>Coming soon.</p>'; break;
                     case 'packaging': content.innerHTML = '<h3>📦 Packaging</h3><p>Coming soon.</p>'; break;
                     case 'sales':
@@ -476,6 +493,24 @@ def erp_frontend():
                 data.forEach(d => { html += `<tr><td>${d.delivery_number}</td><td>${d.order_id}</td><td>${d.status}</td></tr>`; });
                 html += '</table>';
                 document.getElementById('module-content').innerHTML = '<h3>🚛 Deliveries</h3>' + html;
+            }
+
+            async function loadProduction() {
+                const target = document.getElementById('production-content');
+                try {
+                    const resp = await fetch(API_BASE + '/api/production');
+                    if (!resp.ok) throw new Error('Production request failed');
+                    const data = await resp.json();
+                    target.innerHTML = `
+                        <div class="kpi-grid">
+                            <div class="kpi"><div class="number">${data.total_batches}</div><div class="label">Total Batches</div></div>
+                            <div class="kpi"><div class="number">${data.completed_batches}</div><div class="label">Completed</div></div>
+                            <div class="kpi"><div class="number">${data.milling_total}</div><div class="label">Milling Batches</div></div>
+                            <div class="kpi"><div class="number">${data.packaging_total}</div><div class="label">Packaging Batches</div></div>
+                        </div>`;
+                } catch (e) {
+                    target.innerHTML = '<p class="error">Could not load production data.</p>';
+                }
             }
 
             async function loadProducts() {
